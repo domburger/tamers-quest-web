@@ -7,7 +7,6 @@ import { coerce, applyConfig, adminConfig, adminStats, handleAdmin, TUNABLES } f
 
 const mockRes = () => ({ code: 0, body: "", writeHead(c) { this.code = c; }, end(s) { this.body = s || ""; } });
 const mockReq = (url, method = "GET", headers = {}) => ({ url, method, headers });
-// A stream-capable request so handleAdmin's readBody() can parse a POST body.
 const postReq = (url, body, headers = {}) => Object.assign(Readable.from([JSON.stringify(body)]), { url, method: "POST", headers });
 const fullWorld = () => ({ cfg: { minPlayers: 1, roundDurationS: 600, circleStartS: 300, portalIntervalS: 30, monsterGenRate: 0, pvpEnabled: false, baseSpeed: 200, stormDps: 25, encounterRadius: 44, hiddenMonsterPct: 35, energyRestorePct: 50, pvpRadius: 40 } });
 
@@ -20,11 +19,10 @@ test("coerce clamps numbers, rounds ints, coerces bools, rejects junk", () => {
   assert.equal(coerce(TUNABLES.pvpEnabled, "true"), true);
   assert.equal(coerce(TUNABLES.pvpEnabled, false), false);
   assert.equal(coerce(TUNABLES.minPlayers, "abc"), null);
-  // Monster-approach tunables are wired into the validation (were "admin-tunable" in name only).
-  assert.equal(coerce(TUNABLES.monsterApproachPct, 150), 100); // clamp to max
-  assert.equal(coerce(TUNABLES.monsterApproachPct, 30.6), 31); // rounds to int
-  assert.equal(coerce(TUNABLES.monsterApproachSpeedFrac, 2), 1); // 0-1 fraction
-  assert.equal(coerce(TUNABLES.monsterApproachRadius, 99999), 4000); // clamp to max
+  assert.equal(coerce(TUNABLES.monsterApproachPct, 150), 100);
+  assert.equal(coerce(TUNABLES.monsterApproachPct, 30.6), 31);
+  assert.equal(coerce(TUNABLES.monsterApproachSpeedFrac, 2), 1);
+  assert.equal(coerce(TUNABLES.monsterApproachRadius, 99999), 4000);
 });
 
 test("applyConfig writes valid fields to world.cfg and ignores the rest", () => {
@@ -68,7 +66,7 @@ test("adminStats summarizes live world state", () => {
   assert.equal(s.inQueue, 1);
   assert.equal(s.activeRounds, 1);
   assert.equal(s.rounds[0].players, 1);
-  assert.equal(s.monsterPool, monsterTypes.length); // robust to pool growth (was hardcoded 103)
+  assert.equal(s.monsterPool, monsterTypes.length);
   assert.equal(s.recentResults[0].name, "X");
 });
 

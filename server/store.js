@@ -1,16 +1,4 @@
-// Profile store — the persistence seam (P1-T2). The in-memory Map is the live
-// read cache so the hot path (getByToken / createProfile in the join handler)
-// stays synchronous and message ordering is preserved. Durability is layered on:
-// at boot we load every profile from Postgres into the cache; on change we mark
-// the token dirty and a coalescing flush loop writes the *current* state back
-// (order-independent, last-write-wins) — plus a final flush on shutdown so a
-// graceful redeploy (Railway SIGTERM) loses nothing.
-//
-// Without DATABASE_URL the DB layer is inert and this is a pure in-memory store
-// (local dev, tests) — identical behaviour to before P1-T2, just non-durable.
-//
-// Anonymous players (decision Q6) get an opaque session token on first join; the
-// client stores it and presents it on reconnect to resume the same profile.
+// Hot-path reads must stay sync (in-memory cache): awaiting reorders WS messages.
 
 import { randomBytes, createHash } from "node:crypto";
 import { randomSeed } from "../src/engine/rng.js";
@@ -19,48 +7,34 @@ import { getMonsterTypes, getSpiritChain } from "../src/engine/gamedata.js";
 import { getMonsterStats } from "../src/engine/stats.js";
 import { initDb, dbEnabled, loadAllProfiles, upsertProfiles, closeDb, wipeProfiles, loadAllAccounts, upsertAccounts, wipeAccounts, deleteProfileRow, deleteAccountRow } from "./db.js";
 
-const profiles = new Map(); // token -> PlayerProfile (with a .token field) — live read cache
-const dirty = new Set(); // tokens with unflushed changes
+const profiles = new Map();
+const dirty = new Set();
 const FLUSH_MS = 3000;
 let counter = 1;
 let flushTimer = null;
 
-// Opaque, non-cryptographic id (uniqueness only). Fine for monster/profile ids.
+// Predictable: uniqueness only; never use for session tokens or client-routed ids.
 function rid(prefix) {
   return `${prefix}_${randomSeed().toString(36)}${(counter++).toString(36)}`;
 }
 
-// LS-2: the session token authenticates an anonymous player (token → profile), so
-// it must be UNGUESSABLE — `rid()`'s randomSeed()+counter is predictable, which
-// would let an attacker guess another player's token (account takeover). Mint it
-// from a CSPRNG instead (192 bits). `rid()` stays for non-security uniqueness ids.
 function secureToken() {
   return `tk_${randomBytes(24).toString("hex")}`;
 }
 
-// Unguessable short id for ephemeral server objects whose id is sent to clients and used
-// to ROUTE incoming actions (PvE combat, PvP duels). Sequential ids ("c1","c2"/"v1","v2")
-// let a client enumerate/target another player's combat; a CSPRNG id (72 bits) can't be
-// guessed. The participation check is the real gate, but unpredictable ids are defense-in-depth.
 export function secureId(prefix) {
   return `${prefix}${randomBytes(9).toString("hex")}`;
 }
 
-// Globally-unique monster instance id. Use for every monster created at runtime
-// (caught/looted/rolled) so ids never collide across profiles or server restarts
-// — dedup-by-id (applyRoster) would otherwise silently drop a duplicate.
+// Use for every runtime monster: applyRoster dedups by id, so collisions vanish.
 export function newMonsterId() {
   return rid("m");
 }
 
-// Roll a fresh base inventory: up to TEAM_SIZE distinct random Lv.1 starters.
-// Server-authoritative (mirrors the old client-side character creation).
 export function rollStarters() {
   const types = getMonsterTypes();
   const team = [];
   const used = new Set();
-  // One per name FAMILY ("Cinderbriar", "Cinderbriar 2", "Cinderbriar 3" are near-identical variants): a new
-  // player's team should be four different creatures. Falls back to type-only uniqueness if the pool is tiny.
   const family = (n) => String(n || "").replace(/\s+\d+$/, "").toLowerCase();
   const families = new Set();
   let guard = 0;
@@ -85,7 +59,7 @@ export function createProfile(nickname, { isGuest = false } = {}) {
   const token = secureToken();
   const profile = createPlayerProfile({ id: rid("pl"), name: nickname, isGuest });
   profile.activeMonsters = rollStarters();
-  grantStarterInventory(profile, getSpiritChain); // new players start with ≥5 chains
+  grantStarterInventory(profile, getSpiritChain);
   profile.token = token;
   profiles.set(token, profile);
   dirty.add(token);
@@ -96,20 +70,14 @@ export function getByToken(token) {
   if (!token) return null;
   const profile = profiles.get(token);
   if (!profile) return null;
-  // Backfill the chain inventory on profiles persisted before the chains field.
   if (!Array.isArray(profile.chains) || !profile.equippedChainId) {
     grantStarterChains(profile, getSpiritChain);
     dirty.add(token);
   }
-  // Backfill the 3-slot chain loadout on profiles persisted before equippedChainIds (2026-06-10).
   if (!Array.isArray(profile.equippedChainIds) || profile.equippedChainIds.length === 0) {
     ensureChainSlots(profile);
     dirty.add(token);
   }
-  // TQ-132: essence became the premium (paid) currency. Any essence on a legacy profile was
-  // EARNED as the old crafting material — and since the payment webhook (TQ-68) doesn't exist
-  // yet, none of it was ever paid for. Zero it once so farmed essence can't become free premium
-  // currency. New profiles carry `essencePremium` from createPlayerProfile and skip this.
   if (!profile.essencePremium) {
     profile.essence = 0;
     profile.essencePremium = true;
@@ -125,9 +93,6 @@ export function saveProfile(profile) {
   }
 }
 
-// AUTH-T2: OAuth account linking. A profile is keyed by its session token; an OAuth
-// account is located by its provider id stored on the profile (`googleId`/`discordId`).
-// The cache holds every profile (loaded at boot), so a linear scan is fine at this scale.
 export function findByOAuth(provider, providerId) {
   if (!provider || !providerId) return null;
   const field = `${provider}Id`;
@@ -135,9 +100,6 @@ export function findByOAuth(provider, providerId) {
   return null;
 }
 
-// Link an OAuth identity onto a profile (idempotent). Sets `<provider>Id`, backfills
-// email if we don't have one, and clears the guest flag (an OAuth login is a real
-// account). Persists. Returns the profile.
 export function linkOAuth(profile, provider, providerId, email) {
   if (!profile || !provider || !providerId) return profile;
   profile[`${provider}Id`] = String(providerId);
@@ -147,16 +109,12 @@ export function linkOAuth(profile, provider, providerId, email) {
   return profile;
 }
 
-// AUTH-T3: native email/password accounts. `email` is the account key (normalized
-// lowercase by the caller); `passwordHash` marks a profile as a native account.
 export function findByEmail(email) {
   if (!email) return null;
   for (const p of profiles.values()) if (p.email === email && p.passwordHash) return p;
   return null;
 }
 
-// Create a native account: a normal profile (starters + chains) plus email + hash, and
-// not a guest. Caller validates/normalizes email + hashes the password first.
 export function createAccount(email, passwordHash, nickname) {
   const profile = createProfile(nickname || "Tamer", { isGuest: false });
   profile.email = email;
@@ -165,14 +123,9 @@ export function createAccount(email, passwordHash, nickname) {
   return profile;
 }
 
-// AUTH-T4: claim/migration — let an anonymous player turn THEIR existing profile (held
-// by its session token) into a real account, instead of orphaning the save behind a
-// fresh one. The token is the holder's own session secret, so claiming is safe; we only
-// refuse when it would CLOBBER an existing credential (a profile that's already a native
-// account / already linked to that provider) — the caller then falls back to a new account.
 export function claimAccount(token, email, passwordHash) {
   const profile = token && profiles.get(token);
-  if (!profile || profile.passwordHash) return null; // unknown token, or already a native account
+  if (!profile || profile.passwordHash) return null;
   profile.email = email;
   profile.passwordHash = passwordHash;
   profile.isGuest = false;
@@ -182,55 +135,40 @@ export function claimAccount(token, email, passwordHash) {
 
 export function claimOAuth(token, provider, providerId, email) {
   const profile = token && profiles.get(token);
-  if (!profile || profile[`${provider}Id`]) return null; // unknown token, or already linked to this provider
+  if (!profile || profile[`${provider}Id`]) return null;
   return linkOAuth(profile, provider, providerId, email);
 }
 
-// ── Accounts (cloud saves, Phase 2) ─────────────────────────────────────────
-// An ACCOUNT owns N character profiles. Credentials live on the account (not on a game
-// profile), so a logged-in player's characters follow their account across devices. Each
-// character is an ordinary token-keyed profile tagged with `ownerAccountId`. Accounts are
-// cached + flushed exactly like profiles (a separate dirty set). This is the additive
-// FOUNDATION — wiring into auth/world/client lands in follow-ups, so nothing here changes
-// existing behaviour yet.
-const accounts = new Map(); // sessionToken -> Account
+const accounts = new Map();
 const dirtyAccounts = new Set();
 
 function markAccountDirty(a) {
   if (a && a.sessionToken) { accounts.set(a.sessionToken, a); dirtyAccounts.add(a.sessionToken); }
 }
 
-// Create a fresh account — starts EMPTY (no characters; the user creates them — "start fresh per
-// account"). Pass exactly one credential kind: {passwordHash} (native) or {googleId}/{discordId}.
 export function createAccountRecord({ email = null, passwordHash = null, googleId = null, discordId = null, nickname = "Tamer", usernameChosen = false } = {}) {
   const a = {
     id: rid("ac"),
     sessionToken: secureToken(),
     email: email ? String(email).toLowerCase() : null,
     passwordHash: passwordHash || null,
-    emailVerified: !!(googleId || discordId), // TQ-60: native signups confirm via email; an OAuth email is provider-verified
+    emailVerified: !!(googleId || discordId),
     googleId: googleId ? String(googleId) : null,
     discordId: discordId ? String(discordId) : null,
     nickname: String(nickname || "Tamer").slice(0, 24),
-    // Whether the player has explicitly PICKED a username (vs the email-handle default an
-    // OAuth/native signup seeds). false → the client prompts for one on first login; the
-    // profile page surfaces a "set your name" affordance. Set true by accountSetNickname.
     usernameChosen: !!usernameChosen,
     characterTokens: [],
-    // Social graph (TQ-72) — arrays of stable account ids (never sessionTokens).
+    // Store account ids only, never sessionTokens (those are credentials).
     friends: [],
-    incomingRequests: [], // account ids who have requested ME
-    outgoingRequests: [], // account ids I have requested
-    blocked: [], // account ids I blocked (they can't request me; I can't request them)
+    incomingRequests: [],
+    outgoingRequests: [],
+    blocked: [],
     isAccount: true,
   };
   markAccountDirty(a);
   return a;
 }
 
-// Set the account's display USERNAME — the player's cross-device identity and the default
-// for new character names. Trimmed + capped; a blank keeps the current nickname. Marks the
-// username as explicitly chosen (so the first-login prompt won't fire again). Persists.
 export function accountSetNickname(account, name) {
   if (!account) return null;
   const clean = String(name || "").trim().slice(0, 24);
@@ -240,9 +178,6 @@ export function accountSetNickname(account, name) {
   return account.nickname;
 }
 
-// Set the account's native password hash (TQ-58, change-password). The caller validates the
-// current password + hashes the new one (accounts.js); this just persists. The session token is
-// NOT derived from the password, so changing it leaves the current session valid. Returns true.
 export function accountSetPassword(account, passwordHash) {
   if (!account || !passwordHash) return false;
   account.passwordHash = passwordHash;
@@ -250,43 +185,37 @@ export function accountSetPassword(account, passwordHash) {
   return true;
 }
 
-// ── Password-reset tokens (TQ-59) ──────────────────────────────────────────────────────────────────
-// In-memory only: short-lived, so a server restart safely invalidates pending resets (the user just
-// re-requests). We store the SHA-256 HASH of the token, never the raw value, so a memory/log leak
-// can't be turned into an account takeover. Single-use (deleted on consume) + time-limited.
-const passwordResets = new Map(); // sha256(rawToken) hex -> { accountId, expiresAt }
-const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000; // 30 minutes
+// Store only sha256(token), never the raw token; single-use + TTL.
+const passwordResets = new Map();
+const PASSWORD_RESET_TTL_MS = 30 * 60 * 1000;
 const sha256hex = (s) => createHash("sha256").update(String(s)).digest("hex");
 
-// Issue a reset token for an account → returns the RAW token (emailed once, never stored raw).
 export function issuePasswordReset(account, now = Date.now()) {
   if (!account || !account.id) return null;
-  for (const [h, r] of passwordResets) if (r.expiresAt <= now) passwordResets.delete(h); // sweep (bounded growth)
-  const raw = `pr_${randomBytes(24).toString("hex")}`; // 192-bit CSPRNG
+  for (const [h, r] of passwordResets) if (r.expiresAt <= now) passwordResets.delete(h);
+  const raw = `pr_${randomBytes(24).toString("hex")}`;
   passwordResets.set(sha256hex(raw), { accountId: account.id, expiresAt: now + PASSWORD_RESET_TTL_MS });
   return raw;
 }
 
-// Validate + CONSUME (single-use) a reset token → the account, or null (unknown / already-used / expired).
 export function consumePasswordReset(rawToken, now = Date.now()) {
   if (!rawToken) return null;
   const h = sha256hex(rawToken);
   const rec = passwordResets.get(h);
-  if (!rec) return null;             // unknown or already consumed
-  passwordResets.delete(h);          // single-use: consume regardless (an expired token is also burned)
+  if (!rec) return null;
+  passwordResets.delete(h);
   if (rec.expiresAt <= now) return null;
   return getAccountById(rec.accountId) || null;
 }
 
-// ── Email verification (TQ-60) — same hashed/single-use token design as the reset tokens, longer TTL.
 export function accountMarkEmailVerified(account) {
   if (!account) return false;
   account.emailVerified = true;
   markAccountDirty(account);
   return true;
 }
-const emailVerifications = new Map(); // sha256(rawToken) hex -> { accountId, expiresAt }
-const EMAIL_VERIFY_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const emailVerifications = new Map();
+const EMAIL_VERIFY_TTL_MS = 24 * 60 * 60 * 1000;
 
 export function issueEmailVerification(account, now = Date.now()) {
   if (!account || !account.id) return null;
@@ -300,8 +229,8 @@ export function consumeEmailVerification(rawToken, now = Date.now()) {
   if (!rawToken) return null;
   const h = sha256hex(rawToken);
   const rec = emailVerifications.get(h);
-  if (!rec) return null;          // unknown or already consumed
-  emailVerifications.delete(h);   // single-use
+  if (!rec) return null;
+  emailVerifications.delete(h);
   if (rec.expiresAt <= now) return null;
   return getAccountById(rec.accountId) || null;
 }
@@ -324,13 +253,7 @@ export function findAccountByOAuth(provider, providerId) {
   return null;
 }
 
-// An OAuth-origin account by VERIFIED email: the email matches AND the account already has a linked
-// OAuth provider (google/discord), so its email came from a provider that verified it. Used to UNIFY
-// a player who signs in with BOTH Google and Discord under the same verified email (account linking)
-// instead of fragmenting them into two separate accounts. Deliberately EXCLUDES native-only accounts
-// (`passwordHash` but no OAuth id): their email is UNVERIFIED (no email-verification flow yet), so
-// auto-linking an OAuth identity onto a native account by a bare email match would be an
-// account-takeover vector — native↔OAuth unification waits on email verification.
+// Exclude native-only accounts: their email is unverified (auto-link = takeover).
 export function findAccountByVerifiedEmail(email) {
   if (!email) return null;
   const e = String(email).toLowerCase();
@@ -338,9 +261,6 @@ export function findAccountByVerifiedEmail(email) {
   return null;
 }
 
-// Link an OAuth provider id onto an EXISTING account (account linking): set `<provider>Id`, backfill
-// the email if absent, and persist. Idempotent. Returns the account. (findAccountByOAuth is a scan
-// over these fields, so no separate index needs updating.)
 export function accountLinkProvider(account, provider, providerId, email) {
   if (!account || !provider || !providerId) return account;
   account[`${provider}Id`] = String(providerId);
@@ -349,7 +269,6 @@ export function accountLinkProvider(account, provider, providerId, email) {
   return account;
 }
 
-// TQ-61: how many distinct sign-in methods an account has (google / discord / email+password).
 export function accountMethodCount(account) {
   if (!account) return 0;
   return (account.googleId ? 1 : 0) + (account.discordId ? 1 : 0) + (account.passwordHash ? 1 : 0);
@@ -357,9 +276,6 @@ export function accountMethodCount(account) {
 
 const UNLINK_FIELD = { google: "googleId", discord: "discordId", password: "passwordHash" };
 
-// TQ-61: remove one sign-in method from an account, with the safety guard that AT LEAST ONE method
-// must always remain (a player can never lock themselves out). Returns { ok, reason }; reasons:
-// "invalid_method" | "not_linked" | "last_method". Persists on success.
 export function accountUnlinkProvider(account, method) {
   if (!account) return { ok: false, reason: "invalid_method" };
   const field = UNLINK_FIELD[method];
@@ -371,10 +287,6 @@ export function accountUnlinkProvider(account, method) {
   return { ok: true };
 }
 
-// TQ-61: attach an OAuth provider to an account, REFUSING when that provider identity already belongs
-// to a DIFFERENT account (no silent takeover/merge). Idempotent for the same account. Returns
-// { ok, reason } — reason "conflict" when the id is bound elsewhere. The OAuth round-trip that
-// supplies providerId is wired in TQ-62; this is the safe persistence primitive it calls.
 export function accountAttachProvider(account, provider, providerId, email) {
   if (!account || !(provider in UNLINK_FIELD) || provider === "password" || !providerId) return { ok: false, reason: "invalid" };
   const existing = findAccountByOAuth(provider, providerId);
@@ -383,11 +295,9 @@ export function accountAttachProvider(account, provider, providerId, email) {
   return { ok: true };
 }
 
-// Mint a new character profile OWNED by the account (starters + chains, like createProfile), tag
-// it, and add it to the account (capped at maxSlots). Returns the profile, or null when full.
 export function accountAddCharacter(account, name, { maxSlots = 5 } = {}) {
   if (!account) return null;
-  account.characterTokens = (account.characterTokens || []).filter((t) => profiles.has(t)); // drop dangling
+  account.characterTokens = (account.characterTokens || []).filter((t) => profiles.has(t));
   if (account.characterTokens.length >= maxSlots) return null;
   const profile = createProfile(name || account.nickname || "Tamer", { isGuest: false });
   profile.name = String(name || account.nickname || "Tamer").slice(0, 24);
@@ -398,13 +308,11 @@ export function accountAddCharacter(account, name, { maxSlots = 5 } = {}) {
   return profile;
 }
 
-// The account's character profiles (skips dangling tokens), as live profile objects.
 export function accountCharacters(account) {
   if (!account) return [];
   return (account.characterTokens || []).map((t) => profiles.get(t)).filter(Boolean);
 }
 
-// Remove one character (must belong to the account): drop it from the account + delete the profile.
 export function accountRemoveCharacter(account, token) {
   if (!account || !token || !(account.characterTokens || []).includes(token)) return false;
   account.characterTokens = account.characterTokens.filter((t) => t !== token);
@@ -413,10 +321,6 @@ export function accountRemoveCharacter(account, token) {
   return true;
 }
 
-// Permanently delete an entire account (right to be forgotten, TQ-11): purge every owned character
-// profile (cache + DB), then remove the account itself from cache + DB. The session token IS the
-// account key, so dropping it from `accounts` immediately invalidates the session (getAccountBySession
-// returns null). Idempotent; returns the number of character profiles removed.
 export function deleteAccount(account) {
   if (!account) return 0;
   const tokens = [...(account.characterTokens || [])];
@@ -428,7 +332,6 @@ export function deleteAccount(account) {
   return tokens.length;
 }
 
-// Delete a profile from the cache + DB (used by accountRemoveCharacter).
 export function deleteProfile(token) {
   if (!token) return;
   profiles.delete(token);
@@ -436,9 +339,6 @@ export function deleteProfile(token) {
   deleteProfileRow(token).catch((e) => console.error("[store] deleteProfile:", e.message));
 }
 
-// Attach an EXISTING profile to an account as one of its characters (migration / guest-claim
-// path — does NOT mint a new profile). Tags ownership, names it, clears the guest flag.
-// Idempotent on the token. Returns true on success.
 export function accountAttachExistingCharacter(account, profile) {
   if (!account || !profile || !profile.token) return false;
   account.characterTokens = account.characterTokens || [];
@@ -451,18 +351,13 @@ export function accountAttachExistingCharacter(account, profile) {
   return true;
 }
 
-// Migrate a LEGACY credentialed profile (the old "1 account = 1 profile" model) into the account
-// model: mint an account from its credentials and attach the profile as its FIRST character — so
-// an existing player keeps their save (it becomes their first cloud character) instead of being
-// orphaned. The credential is left on the profile too (harmless) so a stale old-style lookup still
-// resolves during the transition. Returns the new account.
 export function migrateProfileToAccount(profile) {
   if (!profile) return null;
   const account = createAccountRecord({
     email: profile.email, passwordHash: profile.passwordHash,
     googleId: profile.googleId, discordId: profile.discordId,
     nickname: profile.name || "Tamer",
-    usernameChosen: true, // a legacy/native profile already carries a real chosen name — don't re-prompt
+    usernameChosen: true,
   });
   accountAttachExistingCharacter(account, profile);
   return account;
@@ -474,20 +369,12 @@ export function getAccountById(id) {
   return null;
 }
 
-// Ensure a profile is wrapped by an account (IDEMPOTENT): return the account that already owns it,
-// else migrate the legacy credentialed profile into a fresh account on first use. The auth handlers
-// call this so every login/signup yields an account session WITHOUT disturbing the existing token
-// flow — an existing player's save simply becomes their account's first cloud character. Never
-// throws; returns null only for a nullish profile.
 export function ensureAccountForProfile(profile) {
   if (!profile) return null;
   if (profile.ownerAccountId) {
     const existing = getAccountById(profile.ownerAccountId);
     if (existing) return existing;
   }
-  // Durable idempotency (not just the in-memory ownerAccountId): if an account already exists for
-  // this credential — e.g. the profile's first migration flush was lost on a restart but the
-  // account's flush landed — re-attach instead of minting a DUPLICATE account for one identity.
   const existing =
     (profile.email && findAccountByEmail(profile.email)) ||
     (profile.googleId && findAccountByOAuth("google", profile.googleId)) ||
@@ -500,16 +387,9 @@ export function accountCount() {
   return accounts.size;
 }
 
-// ── Social graph: friends + requests + blocks (TQ-72) ──
-// The friendship model on the account record. Every relationship references the stable account
-// `id` (never the secret sessionToken). Helpers mutate the in-memory account(s) and mark them dirty
-// so the coalescing flush persists them, exactly like the rest of the account model. Endpoints
-// (TQ-73), presence (TQ-74) and the UI (TQ-75) build on these. Caps keep one account's lists bounded.
 export const MAX_FRIENDS = 200;
 export const MAX_PENDING_REQUESTS = 100;
 
-// Default the social arrays on an account created before this feature existed (DB rows have no
-// friends/requests/blocked). Idempotent; returns the account.
 function ensureSocial(a) {
   if (!a) return a;
   if (!Array.isArray(a.friends)) a.friends = [];
@@ -521,9 +401,6 @@ function ensureSocial(a) {
 
 const withoutId = (arr, id) => arr.filter((x) => x !== id);
 
-// Send a friend request from `account` to the account with id `toId`. Returns a result code:
-// "sent" | "friends" (a reciprocal pending request was auto-accepted) | "exists" (already friends) |
-// "pending" (already requested) | "blocked" | "self" | "full" (cap hit) | "unknown" (no such account).
 export function sendFriendRequest(account, toId) {
   if (!account || !toId) return "unknown";
   ensureSocial(account);
@@ -533,7 +410,6 @@ export function sendFriendRequest(account, toId) {
   ensureSocial(to);
   if (account.blocked.includes(toId) || to.blocked.includes(account.id)) return "blocked";
   if (account.friends.includes(toId)) return "exists";
-  // They already requested ME → accept directly instead of crossing requests.
   if (account.incomingRequests.includes(toId)) { acceptFriendRequest(account, toId); return "friends"; }
   if (account.outgoingRequests.includes(toId)) return "pending";
   if (account.outgoingRequests.length >= MAX_PENDING_REQUESTS || to.incomingRequests.length >= MAX_PENDING_REQUESTS) return "full";
@@ -544,7 +420,6 @@ export function sendFriendRequest(account, toId) {
   return "sent";
 }
 
-// Accept a pending incoming request from `fromId` → mutual friendship on both records. Returns true.
 export function acceptFriendRequest(account, fromId) {
   if (!account || !fromId) return false;
   ensureSocial(account);
@@ -562,7 +437,6 @@ export function acceptFriendRequest(account, fromId) {
   return true;
 }
 
-// Decline an incoming request from `fromId` (drops it on both sides). Returns true if one was removed.
 export function declineFriendRequest(account, fromId) {
   if (!account || !fromId) return false;
   ensureSocial(account);
@@ -574,7 +448,6 @@ export function declineFriendRequest(account, fromId) {
   return true;
 }
 
-// Remove an existing friend (mutual). Returns true if they were friends.
 export function removeFriend(account, otherId) {
   if (!account || !otherId) return false;
   ensureSocial(account);
@@ -586,8 +459,6 @@ export function removeFriend(account, otherId) {
   return true;
 }
 
-// Block an account: drop any friendship + pending requests BOTH ways, then add to the blocklist so
-// they can't request again (and I can't request them). Idempotent. Returns true.
 export function blockAccount(account, otherId) {
   if (!account || !otherId || otherId === account.id) return false;
   ensureSocial(account);
@@ -607,7 +478,6 @@ export function blockAccount(account, otherId) {
   return true;
 }
 
-// Unblock: remove from the blocklist (does NOT restore a prior friendship). Returns true if blocked.
 export function unblockAccount(account, otherId) {
   if (!account || !otherId) return false;
   ensureSocial(account);
@@ -617,7 +487,6 @@ export function unblockAccount(account, otherId) {
   return true;
 }
 
-// Read views (TQ-73 endpoints serialize these to SAFE shapes — id + nickname + status, never email).
 export function listFriends(account) { return account ? [...ensureSocial(account).friends] : []; }
 export function listRequests(account) {
   if (!account) return { incoming: [], outgoing: [] };
@@ -628,15 +497,11 @@ export function isBlocked(account, otherId) {
   return !!account && ensureSocial(account).blocked.includes(otherId);
 }
 
-// Test/introspection helper.
 export function profileCount() {
   return profiles.size;
 }
 
-// Admin "clean wipe": drop ALL player data — the in-memory cache, the dirty set (so the
-// flush loop can't resurrect a just-cleared profile), and the DB rows. Destructive +
-// irreversible. A player who reconnects with an old token afterward simply gets a fresh
-// profile (getByToken misses → the join handler mints a new one), i.e. a true clean slate.
+// Clear dirty too, or the flush loop resurrects wiped profiles.
 export async function wipeAllProfiles() {
   const n = profiles.size;
   profiles.clear();
@@ -648,16 +513,12 @@ export async function wipeAllProfiles() {
   return n;
 }
 
-// Increment a lifetime stat counter on a profile (P8-T1). Defaults the stats map
-// for profiles created before stats existed. Caller persists via saveProfile.
 export function bumpStat(profile, key, n = 1) {
   if (!profile) return;
   profile.stats = profile.stats || {};
   profile.stats[key] = (profile.stats[key] || 0) + n;
 }
 
-// Top profiles by a stat, for the leaderboard (P8-T4). Ranks the in-memory cache
-// (all profiles are loaded at boot), excludes zeros.
 export function topProfiles(stat, n = 10) {
   return [...profiles.values()]
     .map((p) => ({ name: p.name, value: (p.stats && p.stats[stat]) || 0 }))
@@ -666,10 +527,6 @@ export function topProfiles(stat, n = 10) {
     .slice(0, n);
 }
 
-// --- persistence lifecycle (P1-T2) ---
-
-// Load durable profiles into the cache and start the write-back loop. Pure
-// in-memory no-op (returns false) when DATABASE_URL is unset — local dev, tests.
 export async function initStore() {
   const enabled = await initDb();
   if (!enabled) {
@@ -684,14 +541,12 @@ export async function initStore() {
   flushTimer = setInterval(() => {
     flushStore().catch((e) => console.error("[store] flush:", e.message));
   }, FLUSH_MS);
-  flushTimer.unref?.(); // don't keep the process alive just for the timer
+  flushTimer.unref?.();
   return true;
 }
 
-// Write all dirty profiles' + accounts' current state to the DB (coalesced, order-independent).
 export async function flushStore() {
   if (!dbEnabled() || (dirty.size === 0 && dirtyAccounts.size === 0)) return;
-  // Profiles
   if (dirty.size > 0) {
     const batch = [];
     for (const token of dirty) { const p = profiles.get(token); if (p) batch.push(p); }
@@ -699,11 +554,10 @@ export async function flushStore() {
     try {
       await upsertProfiles(batch);
     } catch (e) {
-      for (const p of batch) dirty.add(p.token); // re-queue for the next flush
+      for (const p of batch) dirty.add(p.token);
       throw e;
     }
   }
-  // Accounts (cloud saves) — same coalesced last-write-wins pattern.
   if (dirtyAccounts.size > 0) {
     const abatch = [];
     for (const tk of dirtyAccounts) { const a = accounts.get(tk); if (a) abatch.push(a); }
@@ -711,13 +565,12 @@ export async function flushStore() {
     try {
       await upsertAccounts(abatch);
     } catch (e) {
-      for (const a of abatch) dirtyAccounts.add(a.sessionToken); // re-queue
+      for (const a of abatch) dirtyAccounts.add(a.sessionToken);
       throw e;
     }
   }
 }
 
-// Graceful shutdown: stop the loop, flush once more, close the pool.
 export async function shutdownStore() {
   if (flushTimer) {
     clearInterval(flushTimer);

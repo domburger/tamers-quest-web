@@ -11,10 +11,6 @@ import {
   listFriends, listRequests, isBlocked, MAX_PENDING_REQUESTS,
 } from "./store.js";
 
-// The account model is the Phase-2 cloud-save foundation: an account OWNS N character profiles,
-// credentials live on the account (not a game profile), so a logged-in player's characters follow
-// the account across devices. Pure in-memory here (no DATABASE_URL). accountAddCharacter rolls
-// starters, so the engine needs real monster data.
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
   setGameData({
@@ -81,21 +77,19 @@ test("accountRemoveCharacter: only an OWNED token is removed + its profile delet
 test("accountAttachExistingCharacter: adds an existing profile as a character (no new profile minted)", () => {
   loadData();
   const a = createAccountRecord({ email: "att@x.io", passwordHash: "h" });
-  const p = createProfile("Existing", { isGuest: true }); // a guest's existing save
+  const p = createProfile("Existing", { isGuest: true });
   const ok = accountAttachExistingCharacter(a, p);
   assert.equal(ok, true);
   assert.deepEqual(a.characterTokens, [p.token], "the existing profile token is attached");
   assert.equal(p.ownerAccountId, a.id, "tagged with the owner");
   assert.equal(p.isGuest, false, "guest flag cleared (now an account character)");
   assert.equal(getByToken(p.token), p, "same profile object — not re-minted");
-  // Idempotent on the token.
   accountAttachExistingCharacter(a, p);
   assert.equal(a.characterTokens.length, 1, "attaching the same profile twice is a no-op");
 });
 
 test("migrateProfileToAccount: a legacy credentialed profile becomes an account whose first character IS that save", () => {
   loadData();
-  // The OLD model: createAccount stamps email+hash onto a playable game profile.
   const legacy = createAccount("legacy@x.io", "scrypt$s$h", "OldTimer");
   assert.ok(legacy.passwordHash && legacy.activeMonsters.length, "legacy profile has creds + a team");
   const acct = migrateProfileToAccount(legacy);
@@ -123,7 +117,6 @@ test("ensureAccountForProfile: a lost ownerAccountId (flush race) re-attaches by
   const legacy = createAccount("dedup@x.io", "scrypt$s$h", "Dedup");
   const a1 = ensureAccountForProfile(legacy);
   const before = accountCount();
-  // Simulate the profile's migration flush being LOST on a restart: it reloads WITHOUT ownerAccountId.
   delete legacy.ownerAccountId;
   const a2 = ensureAccountForProfile(legacy);
   assert.equal(a2, a1, "re-attached to the SAME account (found by email), not a fresh one");
@@ -131,7 +124,6 @@ test("ensureAccountForProfile: a lost ownerAccountId (flush race) re-attaches by
   assert.equal(legacy.ownerAccountId, a1.id, "ownerAccountId re-stamped");
 });
 
-// ── Social graph (TQ-72) ──
 const acct = (n) => createAccountRecord({ email: `${n}@x.io`, passwordHash: "h", nickname: n });
 
 test("friend request → accept makes a MUTUAL friendship; request clears both sides", () => {
@@ -205,7 +197,6 @@ test("listRequests / listFriends return copies (defensive), default for DB-loade
   const reqs = listRequests(a);
   reqs.outgoing.push("tamper");
   assert.deepEqual(a.outgoingRequests, [b.id], "mutating the returned list doesn't affect the account");
-  // An account loaded before this feature (no social arrays) is defaulted, not crashed.
   const legacyShape = createAccountRecord({ email: "old@x.io", passwordHash: "h" });
   delete legacyShape.friends; delete legacyShape.incomingRequests; delete legacyShape.outgoingRequests; delete legacyShape.blocked;
   assert.deepEqual(listFriends(legacyShape), [], "missing arrays default to []");

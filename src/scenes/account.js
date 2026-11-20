@@ -1,13 +1,9 @@
 import { getProfile, getCharacters, getAccountSession, getAccountNickname, clearProfile } from "../storage.js";
-import { net } from "../netClient.js"; // clearSession() on Sign out
+import { net } from "../netClient.js";
 import { THEME, PAL, FONT, FONT_BODY, addMenuBackground, addHeader, addLabel, addButton, addPanel } from "../ui/theme.js";
 import { safeInsetsDesign } from "../systems/safearea.js";
-import { addGuestGate } from "../ui/guestGate.js"; // UI v4: shared guest gate (icon disc + title + Log in)
+import { addGuestGate } from "../ui/guestGate.js";
 
-// Account page (user 2026-06-10): the account/security home reached from the top-right
-// account dropdown. Distinct from the PROFILE page (avatar + stats + match history) — this
-// is about the ACCOUNT itself: how you signed in (linked providers), email on file, the
-// character count, manage-characters + sign-out. Username editing lives on the profile page.
 export default function accountScene(k) {
   k.scene("account", (args = {}) => {
     addMenuBackground(k);
@@ -18,28 +14,24 @@ export default function accountScene(k) {
     const profile = getProfile();
     const authed = !!(profile && !profile.isGuest);
     const session = getAccountSession();
-    let pwModalUp = false; // TQ-58: the change-password DOM form is up — gate the top-nav buttons (overlay-bleed)
+    let pwModalUp = false;
 
-    addHeader(k, { x: cx, y: 50 + ins.top, text: "Account", size: 34 }); // TQ-200: title-case (no-caps; matches the identity/menu header convention)
+    addHeader(k, { x: cx, y: 50 + ins.top, text: "Account", size: 34 });
     addButton(k, { x: 70 + ins.left, y: 40 + ins.top, w: 96, h: 36, text: "Back", size: 16, icon: "chevronL",
       fill: THEME.surfaceAlt, textColor: THEME.text, onClick: () => { if (pwModalUp) return; k.go(backScene, backArgs); } });
     if (authed) {
       addButton(k, { x: k.width() - 76 - ins.right, y: 40 + ins.top, w: 108, h: 36, text: "Sign out", size: 15,
         fill: THEME.surfaceAlt, textColor: THEME.danger,
-        onClick: () => { if (pwModalUp) return; try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); } });
+        onClick: () => { if (pwModalUp) return; try { net.clearSession(); } catch {} clearProfile(); k.go("start"); } });
     }
 
-    // Guests can't have an account — invite them to log in.
     if (!authed) {
       addGuestGate(k, { cx, icon: "person", title: "You're playing as a guest", lines: 2,
         text: "Guest progress isn't saved. Log in to keep your tamers across devices." });
       return;
     }
 
-    // Delete-account confirm is a RE-RENDERED state (not a floating overlay): this scene has no
-    // modal/z gating, so an overlay would bleed clicks through to the buttons beneath it. Toggling
-    // `confirming` and re-rendering keeps everything in the single acUI layer. (TQ-11)
-    let confirming = false, delErr = "", linkErr = ""; // linkErr: TQ-63 inline message (e.g. last-method unlink)
+    let confirming = false, delErr = "", linkErr = "";
 
     function render(data) {
       k.destroyAll("acUI");
@@ -48,24 +40,17 @@ export default function accountScene(k) {
       const label = (x, y, text, size, color, font = FONT, anchor = "center") =>
         k.add([k.text(text, { size, font }), k.pos(x, y), k.anchor(anchor), k.color(...color), "acUI"]);
 
-      // ── Identity panel: who you are + email status ──
       addPanel(k, { x: cx, y: 150, w: colW, h: 96, radius: 16, tag: "acUI" });
       label(left + 20, 122, "SIGNED IN AS", 13, THEME.teal, FONT, "left");
-      // Cap the displayed name so a long account nickname (up to 24 chars) can't overflow the panel
-      // and collide with the right-anchored email-status on a narrow screen (the panel shrinks to
-      // width-64). No-op for short names / wide layouts (≈25 chars fit at the full 520px width).
-      const maxName = Math.max(8, Math.floor((colW - 165) / 14)); // hard length cap (very long names get an ellipsis)
+      const maxName = Math.max(8, Math.floor((colW - 165) / 14));
       const dispName = data.name && data.name.length > maxName ? data.name.slice(0, maxName - 1) + "…" : data.name || "Tamer";
       const statusTxt = data.hasEmail ? "Email on file" : "No email on file";
-      // TQ-354: also SHRINK the name font when the (capped) name still wouldn't fit beside the right-
-      // anchored status — at ≤~340px the size-26 name collided with "No email on file". Wide stays 26.
       const nameAvail = colW - 40 - statusTxt.length * 13 * 0.56 - 16;
       const nameW26 = Math.max(1, dispName.length) * 26 * 0.58;
       const nameSize = nameW26 <= nameAvail ? 26 : Math.max(14, Math.floor(26 * nameAvail / nameW26));
       label(left + 20, 152, dispName, nameSize, THEME.text, FONT, "left");
       label(left + colW - 20, 152, statusTxt, 13, THEME.textMut, FONT_BODY, "right");
 
-      // ── Linked sign-in methods ──
       const methods = [
         { key: "google", name: "Google" },
         { key: "discord", name: "Discord" },
@@ -75,8 +60,6 @@ export default function accountScene(k) {
       addPanel(k, { x: cx, y: 248 + ph / 2, w: colW, h: ph, radius: 16, tag: "acUI" });
       label(left + 20, 268, "SIGN-IN METHODS", 13, THEME.teal, FONT, "left");
       if (linkErr) label(left + colW - 20, 268, linkErr, 11, THEME.warn, FONT_BODY, "right");
-      // Unlink a method (TQ-61 endpoint) then re-render from the echoed providers; the server guard
-      // refuses to remove the only remaining method (409 last_method) → surfaced inline.
       const unlinkMethod = async (method) => {
         if (!session) return;
         linkErr = "";
@@ -99,25 +82,20 @@ export default function accountScene(k) {
           addButton(k, { x: bx, y, w: 84, h: 30, text: "Unlink", size: 13,
             fill: THEME.surfaceAlt, textColor: THEME.danger, tag: "acUI", onClick: () => unlinkMethod(m.key) });
         } else if (m.key === "password") {
-          // Adding a password to an OAuth-only account is a separate set-password flow (not in scope here).
           label(left + colW - 20, y, "Not set", 13, THEME.textMut, FONT_BODY, "right");
         } else {
-          // Link → the OAuth attach flow (TQ-62): full-page nav carrying the account session as ?attach=.
           addButton(k, { x: bx, y, w: 84, h: 30, text: "Link", size: 13,
             fill: THEME.surface, textColor: THEME.teal, tag: "acUI",
             onClick: () => { if (session) window.location.href = `/auth/${m.key}?attach=${encodeURIComponent(session)}`; } });
         }
       });
 
-      // ── Actions ──
       const aTop = 248 + ph + 28;
       const nChars = (data.characters || []).length;
       addButton(k, { x: cx - 78, y: aTop, w: 144, h: 46, text: `Characters (${nChars}/5)`, size: 14,
         fill: THEME.surface, textColor: THEME.text, tag: "acUI", onClick: () => k.go("characterSelect") });
       addButton(k, { x: cx + 78, y: aTop, w: 144, h: 46, text: "Friends", size: 16,
         fill: THEME.surface, textColor: THEME.teal, tag: "acUI", onClick: () => k.go("friends", { backScene: "account", backArgs: args }) });
-      // Native (email/password) accounts get a Change-password action beside View profile (TQ-58);
-      // OAuth-only accounts have no password to change, so the row stays a single full-width button.
       const hasPw = !!(data.providers && data.providers.password);
       if (hasPw) {
         addButton(k, { x: cx - 78, y: aTop + 56, w: 144, h: 46, text: "View profile", size: 15,
@@ -131,7 +109,6 @@ export default function accountScene(k) {
           onClick: () => k.go("profile", { backScene: "account", backArgs: args }) });
       }
 
-      // ── Danger zone: permanently delete the account (right to be forgotten, TQ-11) ──
       const dTop = aTop + 124;
       if (!confirming) {
         addButton(k, { x: cx, y: dTop, w: 300, h: 44, text: "Delete account", size: 15,
@@ -149,7 +126,7 @@ export default function accountScene(k) {
           delErr = "Deleting…"; render(data);
           try {
             const r = await fetch("/account/delete", { method: "POST", headers: { "x-account-session": session } });
-            if (r.ok) { try { net.clearSession(); } catch { /* none */ } clearProfile(); k.go("start"); return; }
+            if (r.ok) { try { net.clearSession(); } catch {} clearProfile(); k.go("start"); return; }
             delErr = "Couldn't delete — please try again.";
           } catch { delErr = "Network error — please try again."; }
           render(data);
@@ -161,8 +138,6 @@ export default function accountScene(k) {
       }
     }
 
-    // Change-password DOM form (TQ-58) — real <input type=password> for the keyboard + managers,
-    // mirroring the profile rename modal. Posts /account/password (server re-auths the current pw).
     function openChangePassword() {
       if (pwModalUp || !session) return;
       pwModalUp = true;
@@ -204,7 +179,6 @@ export default function accountScene(k) {
       k.onSceneLeave(() => { [curEl, newEl].forEach((e) => e && e.remove()); });
     }
 
-    // Optimistic local render, then refresh from the server.
     render({
       name: getAccountNickname() || (profile && profile.nickname) || "Tamer",
       providers: null, hasEmail: false, characters: getCharacters(),
@@ -218,7 +192,7 @@ export default function accountScene(k) {
           hasEmail: !!d.account.hasEmail,
           characters: d.account.characters || [],
         }); })
-        .catch(() => { /* offline — keep the local render */ });
+        .catch(() => {});
     }
   });
 }

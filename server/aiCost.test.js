@@ -2,7 +2,7 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { recordUsage, aiCostSnapshot, resetAiCost } from "./aiCost.js";
 
-beforeEach(resetAiCost); // module-level singleton shared across tests in the one process — start clean
+beforeEach(resetAiCost);
 
 test("recordUsage accumulates grand totals + per-model breakdown", () => {
   recordUsage({ model: "gpt-5.4-mini", promptTokens: 1000, completionTokens: 200 });
@@ -20,8 +20,8 @@ test("recordUsage accumulates grand totals + per-model breakdown", () => {
 });
 
 test("estUsd uses the per-model rate table (priced models) and totals across models", () => {
-  recordUsage({ model: "gpt-5.4-mini", promptTokens: 1_000_000, completionTokens: 1_000_000 }); // 0.15 + 0.60 = 0.75
-  recordUsage({ model: "gpt-5.4", promptTokens: 1_000_000, completionTokens: 0 });               // 2.50
+  recordUsage({ model: "gpt-5.4-mini", promptTokens: 1_000_000, completionTokens: 1_000_000 });
+  recordUsage({ model: "gpt-5.4", promptTokens: 1_000_000, completionTokens: 0 });
   const s = aiCostSnapshot();
   const mini = s.byModel.find((x) => x.model === "gpt-5.4-mini");
   assert.equal(mini.estUsd, 0.75);
@@ -29,7 +29,6 @@ test("estUsd uses the per-model rate table (priced models) and totals across mod
   const big = s.byModel.find((x) => x.model === "gpt-5.4");
   assert.equal(big.estUsd, 2.5);
   assert.equal(s.estUsd, 3.25, "grand estimate is the sum across models");
-  // Priciest first.
   assert.equal(s.byModel[0].model, "gpt-5.4");
 });
 

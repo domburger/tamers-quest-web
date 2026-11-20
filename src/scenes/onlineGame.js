@@ -1,108 +1,85 @@
 import { net } from "../netClient.js";
 import { GAME } from "../engine/schemas.js";
 import { generateMap, biomeTintAt, biomeNameAt, stepBody } from "../engine/mapgen.js";
-import { takeAcked, reconcileStep } from "../engine/reconcile.js"; // ACK-based reconciliation (pure, unit-tested)
-import { sprintMult, sprintingNow, tickStamina } from "../engine/movement.js"; // shared speed + sprint-gate rule + stamina integrator for client-side prediction (#10, TQ-382)
+import { takeAcked, reconcileStep } from "../engine/reconcile.js";
+import { sprintMult, sprintingNow, tickStamina } from "../engine/movement.js";
 import { getSpiritChain, cleanAttackName } from "../data.js";
-import { getMonsterType } from "../engine/gamedata.js"; // team-card element lookup (PV-T8)
-import { nextChainId } from "../engine/inventory.js"; // PARITY-3: shared chain-cycle (SP↔MP)
-import { markDiscovered, markEncountered } from "../engine/discovered.js"; // PV-T15 first-catch milestone + wild-encounter tracking (bestiary "seen" state)
-import { objectiveText } from "../ui/objective.js"; // PT2-T10: persistent objective HUD (SP↔MP shared)
-import { drawBiomeChip } from "../ui/biomeHud.js"; // PT1-T18: current-biome + speed HUD chip (shared SP↔MP)
+import { getMonsterType } from "../engine/gamedata.js";
+import { nextChainId } from "../engine/inventory.js";
+import { markDiscovered, markEncountered } from "../engine/discovered.js";
+import { objectiveText } from "../ui/objective.js";
+import { drawBiomeChip } from "../ui/biomeHud.js";
 import { drawCharacter } from "../render/character.js";
-import { getSkin, getEquippedSkin, getEquippedSkinId, drawChainGlyph, tierColor } from "../render/chainCosmetics.js"; // CN-12: per-player skins; TQ-143: chain glyph with tier-coloured centre dot; SC-tier: tierColor for the active-slot tier readout
-import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin } from "../render/characterCosmetics.js"; // self's character skin in MP (accent + cloak + model); resolve rivals' model from their charId
+import { getSkin, getEquippedSkin, getEquippedSkinId, drawChainGlyph, tierColor } from "../render/chainCosmetics.js";
+import { getEquippedCharacterSkin, getEquippedCharacterSkinId, getCharacterSkin } from "../render/characterCosmetics.js";
 import { drawSpiritChainProjectile, drawChest, chainColor } from "../render/spiritchain.js";
-import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js"; // Pokémon-style battle screen + spirit-chain throw → spawn cinematic
-import { drawMonster, drawMonsterIcon } from "../render/monster.js"; // drawMonster: standardized walk/attack on the baked sprite; drawMonsterIcon: TQ-397 combat-row portrait that also rasterizes generated (html-model) monsters
-import { createHtmlMonsterOverlay } from "../render/htmlMonsterOverlay.js"; // TQ-262: live-DOM render path for monsters carrying an html model (dormant until any do)
-import { drawMonsterDetail } from "../ui/monsterDetail.js"; // TQ-125: shared monster-detail popup (epic TQ-87)
-import { ATTACK_DURATION } from "../systems/monsterAnim.js"; // length of the one-shot combat attack lunge
+import { drawBattleStage, BATTLE_INTRO_DURATION } from "../render/battleStage.js";
+import { drawMonster, drawMonsterIcon } from "../render/monster.js";
+import { createHtmlMonsterOverlay } from "../render/htmlMonsterOverlay.js";
+import { drawMonsterDetail } from "../ui/monsterDetail.js";
+import { ATTACK_DURATION } from "../systems/monsterAnim.js";
 import { drawTiles, makeTileCache } from "../render/tiles.js";
 import { emit, emitText, updateFx, drawFx, drawFxScreen, clearFx } from "../render/fx.js";
-import { drawPlayWindow, playWindowRect } from "../render/playWindow.js"; // square play-window frame + geometry (user design 2026-06-08)
-import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js"; // PV-A5 screen shake
+import { drawPlayWindow, playWindowRect } from "../render/playWindow.js";
+import { addShake, updateShake, shakeOffset, clearShake } from "../render/shake.js";
 import { drawPortal, drawExtractFlash } from "../render/portal.js";
-import { minimapWindow, minimapSize, nextMinimapZoom } from "../render/minimap.js"; // PT1-T24: shared zoom-window math + size rule + zoom-level cycle (SP↔MP)
-import { hudLayout } from "../render/hudLayout.js"; // HUD-OUT: place HUD clusters in the gutters OUTSIDE the square (SP↔MP shared)
-import { drawHubPanel } from "../render/hubPanel.js"; // task: show the lobby's identity+inventory panel in the cave too (left gutter)
-import { getCharacter } from "../storage.js"; // local character slot → identity (name/level) for the cave lobby panel
+import { minimapWindow, minimapSize, nextMinimapZoom } from "../render/minimap.js";
+import { hudLayout } from "../render/hudLayout.js";
+import { drawHubPanel } from "../render/hubPanel.js";
+import { getCharacter } from "../storage.js";
 import { initAudio, toggleMuted, isMuted, sfx, haptic } from "../systems/audio.js";
 import { gamepadMove, gamepadPressed, gamepadConnected, BTN } from "../systems/gamepad.js";
-import { getBindings } from "../systems/keybinds.js"; // TQ-458: remappable keyboard controls (defaults reproduce the old hard-coded keys)
-import { safeInsetsDesign } from "../systems/safearea.js"; // MB-4: keep touch HUD off the notch/home-bar (shared design-unit helper)
-import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js"; // mobile-only on-screen controls + standardized renderers
-import { prefersReducedMotion } from "../systems/a11y.js"; // a11y: freeze decorative monster bob
+import { getBindings } from "../systems/keybinds.js";
+import { safeInsetsDesign } from "../systems/safearea.js";
+import { touchPrimary, drawJoystick, drawTouchButton, drawThrowPad, JOY_R as JOY_RADIUS } from "../systems/inputMode.js";
+import { prefersReducedMotion } from "../systems/a11y.js";
 import { THEME, FONT_BOLD, hpColor, drawButton, drawOrnamentRule, inRect, drawGlass, drawEyebrow, drawHairline, drawChip } from "../ui/theme.js";
-import { drawIcon } from "../ui/icons.js"; // UI v4 icon set (HUD chips, combat actions, result cards)
+import { drawIcon } from "../ui/icons.js";
 import { drawIconTab, WHITE } from "../ui/theme.js";
-import { drawGlassSheet } from "../ui/stationPopup.js"; // UI v3: frosted modal sheets (pause / result)
+import { drawGlassSheet } from "../ui/stationPopup.js";
 
-// HUD chrome routed through the design system (PV-A1). Only neutral *chrome*
-// (plain HUD/overlay text, panel + scrim fills, frame outlines) is themed here —
-// procedural art (minimap blips, storm rings, FX, sprites, shadows), semantic
-// accents (gold titles, win/lose, danger alerts, damage numbers, bar fills) and
-// the self-contained touch/pause widgets keep their own intentional colors.
 const UI = {
-  text:  THEME.text,     // primary HUD / overlay text (was ad-hoc white)
-  body:  THEME.textBody,  // secondary HUD text
-  mut:   THEME.textMut,   // dim section labels
-  panel: THEME.bgAlt,     // HUD panel + overlay scrim fill (near-black violet)
-  track: THEME.surface2,  // recessed bar track
-  line:  THEME.line,       // panel / frame outline
+  text:  THEME.text,
+  body:  THEME.textBody,
+  mut:   THEME.textMut,
+  panel: THEME.bgAlt,
+  track: THEME.surface2,
+  line:  THEME.line,
   amber: THEME.amber, danger: THEME.danger, primary: THEME.primary,
 };
 
-// Online round view: the seeded map (regenerated client-side from the server
-// seed) drawn as culled, biome-colored tiles, plus server-authoritative players.
-// WASD -> server (~20Hz). Single-player game scene is unchanged.
 export default function onlineGameScene(k) {
   k.scene("onlineGame", (args = {}) => {
     let map = args.map || null;
-    // SP/MP unify: after a run, return to where the run was launched from (the walkable camp HUB
-    // passes backScene:"hub"; legacy callers default to "lobby") — KEEP the connection so the hub
-    // reuses the session and reads the now-updated authoritative profile. A lost connection or a
-    // missing characterId (legacy entry) falls back to the title.
     function exitAfterRun() {
-      // Always back to the village when we know which character this is — the hub re-establishes the session
-      // itself if the socket dropped (it used to bounce to the TITLE on any disconnect, losing the player's place).
       if (args.characterId) { k.go(args.backScene || "hub", { characterId: args.characterId }); return; }
       net.close(); k.go("start");
     }
-    initAudio(net); // P8-T6: wire procedural SFX to net events (idempotent)
-    net.setSkin(getEquippedSkinId()); // CN-12: tell the server our equipped chain cosmetic so rivals see it
-    net.setCharSkin(getEquippedCharacterSkinId()); // tell the server our character body-model skin so rivals render the right figure
-    // Defensive: if entered without a prebuilt map, regenerate it from the seed.
+    initAudio(net);
+    net.setSkin(getEquippedSkinId());
+    net.setCharSkin(getEquippedCharacterSkinId());
     if (!map && net.state.seed != null) {
-      generateMap(null, net.state.seed, net.state.roundBiomes, net.state.roundComp).then((m) => { map = m; }).catch(() => {}); // TQ-365/367: same biome set + tile composition as the server
+      generateMap(null, net.state.seed, net.state.roundBiomes, net.state.roundComp).then((m) => { map = m; }).catch(() => {}); // Same generateMap inputs as server/world.js, or client and server maps diverge
     }
-    // TQ-529: ADVENTURE region travel — the server sends a fresh roundStart (new seed) when you walk off a map
-    // edge. Rebuild the map from it; the fog + per-round render state reset below once the map lands.
     let regionGen = 0;
     const offRegion = net.on("roundStart", (m) => {
       if (!m || !m.travelled) return;
       const gen = ++regionGen;
-      map = null; // the old region must not draw against the new coordinates
+      map = null;
       generateMap(null, net.state.seed, net.state.roundBiomes, net.state.roundComp).then((nm) => {
         if (gen !== regionGen) return;
         map = nm; onRegionArrived();
       }).catch(() => {});
     });
-    k.onSceneLeave(() => { try { offRegion(); } catch { /* already gone */ } });
-    let onRegionArrived = () => {}; // bound below once the render state exists
-    const tileCache = makeTileCache(); // P-floortile: textured floor, cached per tile type
-    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg), k.fixed(), k.z(-10)]); // was raw [10,14,18] blue-grey; THEME.bg is the violet base
+    k.onSceneLeave(() => { try { offRegion(); } catch {} });
+    let onRegionArrived = () => {};
+    const tileCache = makeTileCache();
+    k.add([k.rect(k.width(), k.height()), k.pos(0, 0), k.color(...THEME.bg), k.fixed(), k.z(-10)]);
 
-    // Fog of war (PT1-T08, headline demand) — client-side, mirrors SP `game.js`. The
-    // map hides until you walk near it; `explored` holds revealed tile keys for the
-    // round, the floor + minimap gate on it. No server change (each client tracks its own).
     const explored = new Set();
-    const FOG_REVEAL = 6; // tiles revealed around the player (< the on-screen radius)
+    const FOG_REVEAL = 6;
     const fogKey = (x, y) => x * 100000 + y;
     const isExplored = (x, y) => explored.has(fogKey(x, y));
-    // Perf: the revealed disc only changes when the player crosses a tile boundary, so skip the
-    // 169-cell re-add on every frame the player stays in the same tile (the common case while
-    // standing still or moving sub-tile). Result is identical — those keys are already in the set.
     let lastFogTx = null, lastFogTy = null;
     function revealAround() {
       const self = net.state.self; if (!self) return;
@@ -115,30 +92,8 @@ export default function onlineGameScene(k) {
           if (dx * dx + dy * dy <= r2) explored.add(fogKey(ptx + dx, pty + dy));
     }
 
-    // TQ-96 (Dominik's TQ-117 decision ≈ 4:3): the play window is a touch WIDER than square
-    // while roaming, but stays SQUARE during combat (the fight UI is laid out for a square).
-    // Read the live combat flag at call time so every play-window / HUD site below picks the
-    // right aspect per frame (combat starts/ends mid-scene without a re-init).
-    // TQ-494/501: the fight screen uses the SAME 4:3 play window as the overworld (was a forced
-    // square during combat, which read as a narrower screen than every other view). The combat
-    // stage + panel below now lay out across the full 4:3 width (see W / iw = pw.w).
-    // Portrait phones: fill the screen's height instead of leaving black bands (2026-11-08). Fair: a phone's
-    // view (≈390x664) is still far smaller than desktop's 960x720, and the server only sends what is within
-    // AOI_RADIUS (900 px) anyway. The cap still stops ultra-wide LANDSCAPE screens from seeing more.
     const winAspect = () => { const W = k.width(), H = k.height(); return H > W ? Math.max(4 / 3, H / W + 0.01) : 4 / 3; };
-    // WIN-T2: anchor the corner/edge HUD labels to the square play window (not the raw
-    // canvas) so they sit on the square in every aspect ratio. In landscape pwTop insets
-    // them to the square's left edge; objective stays centered on the square.
     const pwTop = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
-    // HUD-OUT: the shim does NOT restart gameplay scenes on resize (it'd reset the run),
-    // so the retained HUD labels are re-anchored to their gutter slots every frame in the
-    // onUpdate below (hudSlots) rather than baked once here.
-    // Persistent HUD text — tokenized through the UI map declared above (was raw
-    // 255,255,255 / 210,210,220 / 150,210,235 — the audit's HIGH item: chrome that
-    // had a token but bypassed it).
-    // Design upgrade: the timer moved into its own chip (drawTimerChip, right gutter) and the player
-    // name lives in the gutter identity panel, so this label is now the quiet secondary line
-    // (connection + rivals in view; seed/coords in DEV only) — smaller + muted.
     const info = k.add([
       k.text("", { size: 12, font: "gameFont" }),
       k.pos(pwTop.x + 12, pwTop.y + 12), k.color(...UI.body), k.fixed(), k.z(100),
@@ -147,14 +102,6 @@ export default function onlineGameScene(k) {
       k.text("Move: WASD or drag     Throw: hold Space to charge     Cycle chain: [ ]     Leave: ESC     M mute", { size: 12, font: "gameFont" }),
       k.pos(pwTop.x + 12, pwTop.bottom - 24), k.color(...UI.body), k.fixed(), k.z(100),
     ]);
-    // PT2-T10 (#9): a persistent objective line so a new player always knows the
-    // goal — from "catch & loot" early to "extract" once the storm closes. The
-    // objective strings are long (50–76 chars); in landscape they live in a narrow
-    // (~280px) side-gutter slot, so they MUST word-wrap or they clip off-screen left
-    // and bleed over the play window. The shim's retained-text `.width` setter SCALES
-    // (displayWidth), it doesn't re-wrap, so we bake the wrap width at creation and
-    // recreate the label when the slot width changes (orientation / resize) — cheap,
-    // and only a handful of times in a run.
     let objectiveW = 0;
     const makeObjective = (x, y, w) =>
       k.add([
@@ -162,18 +109,14 @@ export default function onlineGameScene(k) {
         k.pos(x, y), k.anchor("center"), k.color(...THEME.teal), k.fixed(), k.z(100),
       ]);
     let objective = makeObjective(pwTop.cx, pwTop.y + 34, 0);
-    let objectiveVisible = false; // set per frame in onUpdate; drawObjectiveChip reads it
+    let objectiveVisible = false;
 
-    // Objective CHIP: a backing pill (panel material) behind the contextual goal, at the gutter slot (or
-    // the square's bottom edge when the lobby panel fills the left gutter / in portrait). Wraps to the slot.
     function drawObjectiveChip() {
       let txt = objective.text;
       if (!objectiveVisible || !txt) return;
       const h = hudSlots();
       const onSquare = lobbyPanelActive() || h.orientation !== "landscape";
       const narrow = k.width() < 560;
-      // Phones: a compact one-liner (strip the "Objective:" prefix, keep the first clause) tucked onto the
-      // square's bottom edge, under the touch controls' reach.
       const tut = /^Tutorial \d\/\d — /.test(txt);
       if (narrow) txt = tut ? txt.replace(/^Tutorial \d\/\d — /, "").split(",")[0].trim() : txt.replace(/^Objective:\s*/i, "").split(/,| — /)[0].trim().replace(/^\w/, (c) => c.toUpperCase());
       const cx = onSquare ? h.square.cx : h.objective.x, cy = onSquare ? h.square.bottom - (narrow ? 16 : 24) : h.objective.y;
@@ -183,12 +126,9 @@ export default function onlineGameScene(k) {
       const w = Math.min(maxW, est), hgt = lines * 16 + 12;
       drawGlass(k, { rect: [cx - w / 2, cy - hgt / 2, w, hgt], radius: Math.min(15, hgt / 2), tint: 0.62, fill: 0.06, line: tut ? 0 : 0.14, fixed: true });
       if (tut) k.drawRect({ pos: k.vec2(cx - w / 2 + 0.5, cy - hgt / 2 + 0.5), width: w - 1, height: hgt - 1, radius: Math.min(15, hgt / 2), color: k.rgb(...THEME.amber), opacity: 0.8, fill: false, outline: { width: 1, color: k.rgb(...THEME.amber) }, fixed: true });
-      drawIcon(k, "flag", { x: cx - w / 2 + 16, y: cy, size: 14, color: tut ? THEME.amber : THEME.teal, fixed: true }); // amber flag while the tutorial drives the pill
+      drawIcon(k, "flag", { x: cx - w / 2 + 16, y: cy, size: 14, color: tut ? THEME.amber : THEME.teal, fixed: true });
       k.drawText({ text: txt, pos: k.vec2(cx + 8, cy), size: 12, font: "gameFont", anchor: "center", width: w - 44, align: "center", color: k.rgb(...UI.text), fixed: true });
     }
-    // UI v4: the secondary info line as a glass CHIP — connection dot (desktop) + rivals-in-view with the
-    // multi icon. Sits where the retained `info` label is anchored; the label itself is only shown in DEV
-    // (seed / coords) under the chip.
     function drawInfoChip() {
       if (info.hidden) return;
       const rivals = net.state.players || [];
@@ -199,18 +139,16 @@ export default function onlineGameScene(k) {
       const tw = typeof k.measureText === "function" ? k.measureText(txt, 11, FONT_BOLD) : txt.length * 6.4;
       const conn = !narrowHud && net.state.connected;
       const hs = hudSlots();
-      const w = 30 + tw + (conn ? 14 : 0) + 12, h = 22, x = hs.team.x, y = hs.orientation === "landscape" ? hs.team.y - 2 : hs.team.y + 20; // portrait: the short band between the chip row and the team card
+      const w = 30 + tw + (conn ? 14 : 0) + 12, h = 22, x = hs.team.x, y = hs.orientation === "landscape" ? hs.team.y - 2 : hs.team.y + 20;
       drawGlass(k, { rect: [x, y, w, h], radius: 11, tint: 0.6, fill: 0.05, line: 0.12, fixed: true });
       drawIcon(k, "multi", { x: x + 15, y: y + h / 2, size: 13, color: n ? THEME.amber : UI.mut, fixed: true });
       k.drawText({ text: txt, pos: k.vec2(x + 28, y + h / 2 - 5.5), size: 11, font: FONT_BOLD, anchor: "left", color: k.rgb(...(n ? UI.text : UI.mut)), fixed: true });
-      if (conn) k.drawCircle({ pos: k.vec2(x + w - 11, y + h / 2), radius: 3.5, color: k.rgb(82, 200, 124), fixed: true }); // online dot (the ms figure is in the DEV line)
+      if (conn) k.drawCircle({ pos: k.vec2(x + w - 11, y + h / 2), radius: 3.5, color: k.rgb(82, 200, 124), fixed: true });
     }
-    // Round TIMER chip (right gutter / top-centre in portrait): m:ss in bold, "left" small; turns amber
-    // under 3:00 and pulses danger under 1:00 so the closing storm's clock is always readable.
     function drawTimerChip() {
       const h = hudSlots();
       if (!h.timer) return;
-      if (net.state.adventure) { // TQ-529: no clock in an adventure — the chip shows the region depth instead
+      if (net.state.adventure) {
         const w = 132, hgt = 30, x = h.timer.x - w / 2, y = h.timer.y - hgt / 2;
         drawGlass(k, { rect: [x, y, w, hgt], radius: 15, tint: 0.62, fill: 0.06, line: 0.14, fixed: true });
         drawIcon(k, "region", { x: x + 18, y: h.timer.y, size: 15, color: THEME.amber, fixed: true });
@@ -229,14 +167,11 @@ export default function onlineGameScene(k) {
       k.drawText({ text: `${mm}:${ss}`, pos: k.vec2(h.timer.x + 2, h.timer.y), size: 17, font: "gameFontBold", anchor: "center", color: k.rgb(...col), opacity: pulse, fixed: true });
       k.drawText({ text: "left", pos: k.vec2(h.timer.x + 38, h.timer.y + 1), size: 10, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
     }
-    // TQ-554: END-OF-FIGHT overview card — drawn over the battle stage once the fight has an outcome
-    // (won / caught / fled). Victory shows the active monster's XP gain + progress bar (+ a LEVEL UP
-    // badge); a catch names the monster and where it landed. Dismissed by the existing tap / space.
     function drawFightSummary(c, pw, top) {
       if (!c || !c.outcome || c.outcome === "lost") return;
       const col = (t) => k.rgb(...t);
       const age = Math.max(0, (Date.now() - (c.endedAt || Date.now())) / 1000);
-      const ease = Math.min(1, age / 0.35), e = 1 - (1 - ease) * (1 - ease); // ease-out entrance
+      const ease = Math.min(1, age / 0.35), e = 1 - (1 - ease) * (1 - ease);
       const w = Math.min(420, pw.w - 40), hgt = c.outcome === "won" ? 184 : 150;
       const cx = pw.cx, cy = Math.max(pw.y + hgt / 2 + 16, top - hgt / 2 - 30) + (1 - e) * 14;
       const x = cx - w / 2, y = cy - hgt / 2;
@@ -253,8 +188,6 @@ export default function onlineGameScene(k) {
       let ly = y + 70;
       if (won && c.gains) {
         const g = c.gains, leveled = (g.levelTo || 0) > (g.levelFrom || 0);
-        // UI v4 "juice": the XP number counts up and the bar FILLS from the pre-fight value over ~0.9s
-        // (starting after the card lands); a level-up fills to the end, resets, then fills the remainder.
         const fillP = prefersReducedMotion() ? 1 : Math.max(0, Math.min(1, (age - 0.35) / 0.9));
         const shownXp = Math.round((g.xp || 0) * (prefersReducedMotion() ? 1 : Math.max(0, Math.min(1, (age - 0.3) / 0.8))));
         k.drawText({ text: `${g.monster || "Your monster"}`, pos: k.vec2(x + 24, ly), size: 15, font: FONT_BOLD, anchor: "left", color: col(UI.text), opacity: e, fixed: true });
@@ -263,7 +196,6 @@ export default function onlineGameScene(k) {
         drawIcon(k, "xp", { x: x + w - 24 - xpW - 12, y: ly + 8, size: 14, color: THEME.amber, opacity: e, fixed: true });
         k.drawText({ text: xpStr, pos: k.vec2(x + w - 24, ly), size: 15, font: FONT_BOLD, anchor: "topright", color: col(THEME.amber), opacity: e, fixed: true });
         ly += 28;
-        // XP progress toward the next level (post-fight values from the server); animate from the pre-fight fraction.
         const bw = w - 48, bh = 12;
         const endFrac = g.xpNeed > 0 ? Math.max(0, Math.min(1, (g.xpNow || 0) / g.xpNeed)) : 0;
         const startFrac = leveled ? 0 : Math.max(0, Math.min(1, ((g.xpNow || 0) - (g.xp || 0)) / Math.max(1, g.xpNeed || 1)));
@@ -273,12 +205,11 @@ export default function onlineGameScene(k) {
         k.drawRect({ pos: k.vec2(x + 24, ly), width: bw, height: bh, radius: bh / 2, color: col(THEME.bgAlt), opacity: 0.9 * e, fixed: true });
         if (frac > 0) k.drawRect({ pos: k.vec2(x + 24, ly), width: Math.max(bh, bw * frac), height: bh, radius: bh / 2, color: col(THEME.amber), opacity: e, fixed: true,
           gradient: { dir: "v", stops: [[0, [255, 214, 140]], [1, THEME.amber]] } });
-        if (frac > 0 && fillP < 1) k.drawCircle({ pos: k.vec2(x + 24 + Math.max(bh, bw * frac), ly + bh / 2), radius: 9, color: col([255, 230, 170]), opacity: 0.5 * e, fixed: true }); // bright head while filling
+        if (frac > 0 && fillP < 1) k.drawCircle({ pos: k.vec2(x + 24 + Math.max(bh, bw * frac), ly + bh / 2), radius: 9, color: col([255, 230, 170]), opacity: 0.5 * e, fixed: true });
         ly += bh + 10;
         k.drawText({ text: `Lv ${g.levelTo}`, pos: k.vec2(x + 24, ly), size: 12, font: FONT_BOLD, anchor: "left", color: col(UI.body), opacity: e, fixed: true });
         k.drawText({ text: `${g.xpNow} / ${g.xpNeed} XP`, pos: k.vec2(x + w - 24, ly), size: 12, font: "gameFont", anchor: "topright", color: col(UI.mut), opacity: e, fixed: true });
         if (leveled && fillP > 0.55) {
-          // LEVEL UP badge: pops in (scale 1.3 → 1) once the bar wraps, then pulses.
           const bp = Math.min(1, (fillP - 0.55) / 0.25), sc = 1 + (1 - bp) * 0.3;
           const pulse = prefersReducedMotion() ? 1 : 0.85 + 0.15 * Math.sin(k.time() * 5);
           const txt = `LEVEL UP   ${g.levelFrom} to ${g.levelTo}`, tw = (typeof k.measureText === "function" ? k.measureText(txt, 13, FONT_BOLD) : txt.length * 8) + 28;
@@ -300,121 +231,79 @@ export default function onlineGameScene(k) {
       k.drawText({ text: `${TOUCH ? "tap" : "tap / space"} to continue`, pos: k.vec2(cx, y + hgt - 24), size: 12, font: "gameFont", anchor: "top", color: col(UI.mut), opacity: e * dPulse, fixed: true });
     }
 
-    // Smooth render positions (interpolate toward authoritative snapshots).
     const lerp = (a, b, t) => a + (b - a) * t;
-    // TQ-478 (RT-NET 4/5): render remote entities INTERP_DELAY in the past, interpolated between the two
-    // buffered snapshots bracketing that time. This is the classic entity-interpolation jitter buffer —
-    // a late/early packet just shortens/lengthens the buffer lead instead of stuttering, and (unlike the
-    // old chase-the-latest extrapolation) there's no overshoot-then-snap-back. Past the newest sample we
-    // extrapolate from the last segment for at most EXTRAP_CAP, then hold. Rendering remote players in the
-    // past is also exactly what server lag-compensation (TQ-479) rewinds to, so this sets combat up to be
-    // fair. Velocity for the walk anim/facing is derived from the active segment.
-    const INTERP_DELAY = 0.12; // s — render remote entities this far in the past (RT-NET 1/5); window.__tqInterpDelay overrides for QA
-    // Samples kept per entity. MUST span INTERP_DELAY + jitter so the jitter buffer never runs dry (which
-    // snaps/stutters remote entities). This is an ENTRY count, so its TIME span shrinks as the snapshot rate
-    // rises: at the old 15Hz, 8 samples ≈ 0.53s (ample); but TQ-504/506 raised the rate to 60Hz where 8 ≈
-    // 0.13s — barely over the 0.12s delay, so any packet jitter starved it. 24 ≈ 0.4s at 60Hz (and more at
-    // lower rates) — comfortable headroom across the whole clamped 1..60Hz range. (sampleBuf's bracket search
-    // walks back only to rt, so a deeper buffer doesn't cost more per frame.)
+    const INTERP_DELAY = 0.12;
+    // Entry count: must span INTERP_DELAY + jitter at the max (60Hz) snapshot rate
     const BUF_MAX = 24;
-    const EXTRAP_CAP = 0.10;   // s — max extrapolation past the newest sample before holding
-    const SNAP_DIST2 = (GAME.BASE_SPEED * 1.7 * 0.5) ** 2; // jump beyond ~0.5s of sprint between snapshots = teleport/respawn → snap (clear buffer), don't glide across it
-    const interpDelay = () => { try { const v = window.__tqInterpDelay; return typeof v === "number" && v >= 0 ? v : INTERP_DELAY; } catch { return INTERP_DELAY; } };
-    // Append a fresh authoritative sample (client-clock timestamp) to an entity's jitter buffer; snap on a teleport.
+    const EXTRAP_CAP = 0.10;
+    const SNAP_DIST2 = (GAME.BASE_SPEED * 1.7 * 0.5) ** 2;
     const pushSample = (r, t, x, y) => {
       const last = r.buf[r.buf.length - 1];
       if (last) { const dx = x - last.x, dy = y - last.y; if (dx * dx + dy * dy > SNAP_DIST2) r.buf.length = 0; }
       r.buf.push({ t, x, y });
       if (r.buf.length > BUF_MAX) r.buf.shift();
     };
-    // Set r.x/r.y (+ r.vx/r.vy, for the walk anim) from the buffer at render time rt. No-op with no samples.
     const sampleBuf = (r, rt) => {
       const b = r.buf, n = b.length;
       if (!n) return;
       if (n === 1 || rt <= b[0].t) { r.x = b[0].x; r.y = b[0].y; r.vx = 0; r.vy = 0; return; }
       const last = b[n - 1];
-      if (rt >= last.t) { // starved → extrapolate the last segment briefly, then hold
+      if (rt >= last.t) {
         const prev = b[n - 2], seg = Math.max(0.001, last.t - prev.t);
         const vx = (last.x - prev.x) / seg, vy = (last.y - prev.y) / seg, ahead = Math.min(rt - last.t, EXTRAP_CAP);
         r.x = last.x + vx * ahead; r.y = last.y + vy * ahead; r.vx = vx; r.vy = vy; return;
       }
-      let i = n - 2; // find the segment [i,i+1] bracketing rt
+      let i = n - 2;
       while (i > 0 && b[i].t > rt) i--;
       const a = b[i], c = b[i + 1], seg = Math.max(0.001, c.t - a.t), f = (rt - a.t) / seg;
       r.x = a.x + (c.x - a.x) * f; r.y = a.y + (c.y - a.y) * f;
       r.vx = (c.x - a.x) / seg; r.vy = (c.y - a.y) / seg;
     };
     const selfRender = { x: net.state.self.x, y: net.state.self.y };
-    // TQ-529: on arrival in a new region snap the render position to the server spawn and forget the old
-    // region's fog + interpolation buffers (the entity ids are all new anyway).
     onRegionArrived = () => {
       selfRender.x = net.state.self.x; selfRender.y = net.state.self.y;
       explored.clear();
-      try { monsterRender.clear(); projRender.clear(); } catch { /* buffers not yet created */ }
+      try { monsterRender.clear(); projRender.clear(); } catch {}
       tutNotice = { text: `Region ${net.state.depth || 1} — a new land unfolds`, at: Date.now() };
     };
-    // DEV-only probe: the live PREDICTED position vs the authoritative snapshot, so a headless harness
-    // can measure reconciliation rubberbanding (backward jumps) under injected latency. Stripped from prod.
-    let predWall = false; // set by the prediction step when a wall blocks the input (DEV QA probes read it)
-    // ACK-BASED RECONCILIATION: where the local prediction was when each move input went out (seq → x,y and
-    // the input's direction). A snapshot's `ack` names the last input the server applied, so its position is
-    // compared with OUR position at that same input — not with "now" — and the legitimate prediction lead
-    // (incl. the lead along the PREVIOUS direction after a turn) is already inside the history. The old
-    // current-direction lead estimate yanked the player back along the old heading on every turn under lag.
     const predHist = [];
     function recordInput(seq, idx, idy) {
       if (typeof seq !== "number") return;
       predHist.push({ seq, x: selfRender.x, y: selfRender.y, dx: idx, dy: idy });
       if (predHist.length > 96) predHist.shift();
     }
-    if (import.meta.env && import.meta.env.DEV) { try { window.__selfRender = () => ({ x: selfRender.x, y: selfRender.y, sx: net.state.self.x, sy: net.state.self.y, rtt: net.state.rtt, wall: predWall }); } catch { /* no window */ } }
-    const othersRender = new Map(); // id -> { x, y, vx, vy, buf:[{t,x,y}], moving, dir } (TQ-478 interpolation jitter buffer)
-    let lastPlayersRef = null; // ref of the last snapshot's players array → detect a fresh snapshot
-    let liveGen = 0; // per-frame epoch for mark-and-sweep liveness of the render maps (replaces per-frame Set allocs)
-    const monsterRender = new Map(); // id -> { x, y, vx, vy, buf:[{t,x,y}], bx, by, moving, dir } — interpolation jitter buffer (TQ-478) + derives walk anim/facing (same scheme as rivals)
+    const othersRender = new Map();
+    let lastPlayersRef = null;
+    let liveGen = 0;
+    const monsterRender = new Map();
     let lastMonstersRef = null;
-    const projRender = new Map(); // projectile id -> { x, y, vx, vy, chainId } (extrapolated)
-    const ents = []; // reused per frame for the Y-sorted draw list (cleared, not reallocated) — avoids a fresh array + growth reallocs each frame
-    const byY = (a, b) => a.y - b.y; // stable comparator (hoisted out of the per-frame draw so it isn't reallocated)
-    // TQ-262: live-DOM monster overlay. Monsters whose TYPE carries a renderable html model render as
-    // pooled DOM nodes synced to their on-screen position; everything else keeps the canvas sprite path.
-    // Collected per frame here, synced after the actor draw gate. Dormant until a monster ships a model.
+    const projRender = new Map();
+    const ents = [];
+    const byY = (a, b) => a.y - b.y;
     const htmlEnts = [];
-    const combatHtmlEnts = []; // TQ-262: the (≤2) combatants that render via the DOM overlay during a fight
+    const combatHtmlEnts = [];
     const htmlOverlay = createHtmlMonsterOverlay(k);
-    k.onSceneLeave(() => htmlOverlay.destroy()); // remove the overlay div + pooled nodes when leaving the round
-    const portalSeen = new Map(); // portal "x,y" -> first-seen time (drives the rise animation)
+    k.onSceneLeave(() => htmlOverlay.destroy());
+    const portalSeen = new Map();
     let selfMoving = false;
-    let stepAcc = 0; // throttle for footstep dust while roaming
-    let stormFxAcc = 0; // throttle for ambient storm particles while outside the safe zone (PV-T13)
-    let prevLevels = new Map(); // monsterId -> last level, for level-up SFX (state diff)
-    let prevChests = null; // last frame's chests, for chest-open SFX (state diff); null = first frame
-    let prevChainIds = null; // owned chain ids last frame, for loot-naming floaters (null = first frame)
-    let prevChainsRef = null; // last frame's net.state.chains array REF — diff only when the snapshot replaced it
-    const NO_CHAINS = []; // shared empty so an absent chains array doesn't churn the ref gate (new [] each frame)
-    let selfDir = { x: 0, y: 1 }; // last heading, for character facing
-    // TQ-458: snapshot the player's key bindings ONCE at scene start (defaults if unset). Read here
-    // — never per frame — so movement stays free of localStorage reads (a11y.js perf lesson); a
-    // rebind in settings applies on the next scene load, same as the other model/menu prefs.
+    let stepAcc = 0;
+    let stormFxAcc = 0;
+    let prevLevels = new Map();
+    let prevChests = null;
+    let prevChainIds = null;
+    let prevChainsRef = null;
+    const NO_CHAINS = [];
+    let selfDir = { x: 0, y: 1 };
     const KB = getBindings();
     const anyDown = (action) => { const ks = KB[action]; for (let i = 0; i < ks.length; i++) if (k.isKeyDown(ks[i])) return true; return false; };
     const bindPress = (action, handler) => { for (const key of KB[action]) k.onKeyPress(key, handler); };
-    // P8-T8: first-run onboarding overlay — shown once (localStorage), dismissed by
-    // moving or tapping. An overlay in this scene (not a new scene — main.js is @phaser's).
     let onboard = false;
     try { onboard = !localStorage.getItem("tq_onboarded"); } catch {}
     let onboardT = 0;
     const dismissOnboard = () => { if (!onboard) return; onboard = false; try { localStorage.setItem("tq_onboarded", "1"); } catch {} };
 
-    // TQ-518: first-run TUTORIAL — contextual steps shown through the objective pill on a brand-new
-    // player's first run(s): move → engage a wild monster → finish a fight → extract. Each step completes
-    // from live game state (no extra server messages) and progress persists in localStorage, so a player
-    // who dies mid-tutorial resumes at the same step next run. Players who onboarded before this shipped
-    // (tq_onboarded set, no tutorial key) skip it — they already know the loop.
     const TUT_KEY = "tq_tutorial";
     const TUT_STEPS = [
-      // `done` is cumulative: a later milestone (e.g. a fight that starts the moment you spawn) also completes
-      // the earlier steps, so the tutorial never gets stuck on an instruction the player has already outgrown.
       { text: (T) => T ? "Tutorial 1/4 — Drag the joystick to move around" : "Tutorial 1/4 — Move with WASD or the arrow keys", done: (f) => f.moved || f.fought || f.finished || f.extracted },
       { text: () => "Tutorial 2/4 — Walk into a wild monster to start a fight", done: (f) => f.fought || f.finished || f.extracted },
       { text: (T) => T ? "Tutorial 3/4 — Tap an attack to win, or Catch when it is weak" : "Tutorial 3/4 — Press 1-4 to attack, or C to catch when it is weak", done: (f) => f.finished || f.extracted },
@@ -444,21 +333,11 @@ export default function onlineGameScene(k) {
     function drawOnboarding() {
       onboardT += k.dt();
       const W = k.width(), H = k.height(), cx = W / 2;
-      // Near-opaque: the HUD clusters are hidden during onboarding, but the WORLD entities
-      // (rival nameplates, wild monsters, chests) are game objects that still render — at 0.86
-      // their bright bits bled through the tutorial. 0.96 keeps a faint sense of the world
-      // without the distracting bleed.
-      // Design upgrade: a top-lit material wash (surface → base) instead of a flat near-black sheet, the bold
-      // display face for the title, and the shared ornamental rule (centred, amber) under it.
-      // UI v3: a near-opaque dark wash, then a frosted card that lists each action as a bold label with
-      // its control beside it (two columns on wide screens, stacked on a phone).
       k.drawRect({ pos: k.vec2(0, 0), width: W, height: H, color: k.rgb(...THEME.bg), opacity: 0.94, fixed: true,
         gradient: { dir: "v", stops: [[0, THEME.surface, 0.95], [0.4, THEME.bg, 0.95], [1, THEME.bgAlt, 0.97]] } });
       const narrowOb = W < 480;
       const obW = Math.min(680, W - 24);
       const obX = cx - obW / 2;
-      // MB-11: hints match the actual controls — touch gestures on touch devices,
-      // keys on desktop (showing "WASD/Q/1-4/ESC" to a phone player was confusing).
       const lines = TOUCH ? [
         "Move — drag the left side of the screen",
         "Sprint — push the joystick all the way out (drains stamina)",
@@ -478,9 +357,6 @@ export default function onlineGameScene(k) {
         "The stakes — die and you lose your team and everything you found this run",
         "Leave — ESC",
       ];
-      // Narrow phone: the long instruction lines wrap, but the fixed 36px spacing made them
-      // overlap into an unreadable jumble. Flow the y by each entry's wrapped line count.
-      // Each entry is "Action — how"; split it into a bold label column + a body column.
       const rows = lines.map((ln) => { const i = ln.indexOf(" — "); return i > 0 ? [ln.slice(0, i), ln.slice(i + 3)] : [ln, ""]; });
       const labW = narrowOb ? 0 : 150, pad = narrowOb ? 14 : 22, bodyW = obW - pad * 2 - labW;
       const sz = narrowOb ? 13 : 15, lh = sz + 5;
@@ -504,148 +380,87 @@ export default function onlineGameScene(k) {
         ly += rowH(r);
       });
       k.popClip();
-      const pulse = prefersReducedMotion() ? 0.9 : 0.55 + 0.45 * Math.sin(k.time() * 4); // a11y: static hint under reduce-motion
+      const pulse = prefersReducedMotion() ? 0.9 : 0.55 + 0.45 * Math.sin(k.time() * 4);
       k.drawText({ text: TOUCH ? "Tap anywhere to begin" : "Move or tap to begin", pos: k.vec2(cx, obY + obH - 26), size: 14, font: FONT_BOLD, anchor: "center", color: k.rgb(...THEME.amber), opacity: pulse, fixed: true });
     }
-    let awaiting = false; // true while a combat turn is being resolved (AI ~1-2s)
+    let awaiting = false;
     let lastLogLen = 0;
-    const logTicker = { line: "", t0: 0 }; // the combat log strip's scroll start (a new line restarts it)
-    // Combat ATTACK animation (standard idle/walk/attack clip from systems/monsterAnim): k.time()
-    // when each side's one-shot lunge began (-1 = not attacking). Set when a player's attack
-    // resolves; the active monster lunges, the enemy counter-lunges a beat later.
+    const logTicker = { line: "", t0: 0 };
     let activeAtkT0 = -1, enemyAtkT0 = -1;
-    // TQ-125: in-combat monster inspect — tap the enemy / your-monster header row to open the shared
-    // monster-detail popup (epic TQ-87). `combatInspect` is "enemy" | "active" | null; `combatRowRects`
-    // is set each frame from the drawn header geometry so pointerDown can hit-test the rows.
     let combatInspect = null, combatRowRects = null;
 
-    // ── Onscreen controls (mobile only) ──
-    // touchPrimary() is true ONLY when a finger is the primary input (phone/tablet) — NOT on a
-    // touchscreen laptop/desktop, which keeps mouse-drag + keyboard and shows no virtual stick.
     const TOUCH = touchPrimary(k);
-    // MB-4: keep the touch controls clear of the notch / rounded corners / home-bar.
-    // env(safe-area-inset-*) is in CSS px; the canvas is uniformly FIT-scaled (design
-    // height = k.height()), so 1 design unit = canvasCssHeight/k.height() CSS px —
-    // divide to convert insets into the design space the HUD is laid out in. Cached
-    // (DOM reads aren't free) + refreshed on a throttle in onUpdate; computed only on
-    // touch devices, so desktop stays all-zero and nothing moves.
     let safeInset = { top: 0, right: 0, bottom: 0, left: 0 };
-    const recomputeSafeInset = () => { safeInset = safeInsetsDesign(k); }; // shared helper (design-unit notch/home-bar insets)
+    const recomputeSafeInset = () => { safeInset = safeInsetsDesign(k); };
     if (TOUCH) recomputeSafeInset();
-    // HUD-OUT: the shared gutter layout — every HUD cluster sits OUTSIDE the square. Call
-    // per frame (resize/orientation-safe); draw + tap-hit-test read the SAME slots.
     const hudSlots = () => hudLayout(k.width(), k.height(), { inset: safeInset, maxAspect: winAspect(), touch: TOUCH });
-    const COMBAT_H = 264; // taller panel: room for larger, touch-friendly action buttons
+    const COMBAT_H = 264;
 
-    // Task: bring the LOBBY's left-side identity + inventory panel (drawHubPanel — character/gold/
-    // team/chains/items) into the cave, so your character + resources stay visible during a run. The
-    // panel reads team/gold/chains/items from net.state while joined; `character` supplies the local
-    // identity (name/level). Shown only in LANDSCAPE (the wide side gutter has room for the tall stack)
-    // while roaming — portrait keeps the existing compact clusters, and it's hidden behind the
-    // combat/result/onboarding/menu overlays. When it's up, the gutter team+chain mini-clusters are
-    // suppressed (the panel already includes them) and the gutter objective is moved onto the square
-    // edge (the panel fills the gutter where the objective used to sit).
     const lobbyChar = (() => { try { return getCharacter(args.characterId); } catch { return null; } })()
       || { name: net.state.nickname || "Tamer", level: 1, isGuest: false };
     const lobbyPanelActive = () => hudSlots().orientation === "landscape"
       && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected;
-    const THROW_PAD_R = 66; // TQ-526: floating THROW pad radius (spawns wherever the right-half touch lands)
-    const THROW_HINT_R = 42; // TQ-526: faint idle hint at the throw "home" slot, for discoverability
-    const throwBtnC = () => { const t = hudSlots().throwBtn; return k.vec2(t.x, t.y); }; // idle throw-hint anchor (right gutter slot)
-    const SWAP_R = 40; // TQ-526: fixed chain-swap button (bigger)
+    const THROW_PAD_R = 66;
+    const THROW_HINT_R = 42;
+    const throwBtnC = () => { const t = hudSlots().throwBtn; return k.vec2(t.x, t.y); };
+    const SWAP_R = 40;
     const swapBtnC = () => { const s = hudSlots().swapBtn; return s ? k.vec2(s.x, s.y) : k.vec2(-999, -999); };
-    // TQ-487: drag the THROW button to aim. While a finger holds the button, this tracks the
-    // aim direction (button-center → finger); release throws that way (or along heading if it was a tap).
-    let throwAim = null; // TQ-526: { id, origin:{x,y}, dir:{x,y}, dragged:bool, t0, enabled } | null — floating throw pad
-    // TQ-450: hold-to-charge throw. While the throw key/button is held, charge builds toward 1 over
-    // CHARGE_TIME_S; releasing throws with that charge (farther + faster). The held chain visibly spins
-    // faster as it charges. A quick tap = charge 0 = the original throw, so it's purely additive.
-    let throwCharge = 0;       // current charge level 0..1 (0 when not charging)
-    let kbCharge = null;       // { t0 } while the keyboard throw key is held (null otherwise)
-    let throwSpinPhase = 0;    // extra accumulated spin for the held chain while charging (smooth, monotonic)
-    let throwLungeT0 = -9;     // TQ-451: k.time() the last throw was loosed → drives the release-lunge pose (decays)
-    // TQ-451: where the tamer is currently aiming (for the throw wind-up/lunge lean): the mouse on PC,
-    // the THROW-button drag on touch, else the heading. Bare {x,y} (no vec methods — kvec2-no-methods).
+    let throwAim = null;
+    let throwCharge = 0;
+    let kbCharge = null;
+    let throwSpinPhase = 0;
+    let throwLungeT0 = -9;
     const currentAimDir = () => {
       if (!TOUCH) { const m = k.mousePos(), ax = m.x - k.width() / 2, ay = m.y - k.height() / 2, al = Math.hypot(ax, ay); if (al > 4) return { x: ax / al, y: ay / al }; }
       if (throwAim && throwAim.dragged) return throwAim.dir;
       return selfDir;
     };
-    // MB-11: touch pause button — the pause/leave menu was ESC-only, so touch players had
-    // no way to pause or leave a round. The menu itself is already touch-operable (see
-    // pointerDown's menuBtns hit-test).
-    const pauseBtnRect = () => { const p = hudSlots().pause; return [p.x, p.y, p.w, p.h]; }; // HUD-OUT: gutter slot
-    // ESC pause/settings overlay (Resume · Sound · Leave). ESC no longer instantly
-    // quits the round (was accidental round-loss). The world keeps running server-side.
+    const pauseBtnRect = () => { const p = hudSlots().pause; return [p.x, p.y, p.w, p.h]; };
     let menuOpen = false;
-    let menuSel = 0; // TQ-459: highlighted pause-menu row for gamepad d-pad navigation
-    let leaveArm = false; // two-step confirm on "Leave round" — abandoning loses the run (SP-parity with 9dc80a8)
-    let extractFlashT = null; // extraction climax flash start (PV juice, MP parity with SP)
+    let menuSel = 0;
+    let leaveArm = false;
+    let extractFlashT = null;
     let extractSfxDone = false;
     const menuBtns = () => {
       const cx = k.width() / 2, bw = Math.min(300, k.width() - 72), bh = 50, gap = 12, y0 = k.height() / 2 - 46;
       return [
         { rect: [cx - bw / 2, y0, bw, bh], label: "Resume", act: () => { menuOpen = false; leaveArm = false; } },
         { rect: [cx - bw / 2, y0 + (bh + gap), bw, bh], label: `Sound: ${isMuted() ? "Off" : "On"}`, act: () => { toggleMuted(); leaveArm = false; } },
-        // TQ-529: an adventure has no stakes — one tap returns you to the village with team + finds kept.
-        // Otherwise two-step: first tap arms (abandoning a round loses the run), second confirms.
         net.state.adventure
           ? { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: "Return to village", act: () => { menuOpen = false; leaveArm = false; net.returnHome(); } }
           : { rect: [cx - bw / 2, y0 + (bh + gap) * 2, bw, bh], label: leaveArm ? "Confirm — lose this run" : "Leave round", danger: leaveArm,
-            act: () => { if (!leaveArm) { leaveArm = true; return; } menuOpen = false; leaveArm = false; net.leaveRun(); } }, // the server ends the run → result card → exitAfterRun → village
+            act: () => { if (!leaveArm) { leaveArm = true; return; } menuOpen = false; leaveArm = false; net.leaveRun(); } },
       ];
     };
 
-    // Shared neutral accent for monster slots + attack pills (theme.accentColor — one source of truth).
-    // hpColor is now the shared theme helper (was a local raw-RGB copy w/ a 0.2 threshold) so
-    // the in-round team/HP bars match every menu HP bar — palette + thresholds in one place.
-    // Rounded stat bar in fixed/overlay space, with an optional right-aligned label.
     function drawBar(x, y, w, h, ratio, col, label, pulseLow = false) {
       const r = Math.max(0, Math.min(1, ratio || 0));
       k.drawRect({ pos: k.vec2(x, y), width: w, height: h, radius: h / 2, color: k.rgb(...UI.track), fixed: true });
       if (r > 0) {
         const fw = Math.max(h, w * r);
         k.drawRect({ pos: k.vec2(x, y), width: fw, height: h, radius: h / 2, color: k.rgb(col[0], col[1], col[2]), fixed: true });
-        // Critical-HP urgency: a pulsing bright wash over a near-empty HP fill so it
-        // visibly throbs — the red colour alone is easy to miss on a busy frame.
-        // Opt-in (HP bars only, not energy/stamina); frozen under reduce-motion.
         if (pulseLow && r <= 0.25 && !prefersReducedMotion()) {
           k.drawRect({ pos: k.vec2(x, y), width: fw, height: h, radius: h / 2, color: k.rgb(255, 255, 255), opacity: 0.12 + 0.22 * (0.5 + 0.5 * Math.sin(k.time() * 8)), fixed: true });
         }
       }
       if (label) {
-        // Dark shadow under the number so it stays legible on a bright (full green) fill — white
-        // text on the green bar was low-contrast. Fixes every drawBar caller (team HUD + combat).
         k.drawText({ text: label, pos: k.vec2(x + w - 5, y + h / 2 + 1), size: 11, font: "gameFont", anchor: "right", color: k.rgb(...UI.panel), opacity: 0.75, fixed: true });
         k.drawText({ text: label, pos: k.vec2(x + w - 6, y + h / 2), size: 11, font: "gameFont", anchor: "right", color: k.rgb(...UI.text), fixed: true });
       }
     }
-    // Prettify a status label for display: camelCase / snake_case → Title Case, so an
-    // AI-invented status (e.g. "defenseDown") reads as "Defense Down" while canonical ones
-    // (Burn, Stun, …) are unchanged.
     const prettyStatus = (s) => String(s || "")
       .replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim()
       .replace(/\b\w/g, (c) => c.toUpperCase());
-    // One combatant's header (element badge + name + Lv + status) and HP/energy bars.
-    // `side`: "enemy" | "self" for the VS-6 orientation accent.
     function drawCombatant(mon, y, title, m, W, flash = 0, side = null) {
       if (!mon) return;
-      // VS-6: a colored left-edge strip (enemy = danger red, you = teal) so it's
-      // instantly clear which row is the enemy vs your monster.
-      // UI v4: each combatant is a GLASS ROW with a side accent (enemy danger / yours ember), a ringed
-      // portrait tile, bold name + level chip, the HP meter with its number in a gutter, and a thin energy
-      // meter with a bolt. Row geometry is unchanged (y / 42px), so the tap hit-tests stay valid.
       const sideCol = side === "enemy" ? UI.danger : UI.primary;
       drawGlass(k, { rect: [m - 8, y - 3, W + 16, 42], radius: 12, tint: 0.3, fill: 0.045, line: 0.08, fixed: true });
       if (side) k.drawRect({ pos: k.vec2(m - 8, y + 3), width: 3, height: 30, radius: 1.5, color: k.rgb(...sideCol), fixed: true });
-      const P = 44, fainted = mon.maxHealth && mon.currentHealth <= 0; // KO'd → gray the portrait (team-HUD parity)
+      const P = 44, fainted = mon.maxHealth && mon.currentHealth <= 0;
       k.drawRect({ pos: k.vec2(m, y + 2), width: 34, height: 34, radius: 10, color: k.rgb(...THEME.bg), opacity: 0.7, fixed: true });
       k.drawRect({ pos: k.vec2(m + 0.5, y + 2.5), width: 33, height: 33, radius: 9.5, color: k.rgb(...sideCol), opacity: fainted ? 0.3 : 0.7, fill: false, outline: { width: 1.5, color: k.rgb(...sideCol) }, fixed: true });
-      // TQ-397: drawMonsterIcon (not a raw sprite) so a GENERATED (html-model) monster rasterizes its
-      // authored visual here instead of throwing on the missing baked sprite → empty portrait box.
-      drawMonsterIcon(k, { typeName: mon.typeName, cx: m + 17, cy: y + 19, scale: 0.125, topY: y + 3, fixed: true, opacity: fainted ? 0.3 : 1, measure: false }); // never a pixel read-back mid-fight
+      drawMonsterIcon(k, { typeName: mon.typeName, cx: m + 17, cy: y + 19, scale: 0.125, topY: y + 3, fixed: true, opacity: fainted ? 0.3 : 1, measure: false });
       const bx = m + P;
-      // Name on ONE line (truncated) + a level chip after it; status (if any) right-aligned in amber.
       const lvTxt = `Lv ${mon.level}`;
       const lvW = (typeof k.measureText === "function" ? k.measureText(lvTxt, 9, FONT_BOLD) : 24) + 14;
       const statusTxt = mon.status ? prettyStatus(mon.status) : "";
@@ -658,22 +473,17 @@ export default function onlineGameScene(k) {
       drawChip(k, { x: bx + nmW + 8, y: y - 1, text: lvTxt, color: THEME.textBody, size: 9, h: 17, padX: 6, fixed: true });
       if (statusTxt) k.drawText({ text: statusTxt, pos: k.vec2(m + W, y + 1), size: 12, font: FONT_BOLD, anchor: "right", color: k.rgb(...UI.amber), fixed: true });
       const hpR = mon.maxHealth ? mon.currentHealth / mon.maxHealth : 0;
-      // The HP number lives in its own gutter RIGHT of the bars; both bars shorten by the gutter so they stay aligned.
       const hpTxt = `${mon.currentHealth}/${mon.maxHealth}`, gutter = Math.min(76, Math.max(46, hpTxt.length * 7.2 + 12));
       const barW = W - P - gutter;
       drawBar(bx, y + 19, barW, 11, hpR, hpColor(hpR), null, true);
       k.drawText({ text: hpTxt, pos: k.vec2(bx + W - P, y + 24), size: 12, font: FONT_BOLD, anchor: "right", color: k.rgb(...(hpR <= 0.25 ? THEME.danger : UI.text)), fixed: true });
       if (mon.maxEnergy) { drawIcon(k, "bolt", { x: bx + 5, y: y + 35.5, size: 9, color: [120, 180, 250], fixed: true }); drawBar(bx + 12, y + 33, barW - 12, 5, mon.currentEnergy / mon.maxEnergy, [90, 160, 240], null); }
-      // Hit-flash: a brief white pulse over the row when this combatant took damage (PV-A5 juice).
       if (flash > 0) k.drawRect({ pos: k.vec2(m - 5, y - 4), width: W + 10, height: 44, radius: 5, color: k.rgb(255, 255, 255), opacity: 0.3 * flash, fixed: true });
     }
 
-    // ── Minimap / radar (P2-T5 readability) ── Always shows the objective: the
-    // shrinking safe zone + extraction portals + your position, over a faint
-    // downsampled terrain, so you can navigate to extract before the zone closes.
-    const mmSizeBase = minimapSize(k.width(), k.height()); // shared SP↔MP rule (render/minimap.js); drawMinimap uses the HUD slot's clamped size
-    let mmCells = null; // precomputed terrain: [{fx, fy, col}] as 0..1 map fractions
-    let mmZoom = 1; // PT1-T24 parity: cycles MINIMAP_ZOOM_LEVELS (1× full map → 2× → 4× player-centered; tap the minimap)
+    const mmSizeBase = minimapSize(k.width(), k.height());
+    let mmCells = null;
+    let mmZoom = 1;
     function buildMinimap() {
       if (!map) return;
       const N = 34, step = Math.max(1, Math.floor(map.mapSize / N));
@@ -682,15 +492,12 @@ export default function onlineGameScene(k) {
         for (let y = 0; y < map.mapSize; y += step) {
           const t = map.tileMap[x]?.[y];
           if (!t) continue;
-          // PT1-T07: bias the radar cell toward its biome's representative tint so
-          // biomes read distinctly (was muddy per-tile averages → "all green");
-          // keep a little tile variation for texture. Matches the SP minimap.
           const tc = [t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b];
           const tint = biomeTintAt(map, x, y);
           const col = tint
             ? [Math.round(tint[0] * 0.65 + tc[0] * 0.35), Math.round(tint[1] * 0.65 + tc[1] * 0.35), Math.round(tint[2] * 0.65 + tc[2] * 0.35)]
             : tc;
-          cells.push({ tx: x, ty: y, key: fogKey(x, y), fx: x / map.mapSize, fy: y / map.mapSize, col }); // key precomputed: the per-frame fog gate is then a bare Set.has (no fogKey() recompute per cell)
+          cells.push({ tx: x, ty: y, key: fogKey(x, y), fx: x / map.mapSize, fy: y / map.mapSize, col });
         }
       }
       mmCells = { cells, frac: step / map.mapSize };
@@ -699,54 +506,39 @@ export default function onlineGameScene(k) {
       if (!map) return;
       if (!mmCells) buildMinimap();
       const E = GAME.EFFECTIVE_TILE;
-      // HUD-OUT: anchor the radar to its GUTTER slot (outside the square). The slot size
-      // matches mmSize for real device sizes; the tap hit-test + kill feed read the same
-      // slot so they can't drift. Per-frame = resize/orientation-safe.
       const mmSlot = hudSlots().minimap;
       const ox = mmSlot.x, oy = mmSlot.y;
-      // The radar's size is the SLOT's (it is clamped to the gutter width) — the scene-wide mmSize is the
-      // unclamped minimapSize(W,H) and drew a 200px radar into a 136px desktop gutter, off the right edge.
       const mmSize = mmSlot.size || mmSizeBase;
-      // PT1-T24 parity: SAME zoom-window math as the SP radar (render/minimap.js,
-      // "fix once"). Tile-space module → world-space wrappers for the net entities.
-      // At Z=1 the window is the whole map → byte-identical to the old full radar.
       const view = minimapWindow({ mapSize: map.mapSize, mmSize, mmX: ox, mmY: oy, zoom: mmZoom, playerTileX: selfRender.x / E, playerTileY: selfRender.y / E });
       const Z = view.zoom;
       const mm = (wx, wy) => { const p = view.project(wx / E, wy / E); return k.vec2(p.x, p.y); };
       const inWin = (wx, wy) => view.inWindow(wx / E, wy / E);
-      // Design upgrade: the radar frame is the shared panel material (gradient + inner highlight + soft shadow).
       drawGlass(k, { rect: [ox - 6, oy - 6, mmSize + 12, mmSize + 12], radius: 12, tint: 0.6, fill: 0.06, line: 0.14, fixed: true });
-      k.drawRect({ pos: k.vec2(ox - 1, oy - 1), width: mmSize + 2, height: mmSize + 2, radius: 4, color: k.rgb(...UI.panel), opacity: 0.9, fixed: true }); // recessed radar well
-      // UI v4: a faint survey grid in the well, so the fogged early-round radar reads as an UNEXPLORED map
-      // (it was a flat black square that looked broken until the player had walked a lot).
+      k.drawRect({ pos: k.vec2(ox - 1, oy - 1), width: mmSize + 2, height: mmSize + 2, radius: 4, color: k.rgb(...UI.panel), opacity: 0.9, fixed: true });
       for (let g = 1; g < 4; g++) {
         const gx = ox + (mmSize * g) / 4, gy = oy + (mmSize * g) / 4;
         k.drawLine({ p1: k.vec2(gx, oy + 2), p2: k.vec2(gx, oy + mmSize - 2), width: 1, color: k.rgb(...WHITE), opacity: 0.06, fixed: true });
         k.drawLine({ p1: k.vec2(ox + 2, gy), p2: k.vec2(ox + mmSize - 2, gy), width: 1, color: k.rgb(...WHITE), opacity: 0.06, fixed: true });
       }
       if (mmCells) {
-        const step = Math.max(1, Math.round(mmCells.frac * map.mapSize)); // tiles per radar cell
+        const step = Math.max(1, Math.round(mmCells.frac * map.mapSize));
         const cw = Math.max(2, step * view.scale + 0.5);
-        for (const c of mmCells.cells) { // fog of war: only reveal walked-near terrain on the radar
-          if (!explored.has(c.key)) continue; // precomputed key (== isExplored) — skip the per-cell fogKey() recompute
-          if (Z > 1 && !view.cellVisible(c.tx, c.ty, step)) continue; // cull to the box, no spill (cellVisible is unconditionally true at 1×, so skip the call)
+        for (const c of mmCells.cells) {
+          if (!explored.has(c.key)) continue;
+          if (Z > 1 && !view.cellVisible(c.tx, c.ty, step)) continue;
           const p = view.project(c.tx, c.ty);
           k.drawRect({ pos: k.vec2(p.x, p.y), width: cw, height: cw, color: k.rgb(c.col[0], c.col[1], c.col[2]), opacity: 0.5, fixed: true });
         }
       }
-      // Storm ring: 1× only — a circle can't be clipped to the box, so at zoom it would overflow.
       if (net.state.circle && Z === 1) {
         const c = net.state.circle;
-        k.pushClip(ox, oy, mmSize, mmSize); // the ring is clipped to the radar well (an early wide zone used to spill past the frame)
+        k.pushClip(ox, oy, mmSize, mmSize);
         try { k.drawCircle({ pos: mm(c.x, c.y), radius: Math.max(2, (c.r / E) * view.scale), fill: false, outline: { width: 1.5, color: k.rgb(...THEME.storm) }, opacity: 0.85, fixed: true }); } finally { k.popClip(); }
       }
-      const pulse = prefersReducedMotion() ? 0.9 : 0.6 + 0.4 * Math.sin(k.time() * 4); // a11y: static portal blip under reduce-motion
-      // Blip colours are constant across all entities of a kind — build them once per
-      // frame instead of re-allocating a k.rgb per portal/monster/chest/player below.
+      const pulse = prefersReducedMotion() ? 0.9 : 0.6 + 0.4 * Math.sin(k.time() * 4);
       const portalCol = k.rgb(...THEME.portal), monBlipCol = k.rgb(220, 180, 80), chestCol = k.rgb(228, 206, 128), rivalCol = k.rgb(235, 95, 95);
       for (const p of net.state.portals) { if (Z > 1 && !inWin(p.x, p.y)) continue; k.drawCircle({ pos: mm(p.x, p.y), radius: 3.5 * pulse + 1.5, color: portalCol, fixed: true }); }
       for (const mo of net.state.monsters) { if (Z > 1 && !inWin(mo.x, mo.y)) continue; k.drawCircle({ pos: mm(mo.x, mo.y), radius: 1.6, color: monBlipCol, fixed: true }); }
-      // Chests reveal on the minimap only when you're close (discovery, not a full loot map).
       const cmr2 = GAME.SPIRIT_CHAIN.CHEST_MINIMAP_RADIUS ** 2;
       for (const c of net.state.chests) {
         const dx = c.x - selfRender.x, dy = c.y - selfRender.y;
@@ -754,8 +546,6 @@ export default function onlineGameScene(k) {
         if (Z > 1 && !inWin(c.x, c.y)) continue;
         k.drawCircle({ pos: mm(c.x, c.y), radius: 2.2, color: chestCol, fixed: true });
       }
-      // Rivals as a tiny character glyph (head + body) — reads as a *player*, distinct
-      // from the round amber monster blobs (radar scale: shapes > mushy mini-sprites).
       for (const p of net.state.players) {
         if (Z > 1 && !inWin(p.x, p.y)) continue;
         const mp = mm(p.x, p.y);
@@ -764,42 +554,24 @@ export default function onlineGameScene(k) {
       }
       const sp = mm(selfRender.x, selfRender.y);
       k.drawCircle({ pos: sp, radius: 3.5, color: k.rgb(90, 170, 255), outline: { width: 1.5, color: k.rgb(255, 255, 255) }, fixed: true });
-      // Heading "nose": a short line in the facing direction so you can read your
-      // orientation on the radar at a glance — matters for PvP + extraction routing.
       if (selfDir && (selfDir.x || selfDir.y)) {
         const dl = Math.hypot(selfDir.x, selfDir.y) || 1, nx = selfDir.x / dl, ny = selfDir.y / dl;
         k.drawLine({ p1: k.vec2(sp.x + nx * 3, sp.y + ny * 3), p2: k.vec2(sp.x + nx * 9, sp.y + ny * 9), width: 2.2, color: k.rgb(255, 255, 255), opacity: 0.95, fixed: true });
       }
-      // Zoom badge (discoverable; only when zoomed in).
       if (Z !== 1) k.drawText({ text: `${Z}x`, pos: k.vec2(ox + 5, oy + 4), size: 11, font: "gameFont", color: k.rgb(...UI.text), opacity: 0.85, fixed: true });
     }
 
-    // Team HUD layout (top-left). Shared constants so drawTeamHp + drawChainHud
-    // can't desync when the row height changes (PV-T8 compact cards).
-    // WIN-T2: anchor the left HUD cluster (team cards + stamina + chain HUD all key off
-    // TEAM_X/TEAM_Y0) to the square play window's top-left. In landscape pw.x insets it to
-    // the square's left edge (pw.y is 0, square is full-height); in portrait it tucks onto
-    // the square instead of the canvas edge. Reuses pwTop from the label setup above.
-    let TEAM_X = pwTop.x + 12, TEAM_Y0 = pwTop.y + 78; // re-anchored on resize (see onUpdate)
+    let TEAM_X = pwTop.x + 12, TEAM_Y0 = pwTop.y + 78;
     const TEAM_ROW_H = 22, TEAM_CARD_W = 134, TEAM_BAR_H = 7, STAMINA_H = 7;
     const teamLen = () => net.state.self?.team?.length || 0;
     const staminaY = () => TEAM_Y0 + teamLen() * TEAM_ROW_H + 6;
-    const teamHudBottom = () => staminaY() + STAMINA_H + 8; // y where the chain HUD starts
+    const teamHudBottom = () => staminaY() + STAMINA_H + 8;
     const trunc = (s, n) => (s && s.length > n ? s.slice(0, n - 1) + "…" : s || "");
 
-    // Team HP HUD (top-left): a compact card per active monster — element-tinted
-    // dot + name + live HP bar — so storm/combat damage to a *specific* reserve is
-    // identifiable at a glance (was anonymous bars). Names/elements come from the
-    // full active-team objects (state.team, from welcome/roster), index-aligned to
-    // the in-round hp/max snapshot (state.self.team) — no extra snapshot payload.
     function drawTeamHp() {
       const team = net.state.self?.team;
       if (!team || !team.length) return;
-      const full = net.state.team || []; // full active-team (name/typeName/element), index-aligned
-      // Phones / square aspect have no HUD gutter, so this cluster sits over the WORLD — give it a translucent
-      // backing panel (the chain HUD below already has one) so names + bars stay legible on bright terrain.
-      // UI v4: a glass card (phones / square — the landscape gutter is already a dark surface), an eyebrow with the
-      // team icon, a tiny portrait tile per monster, bold names, and a bolt before the stamina meter.
+      const full = net.state.team || [];
       if (hudSlots().orientation !== "landscape") {
         const ph = team.length * TEAM_ROW_H + 6 + STAMINA_H + 14 + 18;
         drawGlass(k, { rect: [TEAM_X - 10, TEAM_Y0 - 22, TEAM_CARD_W + 20, ph], radius: 14, tint: 0.62, fill: 0.05, line: 0.12, fixed: true });
@@ -812,16 +584,12 @@ export default function onlineGameScene(k) {
         const fainted = mo.hp <= 0;
         const m = full[i];
         const name = m ? (m.name || m.typeName || "?") : `Monster ${i + 1}`;
-        // Portrait tile (the monster's real look) — greyed when fainted.
         k.drawRect({ pos: k.vec2(TEAM_X - 2, y - 1), width: 18, height: 18, radius: 5, color: k.rgb(...THEME.bg), opacity: 0.6, fixed: true });
         if (m) drawMonsterIcon(k, { typeName: m.typeName, cx: TEAM_X + 7, cy: y + 8, scale: 0.062, topY: y, fixed: true, opacity: fainted ? 0.35 : 1, measure: false });
         k.drawText({ text: trunc(name, 14), pos: k.vec2(TEAM_X + 21, y - 2), size: 10, font: FONT_BOLD, color: k.rgb(...(fainted ? UI.mut : UI.text)), opacity: fainted ? 0.7 : 1, fixed: true });
-        // HP number on the NAME line, right-aligned (a right-anchored label draws from its top edge, so inside
-        // the 7px bar it hung over the fill). The bar itself carries no label now.
         k.drawText({ text: String(mo.hp), pos: k.vec2(TEAM_X + TEAM_CARD_W, y - 1), size: 9, font: FONT_BOLD, anchor: "right", color: k.rgb(...(fainted ? UI.mut : r <= 0.25 ? THEME.danger : UI.mut)), fixed: true });
         drawBar(TEAM_X + 21, y + 11, TEAM_CARD_W - 21, TEAM_BAR_H, r, fainted ? [70, 70, 78] : hpColor(r), null, !fainted);
       });
-      // Stamina (sprint) under the team: bolt + meter.
       const sy = staminaY();
       const sr = (net.state.stamina ?? GAME.SPRINT.STAMINA_MAX) / GAME.SPRINT.STAMINA_MAX;
       drawIcon(k, "bolt", { x: TEAM_X + 5, y: sy + 3, size: 10, color: sr > 0.3 ? [120, 200, 230] : [220, 170, 80], fixed: true });
@@ -829,18 +597,12 @@ export default function onlineGameScene(k) {
       drawBar(TEAM_X + 62, sy, TEAM_CARD_W - 62, STAMINA_H, sr, sr > 0.3 ? [120, 200, 230] : [220, 170, 80], null);
     }
 
-    // The live instance + definition of the player's equipped spirit chain.
     function equippedChain() {
       const id = net.state.equippedChainId;
       const cs = (net.state.chains || []).find((c) => c.chainId === id);
       return cs ? { cs, def: getSpiritChain(cs.chainId) } : null;
     }
 
-    // PV-T11: throw wind-up tell — a chain-colored ring that snaps inward onto the
-    // tamer the instant a chain is loosed, plus a small spark puff, so the throw has
-    // a readable launch beat (the comet trail + impact burst already cover the flight
-    // and the landing). World-space at the throw origin; self-cancels after ~0.2s.
-    // a11y: a static ring (no inward collapse) under reduce-motion.
     function playThrowWindup(x, y, col) {
       const t0 = k.time(), reduce = prefersReducedMotion();
       const h = k.onDraw(() => {
@@ -849,33 +611,24 @@ export default function onlineGameScene(k) {
         const r = reduce ? 18 : 6 + 26 * (1 - p);
         k.drawCircle({ pos: k.vec2(x, y), radius: r, fill: false, outline: { width: 2 + 2 * (1 - p), color: k.rgb(col[0], col[1], col[2]) }, opacity: 0.6 * (1 - p) });
       });
-      emit({ x, y, n: 6, color: col, speed: 26, life: 0.3, size: 2.4, spread: Math.PI * 2, drag: 3 }); // chain-colored charge sparks (PV-T12 fx path)
+      emit({ x, y, n: 6, color: col, speed: 26, life: 0.3, size: 2.4, spread: Math.PI * 2, drag: 3 });
     }
 
-    // The equipped-chain HUD panel rect (left, under TEAM). Taller when >1 chain is
-    // loaded so the slot-swap pips fit. Shared by the draw + the tap-to-swap hit-test.
     function chainHudRect() {
       const ids = net.state.equippedChainIds || [];
       const bh = ids.length > 1 ? 56 : 40;
-      // Portrait: the team cluster fills the short top gutter, so teamHudBottom() pushes the
-      // chain HUD ~27px into the world. Use the dedicated bottom-gutter slot hudLayout gives.
       const hud = hudSlots();
       if (hud.orientation === "portrait") return [hud.chain.x, hud.chain.y, 150, bh];
       return [TEAM_X, teamHudBottom(), 150, bh];
     }
-    // Equipped-chain HUD: active chain (icon, name, capture charges) + the 3-slot
-    // loadout pips. Throws are FREE now (boomerang), so only charges are shown.
     function drawChainHud() {
       const e = equippedChain();
       const ids = net.state.equippedChainIds || [];
       const [x, y, w, h] = chainHudRect();
-      // UI v4: glass card; the chain glyph in a small well, bold name, a tier chip, and a chain icon before the charges.
       drawGlass(k, { rect: [x, y, w, h], radius: 12, tint: 0.62, fill: 0.05, line: 0.12, fixed: true });
       if (e && e.def) {
         k.drawCircle({ pos: k.vec2(x + 20, y + 20), radius: 15, color: k.rgb(...THEME.bg), opacity: 0.5, fixed: true });
-        drawChainGlyph(k, e.def, { x: x + 20, y: y + 20, size: 24, fixed: true }); // TQ-143: chain ring + tier-coloured centre dot
-        // Fall back to the def's durability if the live counter is missing, so the HUD
-        // never shows "? charges" (a merged chain instance can lack durability).
+        drawChainGlyph(k, e.def, { x: x + 20, y: y + 20, size: 24, fixed: true });
         const dur = e.cs.durability ?? e.def.durability ?? 1;
         const tierN = e.def.tier || 1;
         drawChip(k, { x: x + w - 6, y: y + 5, text: `T${tierN}`, color: tierColor(tierN), size: 8, h: 15, padX: 5, anchor: "right", fixed: true });
@@ -883,8 +636,6 @@ export default function onlineGameScene(k) {
         k.drawText({ text: trunc(e.def.name, nmMax), pos: k.vec2(x + 38, y + 5), size: 11, font: FONT_BOLD, color: k.rgb(...UI.text), fixed: true });
         drawIcon(k, "chain", { x: x + 44, y: y + 27, size: 11, color: UI.body, fixed: true });
         k.drawText({ text: `${dur} charge${dur === 1 ? "" : "s"}   ${TOUCH ? "tap Throw" : "Space"}`, pos: k.vec2(x + 53, y + 22), size: 10, font: "gameFont", color: k.rgb(...UI.body), fixed: true });
-        // CHAIN_SLOTS: a pip per loadout slot, the active one enlarged + ringed; the swap
-        // hint reflects the input ([ ] on desktop, tap the panel on touch).
         if (ids.length > 1) {
           for (let i = 0; i < ids.length; i++) {
             const def = getSpiritChain(ids[i]);
@@ -899,21 +650,14 @@ export default function onlineGameScene(k) {
       } else {
         k.drawText({ text: "No chain", pos: k.vec2(x + 10, y + 14), size: 11, font: "gameFont", color: k.rgb(...UI.mut), fixed: true });
       }
-      // Extraction stakes (genre tension, SP parity): run-found chains are banked on
-      // extract but lost on death — show the count "at risk" (server now flags runFound
-      // in the snapshot's chainsView). Hidden at 0 so there's no early-run clutter.
-      // Everything a death would cost from this run's finds: run-found chains, monsters caught, chest items
-      // (the server sends catches/items as `atRisk`). One amber pill: "At risk" + an icon and count per kind.
       drawAtRiskPill(x, y + h + 6);
     }
 
-    // "At risk" pill: what a death would cost from this run's finds (run-found chains, catches, chest items).
-    // Drawn under the chain HUD (portrait / square) or above the biome chip in the landscape side panel.
     function drawAtRiskPill(x, ry) {
       const ar = net.state.atRisk || {};
       const kinds = [["chain", (net.state.chains || []).filter((c) => c.runFound).length], ["catch", ar.catches || 0], ["bag", ar.items || 0]].filter(([, n]) => n > 0);
       if (kinds.length) {
-        const pw = 58 + kinds.length * 28; // 3 kinds = 142px: fits the 160px landscape gutter (12px inset)
+        const pw = 58 + kinds.length * 28;
         drawGlass(k, { rect: [x, ry, pw, 22], radius: 11, tint: 0.62, fill: 0.05, line: 0, fixed: true });
         k.drawRect({ pos: k.vec2(x + 0.5, ry + 0.5), width: pw - 1, height: 21, radius: 10.5, color: k.rgb(...UI.amber), opacity: 0.6, fill: false, outline: { width: 1, color: k.rgb(...UI.amber) }, fixed: true });
         k.drawText({ text: "At risk", pos: k.vec2(x + 10, ry + 5), size: 11, font: FONT_BOLD, color: k.rgb(...UI.amber), fixed: true });
@@ -925,13 +669,9 @@ export default function onlineGameScene(k) {
       }
     }
 
-    // Zone-death DANGER bar (top of the play window): fills toward death while OUTSIDE the safe
-    // zone (over ~DANGER_FILL_S), drains back to empty in SAFETY (over ~DANGER_DRAIN_S). Driven by
-    // the server-authoritative self.danger (0..1). Amber → red as it fills; pulses while filling.
-    const DANGER_FILL_S = 30; // mirrors the server default — for the seconds-to-death readout only
+    const DANGER_FILL_S = 30; // Mirrors server DANGER_FILL_S (world.js) - change both
     function drawDangerBar(danger, outside) {
       const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
-      // UI v4: a glass card — skull icon, headline, the countdown, and the meter underneath.
       const bw = Math.min(pw.size * 0.62, 380), bh = 8, cardH = 52;
       const bx = pw.cx - bw / 2, by = pw.y + 12;
       const col = danger > 0.6 ? THEME.danger : THEME.amber;
@@ -946,9 +686,6 @@ export default function onlineGameScene(k) {
       if (danger > 0.001) k.drawRect({ pos: k.vec2(bx, by + 34), width: Math.max(bh, bw * danger), height: bh, radius: bh / 2, color: k.rgb(...col), opacity: pulse, fixed: true });
     }
 
-    // Danger overlay: the zone-death bar (whenever there's danger to read), plus a pulsing red
-    // border + run-to-safety arrow while you're actually OUTSIDE the safe zone. Client-side from the
-    // authoritative self position vs the circle + self.danger.
     function drawDanger() {
       const c = net.state.circle, self = net.state.self;
       if (!c || !self) return;
@@ -956,30 +693,18 @@ export default function onlineGameScene(k) {
       const outside = dx * dx + dy * dy > c.r * c.r;
       const danger = Math.max(0, Math.min(1, self.danger || 0));
       if (danger > 0 || outside) drawDangerBar(danger, outside);
-      if (!outside) return; // inside the zone — the draining bar is the only cue (no border/arrow)
+      if (!outside) return;
       const pulse = 0.5 + 0.5 * Math.sin(k.time() * 6);
       const W = k.width(), H = k.height(), t = 8, op = 0.25 + 0.45 * pulse;
-      // Storm danger border + labels routed through THEME.danger (SP↔MP parity;
-      // was hand-tuned [230,60,60] + [255,120,120] / [255,185,185] off-theme pinks).
       const red = k.rgb(...THEME.danger);
       void t;
-      // UI v4: a red VIGNETTE on the play window (radial, transparent centre) instead of four hard bars.
       const pwv = playWindowRect(W, H, { maxAspect: winAspect() });
       k.drawRect({ pos: k.vec2(pwv.x, pwv.y), width: pwv.w, height: pwv.size, color: red, opacity: 1, fixed: true,
         gradient: { dir: "radial", cx: 0.5, cy: 0.5, r: Math.max(pwv.w, pwv.size) * 0.72, stops: [[0, THEME.danger, 0], [0.55, THEME.danger, 0], [1, THEME.danger, 0.55 * op]] } });
-      // Text keys off the square (robust at extreme portrait aspects where H*0.26 would
-      // fall above the square); the border + arrow stay canvas/camera-relative.
       const pw = playWindowRect(W, H, { maxAspect: winAspect() }), cy = pw.y + Math.round(pw.size * 0.26);
-      // (the "Outside the safe zone" headline lives on the danger card above; here only the direction line + arrow)
-      // PT2-T08: make the punishment ACTIONABLE — a screen-edge arrow toward the zone
-      // centre (the nearest safe direction) + the distance still to cross. Without
-      // this the warning says you're in danger but not which way to run.
       const dist = Math.hypot(dx, dy);
       const toSafe = Math.max(0, Math.round((dist - c.r) / GAME.EFFECTIVE_TILE));
       k.drawText({ text: `${toSafe} tiles to safety. Run toward the arrow.`, pos: k.vec2(pw.cx, cy + 26), size: 14, font: FONT_BOLD, anchor: "center", color: red, opacity: 0.8, fixed: true });
-      // Arrow toward the centre, projected to the SQUARE edge (not the screen edge): the world is
-      // only visible inside the square, and a screen-edge arrow lands in the gutter, overlapping the
-      // team HUD / objective (same footgun the portal compass had).
       const ang = Math.atan2(-dy, -dx), cs = Math.cos(ang), sn = Math.sin(ang);
       const hw = pw.size / 2 - 50, hh = pw.size / 2 - 50;
       const scale = Math.min(hw / (Math.abs(cs) || 1e-6), hh / (Math.abs(sn) || 1e-6));
@@ -992,10 +717,6 @@ export default function onlineGameScene(k) {
       k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a2) * head, tip.y + Math.sin(a2) * head), width: aw, color: red, opacity: 0.7 + 0.3 * pulse, fixed: true });
     }
 
-    // Storm-damage hit flash (PV-T13): a brief, brighter pulse of the danger border
-    // on the frame the storm actually ticks HP, fading over ~0.45s. Independent of
-    // drawDanger so it can finish fading even if you've just run back inside the zone.
-    // a11y: under reduce-motion keep it (a fade, not a strobe) but cap the peak alpha.
     function drawStormHit() {
       if (stormHitT < 0) return;
       const age = k.time() - stormHitT;
@@ -1009,11 +730,6 @@ export default function onlineGameScene(k) {
       k.drawRect({ pos: k.vec2(W - t, 0), width: t, height: H, color: red, opacity: a, fixed: true });
     }
 
-    // Off-screen extraction guidance: a screen-edge arrow toward the NEAREST portal
-    // when it isn't already on-screen, so you know which way to run to extract.
-    // Portals otherwise only show on the minimap + once they're in view — easy to
-    // miss in a closing round. Portal-cyan (matches the minimap dots) reads as
-    // "extraction". Hidden once the rift is on-screen (you can see it).
     function drawPortalCompass() {
       const portals = net.state.portals, self = net.state.self;
       if (!portals || !portals.length || !self) return;
@@ -1024,46 +740,34 @@ export default function onlineGameScene(k) {
       }
       if (!np) return;
       const W = k.width(), H = k.height(), margin = 54;
-      // The world is only visible INSIDE the square play window (the gutters are opaque HUD), so
-      // the compass must operate on the square — not the full screen. Using screen bounds left a
-      // blind spot: the compass vanished while the portal sat off the square in the gutter band.
       const pw = playWindowRect(W, H, { maxAspect: winAspect() });
-      // World → screen (the camera centers selfRender on the square, which is canvas-centered).
       const sx = (np.x - selfRender.x) + pw.cx, sy = (np.y - selfRender.y) + pw.cy;
-      if (sx >= pw.x + margin && sx <= pw.right - margin && sy >= pw.y + margin && sy <= pw.bottom - margin) return; // visible in the square
+      if (sx >= pw.x + margin && sx <= pw.right - margin && sy >= pw.y + margin && sy <= pw.bottom - margin) return;
       const ang = Math.atan2(sy - pw.cy, sx - pw.cx), c = Math.cos(ang), s = Math.sin(ang);
       const hw = pw.size / 2 - margin, hh = pw.size / 2 - margin;
       const scale = Math.min(hw / (Math.abs(c) || 1e-6), hh / (Math.abs(s) || 1e-6));
-      const ax = pw.cx + c * scale, ay = pw.cy + s * scale; // square-edge position toward the portal
-      const cyan = k.rgb(...THEME.portal), pulse = prefersReducedMotion() ? 0.9 : 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3; // a11y: static compass under reduce-motion
+      const ax = pw.cx + c * scale, ay = pw.cy + s * scale;
+      const cyan = k.rgb(...THEME.portal), pulse = prefersReducedMotion() ? 0.9 : 0.6 + 0.4 * Math.sin(k.time() * 4), wid = 3;
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 19, color: k.rgb(...THEME.bg), opacity: 0.75, fixed: true });
       k.drawCircle({ pos: k.vec2(ax, ay), radius: 19, fill: false, outline: { width: 1.5, color: cyan }, opacity: 0.5 + 0.35 * pulse, fixed: true });
       drawIcon(k, "portal", { x: ax - c * 4, y: ay - s * 4, size: 12, color: THEME.portal, opacity: 0.6, fixed: true });
       const tip = k.vec2(ax + c * 9, ay + s * 9), b = 8, a1 = ang + Math.PI * 0.78, a2 = ang - Math.PI * 0.78;
-      k.drawLine({ p1: k.vec2(ax - c * 7, ay - s * 7), p2: tip, width: wid, color: cyan, fixed: true }); // shaft
+      k.drawLine({ p1: k.vec2(ax - c * 7, ay - s * 7), p2: tip, width: wid, color: cyan, fixed: true });
       k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a1) * b, tip.y + Math.sin(a1) * b), width: wid, color: cyan, fixed: true });
       k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a2) * b, tip.y + Math.sin(a2) * b), width: wid, color: cyan, fixed: true });
-      const dist = Math.round(Math.sqrt(best) / GAME.EFFECTIVE_TILE); // distance in tiles
+      const dist = Math.round(Math.sqrt(best) / GAME.EFFECTIVE_TILE);
       k.drawText({ text: `${dist}`, pos: k.vec2(ax - c * 31, ay - s * 31), size: 13, font: "gameFont", anchor: "center", color: cyan, fixed: true });
     }
 
-    // Final-minute extraction urgency: the round clock is the deadline, but it's
-    // otherwise just small text in the top-left info line. In the last 60s show a
-    // big centered timer (amber), going red + pulsing in the last 30s, so the
-    // pressure to reach a portal is unmissable. `net.state.time` = seconds left.
     function drawTimeWarning() {
       const t = net.state.time || 0;
       if (t <= 0 || t > 60) return;
-      // WIN: anchor to the square's top so it stays in the play area in portrait
-      // (was canvas-top y=64/92 → floated above the square). Landscape unchanged (pw.y=0).
       const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() }), mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       const crit = t <= 30, pulse = crit ? 0.55 + 0.45 * Math.sin(k.time() * 8) : 1;
-      // When the danger card occupies the top band (outside the zone / recovering), drop the clock under it.
       const selfD = net.state.self, circ = net.state.circle;
       const dangerShown = !!(circ && selfD && ((selfD.danger || 0) > 0 || ((selfD.x - circ.x) ** 2 + (selfD.y - circ.y) ** 2) > circ.r * circ.r));
       const clockY = pw.y + (dangerShown ? 108 : 64);
       const colA = crit ? THEME.danger : THEME.amber, col = k.rgb(...colA);
-      // UI v4: a glass chip around the big clock so it reads against any terrain.
       const tStr = `${mm}:${ss}`, tSize = crit ? 34 : 28;
       const tw = (typeof k.measureText === "function" ? k.measureText(tStr, tSize, FONT_BOLD) : tStr.length * tSize * 0.6) + 70;
       drawGlass(k, { rect: [pw.cx - tw / 2, clockY - tSize / 2 - 8, tw, tSize + 16], radius: (tSize + 16) / 2, tint: 0.62, fill: 0.06, line: 0, fixed: true });
@@ -1073,14 +777,10 @@ export default function onlineGameScene(k) {
       k.drawText({ text: crit ? "Storm closing. Extract now." : "Extract soon", pos: k.vec2(pw.cx, clockY + (crit ? 36 : 32)), size: crit ? 14 : 12, font: FONT_BOLD, anchor: "center", color: col, opacity: 0.85 * pulse, fixed: true });
     }
 
-    // Kill feed (P8-T5): recent round events (PvP defeats, eliminations, escapes)
-    // right-aligned under the minimap, fading out after a few seconds.
     function drawKillFeed() {
       const feed = net.state.killfeed;
       if (!feed || !feed.length) return;
       const now = Date.now(), SHOW = 4000, FADE = 2000;
-      // HUD-OUT: anchor the kill feed just below the radar's GUTTER slot (right-aligned to
-      // the radar's right edge), so it follows the minimap into the gutter.
       const mm = hudSlots().minimap;
       const x = mm.x + mm.size;
       let y = mm.y + mm.size + 14;
@@ -1089,9 +789,6 @@ export default function onlineGameScene(k) {
         if (age > SHOW + FADE) continue;
         const op = age < SHOW ? 1 : Math.max(0, 1 - (age - SHOW) / FADE);
         let text, col;
-        // Truncate names: guest nicks can be 20 chars, and a PvP "X defeated Y" with two long
-        // names overflowed the right gutter and bled over the play window (the strip width grows
-        // with the string + it's drawn after drawPlayWindow). Cap each name so entries stay short.
         const kn = trunc(e.killer || "?", 10), vn = trunc(e.victim || "?", 10);
         let icon = "flag";
         if (e.cause === "pvp") { text = `${kn} defeated ${vn}`; col = THEME.danger; icon = "sword"; }
@@ -1099,9 +796,8 @@ export default function onlineGameScene(k) {
         else if (e.cause === "zone") { text = `${vn} lost to the storm`; col = THEME.danger; icon = "skull"; }
         else if (e.cause === "timeout") { text = `${vn} ran out of time`; col = THEME.textBody; icon = "clock"; }
         else if (e.cause === "disconnect") { text = `${vn} disconnected`; col = THEME.textMut; icon = "flee"; }
-        else if (e.cause === "defeat") { text = `${vn} was defeated`; col = THEME.danger; icon = "skull"; } // combat team-wipe (Q10)
+        else if (e.cause === "defeat") { text = `${vn} was defeated`; col = THEME.danger; icon = "skull"; }
         else { text = `${vn} is out`; col = THEME.textBody; }
-        // UI v4: glass strip, cause icon at the left, bold text (right-aligned under the radar).
         const tw = (typeof k.measureText === "function" ? k.measureText(text, 11, FONT_BOLD) : text.length * 6.5) + 36;
         drawGlass(k, { rect: [x - tw, y - 4, tw, 20], radius: 10, tint: 0.6 * op, fill: 0.05 * op, line: 0.1 * op, fixed: true });
         drawIcon(k, icon, { x: x - tw + 12, y: y + 6, size: 11, color: col, opacity: op, fixed: true });
@@ -1110,9 +806,6 @@ export default function onlineGameScene(k) {
       }
     }
 
-    // Shared transient top-centre toast ({text, at}): auto-fades, clears itself via `clear`.
-    // WIN: anchor to the square (top + center) + cap width to the square so the notice sits
-    // in the play area in portrait. Landscape unchanged (pw.y=0, pw.cx=W/2).
     function drawTopNotice(n, clear, yOff = 110) {
       if (!n) return;
       const age = Date.now() - (n.at || 0), SHOW = 3000, FADE = 1200;
@@ -1127,31 +820,20 @@ export default function onlineGameScene(k) {
       drawIcon(k, "info", { x: cx - tw / 2 + 17, y, size: 14, color: UI.amber, opacity: op, fixed: true });
       k.drawText({ text: n.text, pos: k.vec2(cx + 10, y), size: 13, font: FONT_BOLD, anchor: "center", width: tw - 44, color: k.rgb(...UI.amber), opacity: op, fixed: true });
     }
-    // FGT-T1: brief top-center toast when the server reports the AI combat judge is
-    // offline (so engaging a monster did nothing) — surfaced instead of a silent
-    // deterministic fight. Auto-fades; prod always has the judge, so this is rare.
     function drawCombatNotice() { drawTopNotice(net.state.combatNotice, () => { net.state.combatNotice = null; }); }
-    // TQ-66: brief top-center toast when a chest's item was left behind because the item bag
-    // is full — so a full bag is well-defined to the player, not a silent loot loss. Sits a row
-    // below the combat notice (the two are mutually exclusive in practice — you can't open
-    // chests mid-combat — but the offset avoids any overlap if they ever coincide).
     function drawLootNotice() { drawTopNotice(net.state.lootNotice, () => { net.state.lootNotice = null; }, 148); }
 
-    const JOY_R = JOY_RADIUS; // shared with the hub via inputMode.js (one feel everywhere)
-    const joyRest = () => { const j = hudSlots().joystick; return k.vec2(j.x, j.y); }; // HUD-OUT: gutter slot (left band in landscape, bottom band in portrait)
+    const JOY_R = JOY_RADIUS;
+    const joyRest = () => { const j = hudSlots().joystick; return k.vec2(j.x, j.y); };
     let joyId = null;
     let joyVec = { x: 0, y: 0 };
-    let joyBase = joyRest(); // floating: the base spawns where the thumb lands
+    let joyBase = joyRest();
     let thumb = joyBase;
 
     function joyStart(id, p) {
-      if (joyId !== null) return; // MB-3: one finger owns movement; a 2nd touch can't hijack the stick
-      // TQ-526: on touch, the movement joystick owns the whole LEFT HALF of the screen (it floats to
-      // wherever the thumb lands), the right half is the throw/swap zone. (Was a narrow control gutter.)
-      // The DESKTOP MOUSE ("m") still drives movement from ANYWHERE (hold/drag to walk toward the cursor).
+      if (joyId !== null) return;
       if (id !== "m" && p.x >= k.width() / 2) return;
       joyId = id;
-      // Floating joystick: spawn the base under the thumb (clamped to stay on-screen).
       joyBase = k.vec2(
         Math.max(JOY_R, Math.min(k.width() - JOY_R, p.x)),
         Math.max(JOY_R, Math.min(k.height() - JOY_R, p.y)),
@@ -1161,9 +843,7 @@ export default function onlineGameScene(k) {
     }
     function joyMove(id, p) {
       if (id !== joyId) return;
-      // Plain-arithmetic delta: the canvas2D backend's k.vec2 + pointer positions are bare
-      // {x,y} (no Kaboom .sub/.len/.scale/.add) — using those methods threw on every touchmove
-      // and broke touch movement entirely (TQ-428).
+      // k.vec2 / pointer positions are bare {x,y}: no .sub/.len/.scale methods
       let dx = p.x - joyBase.x, dy = p.y - joyBase.y;
       const len = Math.hypot(dx, dy) || 1;
       if (len > JOY_R) { const s = JOY_R / len; dx *= s; dy *= s; }
@@ -1177,10 +857,6 @@ export default function onlineGameScene(k) {
       thumb = joyBase;
     }
 
-    // Combat action buttons (shared by render + hit-testing).
-    // FGT-T4: the living bench (active team minus the in-combat active, hp > 0). Names
-    // come from the full active-team objects (state.team); live HP from the index-aligned
-    // hp snapshot (state.self.team). The server re-validates by id, so a stale row is safe.
     function benchList() {
       const c = net.state.combat;
       const full = net.state.team || [];
@@ -1199,29 +875,19 @@ export default function onlineGameScene(k) {
 
     function combatButtons() {
       const c = net.state.combat;
-      if (!c || c.outcome || c.waiting) { swapOpen = false; itemsOpen = false; return []; } // PvP: no input while awaiting the opponent
-      // WIN-T3: lay the combat content out within the square play window (not the full
-      // canvas) so the action buttons don't stretch on ultrawide / cramp oddly; centered.
+      if (!c || c.outcome || c.waiting) { swapOpen = false; itemsOpen = false; return []; }
       const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
-      // WIN-T3 fix: anchor vertically to the square's bottom too (was canvas-bottom),
-      // so in portrait the panel rises with the square instead of dropping into the
-      // bottom peripheral band. Landscape is unchanged (pw.bottom === k.height()).
-      const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, m = pw.x + 12, gap = 8, h = 54; // larger, touch-friendly targets (MB-4: above the home-bar)
-      const iw = pw.w - 24; // TQ-494: content spans the full 4:3 window width (was pw.size, the square side)
-      const y = top + 100; // below the two stat rows
-      // Sub-menus (swap/items) stack up to 4 rows (3 entries + Back). The fixed 54px row
-      // overflowed the panel — with a full bench the last entry was clipped and "Back" fell
-      // entirely off-screen (no way to exit). Fit the row height to the space from y down to
-      // the panel bottom so every row, including Back, is on-screen. (panelBottom == top+COMBAT_H.)
+      const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, m = pw.x + 12, gap = 8, h = 54;
+      const iw = pw.w - 24;
+      const y = top + 100;
       const subRowH = (n) => {
         const panelBottom = Math.min(k.height(), pw.bottom) - safeInset.bottom;
         return Math.max(28, Math.min(h, (panelBottom - y - 8 - gap * (n - 1)) / n));
       };
-      // FGT-T4: Swap sub-menu — pick a living bench monster to switch to (free action).
       if (swapOpen) {
         const fw = iw;
         const bench = benchList().slice(0, 3);
-        const sh = subRowH(bench.length + 1); // +1 for the Back row
+        const sh = subRowH(bench.length + 1);
         const btns = bench.map((b, i) => ({
           rect: [m, y + i * (sh + gap), fw, sh],
           label: `Swap to ${trunc(b.m.name || b.m.typeName, 16)}  Lv.${b.m.level}  (${b.cur}/${b.max})`,
@@ -1230,13 +896,10 @@ export default function onlineGameScene(k) {
         btns.push({ rect: [m, y + bench.length * (sh + gap), fw, sh], label: "Back", action: { kind: "closeSwap" } });
         return btns;
       }
-      // #61: Items sub-menu — use a combat item (name + action description) instead of an
-      // attack/flee; the judge resolves the description like an attack and the server
-      // consumes the item. Shows the first few (the bag is small; combat panel is shallow).
       if (itemsOpen) {
         const fw = iw;
         const items = (net.state.items || []).slice(0, 3);
-        const sh = subRowH(items.length + 1); // +1 for the Back row
+        const sh = subRowH(items.length + 1);
         const btns = items.map((it, i) => ({
           rect: [m, y + i * (sh + gap), fw, sh],
           label: `${trunc(it.name, 16)} — ${trunc(it.description, 38)}`,
@@ -1249,34 +912,25 @@ export default function onlineGameScene(k) {
       const atks = (c.attacks || []).slice(0, 4);
       const w = (iw - gap * 3) / 4;
       const btns = atks.map((a, i) => ({
-        rect: [m + i * (w + gap), y, w, h], label: cleanAttackName(a.name), // CN-7: display strip
+        rect: [m + i * (w + gap), y, w, h], label: cleanAttackName(a.name),
         cost: a.energyCost,
-        damage: a.damage, // UI v4: shown as a sword chip on the pill
+        damage: a.damage,
         hotkey: i + 1,
         affordable: (a.energyCost ?? 0) <= energy,
-        description: a.description || "", // TQ-71: full move text, shown on hover/long-press
-        action: { kind: "attack", attackName: a.name }, // keep the FULL name as the server lookup key
+        description: a.description || "",
+        action: { kind: "attack", attackName: a.name }, // Server looks attacks up by the FULL name (label is cleaned)
       }));
-      // Action row: Catch · Swap · Flee (PvE) / Swap · Flee (PvP). Swap appears only when
-      // a living bench monster exists; the row splits evenly to fit 2 or 3 buttons.
       const y2 = y + h + gap;
       const row = [];
-      // Catch is always offered (PvE): there is no rarity gate anymore — the AI capture
-      // judge weighs the equipped chain's power against how weakened the enemy is.
       if (!c.pvp) row.push({ label: "Catch", action: { kind: "catch" } });
       if (benchList().length > 0) row.push({ label: "Swap", action: { kind: "openSwap" } });
-      // Items are PvE-only for now: the AI judge resolves one item user per turn (the
-      // "player" POV), so a symmetric simultaneous PvP turn can't honor both sides' items.
-      // PvP's resolveTurn ignored item actions, so the button silently wasted the turn —
-      // gate it out of duels (like Catch) until the judge supports dual-side items.
+      // PvE only: PvP resolveTurn ignores item actions (turn would be wasted)
       if (!c.pvp && (net.state.items || []).length > 0) row.push({ label: "Items", action: { kind: "openItems" } });
       row.push({ label: "Flee", action: { kind: "flee" } });
       const rw = (iw - gap * (row.length - 1)) / row.length;
       row.forEach((r, i) => btns.push({ rect: [m + i * (rw + gap), y2, rw, h], label: r.label, action: r.action }));
       return btns;
     }
-    // TQ-71: hit-test that returns the whole button descriptor (for the touch attack-press
-    // long-press preview, which needs the rect + description, not just the action).
     function hitButtonObj(p) {
       for (const b of combatButtons()) {
         const [x, y, w, h] = b.rect;
@@ -1284,36 +938,29 @@ export default function onlineGameScene(k) {
       }
       return null;
     }
-    let atkHold = null; // TQ-71: a pending touch press on an attack button — { action, description, rect, t0, x, y }
+    let atkHold = null;
 
-    let sendAcc = 0, pingAcc = 0, safeAcc = 0, moveSent = false; // moveSent: TQ-519 — track so we send one explicit stop on key-release
-    let combatPress = null; // { kind, name, t } — brief tap-feedback flash on combat buttons
-    let swapOpen = false; // FGT-T4: the combat "Swap" sub-menu (pick a living bench monster) is open
-    let itemsOpen = false; // #61: the combat "Items" sub-menu (pick a combat item to use) is open
-    let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false; // combat hit-flash + catch sparkle
-    let battleIntroT0 = -9; // start time of the battle-screen entry cinematic (transition → chain throw → monster spawn); set on each new combat
-    let catchThrowT0 = -9, catchResolveT0 = -9, catchResolveKind = null; // catch cinematic: chain-throw start, verdict start, "caught"|"broke" — drives drawBattleStage's catch animation
-    let newSpeciesT = -9; // PV-T15: timestamp of a first-ever catch → "NEW SPECIES!" banner window
-    let prevTeamHp = null, stormHitT = -1; // PV-T13: storm/zone-tick damage feedback state (declarations were dropped by an edit → ReferenceError; restored)
-    let predWasSprinting = false; // prediction sprint-gate hysteresis (mirrors server rp.wasSprinting) so the client stops predicting sprint at the same stamina floor the server enforces — no rubberband at depletion
-    let predStamina = null; // TQ-382: client-predicted stamina (mirrors server rp.stamina via the shared tickStamina), reconciled to net.state.stamina on each snapshot — see the prediction block
-    let dmgFloaters = []; // floating damage numbers — { x, y, dmg, col:[r,g,b], t0 }
-    clearFx(); // reset the shared particle pool on (re)entry (PV-T12)
-    clearShake(); // reset screen-shake trauma on (re)entry (PV-A5)
+    let sendAcc = 0, pingAcc = 0, safeAcc = 0, moveSent = false;
+    let combatPress = null;
+    let swapOpen = false;
+    let itemsOpen = false;
+    let prevEnemyHp = null, prevActiveHp = null, hitFlashE = -9, hitFlashA = -9, lastCombatId = null, caughtFxDone = false;
+    let battleIntroT0 = -9;
+    let catchThrowT0 = -9, catchResolveT0 = -9, catchResolveKind = null;
+    let newSpeciesT = -9;
+    let prevTeamHp = null, stormHitT = -1;
+    let predWasSprinting = false;
+    let predStamina = null;
+    let dmgFloaters = [];
+    clearFx();
+    clearShake();
     k.onUpdate(() => {
-      updateFx(k.dt()); // advance world particles (PV-T12)
-      updateShake(k.dt()); // decay screen-shake trauma (PV-A5)
-      // HUD-OUT: keep the retained HUD labels + the team-cluster anchor in their GUTTER
-      // slots every frame (the shim doesn't restart the scene on resize, and safe-area
-      // insets / orientation can change mid-round). Cheap; reads the shared hudLayout.
+      updateFx(k.dt());
+      updateShake(k.dt());
       {
         const h = hudSlots();
-        // Landscape: the info line sits at the team slot (top of the left gutter). Portrait / square:
-        // the timer chip owns that top row (centred), so drop the info line beneath it.
-        info.pos = k.vec2(h.team.x, (h.orientation === "landscape" ? h.team.y : h.team.y + 34) + (import.meta.env.DEV && h.orientation === "landscape" ? 26 : 0)); // DEV seed line sits under the rivals chip
-        // Re-wrap the objective to its current gutter slot. The retained text can't have
-        // its wrap width updated in place (the shim's width setter scales), so recreate
-        // it when the slot width changes — preserving the live text + hidden state.
+        info.pos = k.vec2(h.team.x, (h.orientation === "landscape" ? h.team.y : h.team.y + 34) + (import.meta.env.DEV && h.orientation === "landscape" ? 26 : 0));
+        // Shim's text width setter scales, never re-wraps: recreate the label to re-wrap
         const oW = h.objective.width || 0;
         if (Math.abs(oW - objectiveW) > 2) {
           const txt = objective.text, hid = objective.hidden;
@@ -1322,25 +969,13 @@ export default function onlineGameScene(k) {
           objective = makeObjective(h.objective.x, h.objective.y, oW);
           objective.text = txt; objective.hidden = hid;
         }
-        // When the cave lobby panel fills the left gutter, move the objective onto the square's
-        // bottom inside edge (as in portrait) so the panel doesn't cover it.
         objective.pos = lobbyPanelActive() ? k.vec2(h.square.cx, h.square.bottom - 24) : k.vec2(h.objective.x, h.objective.y);
-        // Keyboard-controls hint at the square's bottom-left. Re-anchor EVERY frame for ALL
-        // orientations (the visibility is owned by the combat/result/onboard/menu gate below,
-        // which keeps it shown while roaming): the old square-only anchor left it frozen at
-        // the scene-start x on a landscape→wider resize, so the left-gutter biome chip drifted
-        // on top of it. Following the square keeps it clear of the gutter HUD at any size.
-        hint.hidden = TOUCH || h.orientation !== "square"; // the WASD/Space/ESC reference is desktop-only — touch players have the on-screen joystick/THROW/pause + the touch onboarding
+        hint.hidden = TOUCH || h.orientation !== "square";
         hint.pos = k.vec2(h.square.x + 12, h.square.bottom - 24);
-        // Clear the rivals chip: in portrait / square it sits at team.y+32..+54, and the team card starts
-        // 22px above TEAM_Y0 — so TEAM_Y0 = +84 leaves an 8px gap (+66 overlapped the chip by 10px).
         TEAM_X = h.team.x; TEAM_Y0 = h.team.y + (h.orientation === "landscape" ? 66 : 84);
       }
-      // Latency probe every 2s while connected (drives the HUD ping readout).
       pingAcc += k.dt();
       if (pingAcc >= 2 && net.state.connected) { net.ping(); pingAcc = 0; }
-      // MB-4: refresh safe-area insets on a throttle (cheap; touch only) so a mid-round
-      // rotation or mobile URL-bar show/hide re-flows the touch HUD within ~1s.
       if (TOUCH) { safeAcc += k.dt(); if (safeAcc >= 1) { recomputeSafeInset(); safeAcc = 0; } }
 
       let dx = 0, dy = 0;
@@ -1348,76 +983,52 @@ export default function onlineGameScene(k) {
       if (anyDown("moveDown")) dy = 1;
       if (anyDown("moveLeft")) dx = -1;
       if (anyDown("moveRight")) dx = 1;
-      if (net.state.combat) { joyId = null; joyVec = { x: 0, y: 0 }; thumb = joyRest(); } // no joystick mid-fight (was `JOY`, undefined → crashed combat)
-      else if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; } // joystick overrides keys
+      if (net.state.combat) { joyId = null; joyVec = { x: 0, y: 0 }; thumb = joyRest(); }
+      else if (joyVec.x || joyVec.y) { dx = joyVec.x; dy = joyVec.y; }
       let gm = { x: 0, y: 0 };
-      if (!net.state.combat) { gm = gamepadMove(); if (gm.x || gm.y) { dx = gm.x; dy = gm.y; } } // gamepad stick/d-pad (roaming)
+      if (!net.state.combat) { gm = gamepadMove(); if (gm.x || gm.y) { dx = gm.x; dy = gm.y; } }
       selfMoving = !!(dx || dy);
       if (dx || dy) selfDir = { x: dx, y: dy };
-      // TQ-450: hold-to-charge throw. Keyboard: while the throw key is held, build charge; on release
-      // (or if it becomes un-throwable, e.g. combat starts), loose it with the charge. Touch: the THROW
-      // button held builds charge too (released in onTouchEnd). Then spin the held chain faster the more
-      // it's charged (smooth, monotonic accumulation — no phase jump when charging stops).
       const CHARGE_T = GAME.SPIRIT_CHAIN.CHARGE_TIME_S;
       if (kbCharge != null) {
         const c = Math.min(1, (k.time() - kbCharge.t0) / CHARGE_T);
         if (anyDown("throw") && canThrowNow()) { throwCharge = c; }
-        else { kbCharge = null; throwCharge = 0; throwEquippedChain(null, c); } // release → throw (self-guards if no longer throwable)
+        else { kbCharge = null; throwCharge = 0; throwEquippedChain(null, c); }
       } else if (throwAim) {
         throwCharge = Math.min(1, (k.time() - (throwAim.t0 || k.time())) / CHARGE_T);
       } else {
         throwCharge = 0;
       }
-      throwSpinPhase += throwCharge * 9 * k.dt(); // charged chain whirls faster (drives drawChainSkin via chainSpin)
-      if (onboard && (dx || dy) && onboardT > 0.3) dismissOnboard(); // P8-T8: move to begin
-      // Hold Shift to sprint (server validates against stamina). Send continuously
-      // while held (server consumes one intent per tick), ~20Hz. Touch: push the joystick
-      // to its edge to sprint (joyVec is the 0..1 push fraction — SP parity, MOB-T1).
+      throwSpinPhase += throwCharge * 9 * k.dt();
+      if (onboard && (dx || dy) && onboardT > 0.3) dismissOnboard();
       const sprint = anyDown("sprint") || (joyVec.x * joyVec.x + joyVec.y * joyVec.y) > 0.85
-        || (gm.x * gm.x + gm.y * gm.y) > 0.85; // gamepad full-stick-push also sprints (input parity)
+        || (gm.x * gm.x + gm.y * gm.y) > 0.85;
       sendAcc += k.dt();
-      // TQ-519: ~20Hz move inputs (the server now persists the last input across ticks via a TTL, so this
-      // cadence no longer has to match the tick rate). On release, send ONE explicit (0,0) stop so the
-      // server stops immediately instead of coasting for the TTL.
       const movingInput = !menuOpen && !!(dx || dy);
       if (movingInput && sendAcc >= 0.05) { recordInput(net.move(dx, dy, sprint), dx, dy); sendAcc = 0; moveSent = true; }
       else if (!movingInput && moveSent) { recordInput(net.move(0, 0, false), 0, 0); moveSent = false; }
-      // Throttled footstep DUST while actually roaming. Faster cadence when sprinting. Gated off
-      // menu/combat so it only puffs in-world. (The walking SFX was removed per user request.)
       stepAcc += k.dt();
       if (selfMoving && !menuOpen && !net.state.combat && stepAcc >= (sprint ? 0.24 : 0.34)) {
         stepAcc = 0;
-        emit({ x: selfRender.x, y: selfRender.y + 16, n: 3, color: [150, 140, 122], speed: 16, life: 0.4, size: 2.6, spread: Math.PI * 0.9, dir: -Math.PI / 2, gravity: 30, drag: 2 }); // PV-T12 footstep dust
+        emit({ x: selfRender.x, y: selfRender.y + 16, n: 3, color: [150, 140, 122], speed: 16, life: 0.4, size: 2.6, spread: Math.PI * 0.9, dir: -Math.PI / 2, gravity: 30, drag: 2 });
       }
 
-      // Interaction SFX via state-diffs (no server event needed): level-up = a
-      // team monster's level rose; chest-open = a chest right next to you vanished
-      // (the <56px gate excludes chests that merely scrolled out of view range).
-      // Read net.state.team (the full active-team: id/level/name) — NOT net.state.self.team,
-      // which is only the in-round hp/max snapshot (no id/level), so the diff never fired and
-      // the level-up burst was dead code (every monster skipped on the id==null guard).
+      // Use net.state.team (has id/level); net.state.self.team is index-aligned hp/max only
       const myTeam = net.state.team;
       if (myTeam) for (const mon of myTeam) {
         if (!mon || mon.id == null) continue;
         const pl = prevLevels.get(mon.id);
-        if (pl != null && mon.level > pl) { sfx("levelup"); emit({ x: selfRender.x, y: selfRender.y, n: 14, color: [255, 220, 120], speed: 70, life: 0.7, size: 3, gravity: -40, drag: 1.5 }); emitText({ x: selfRender.x, y: selfRender.y - 22, text: `${mon.name || "Monster"} Lv ${mon.level}`, color: [255, 224, 130], size: 13 }); } // PV-T12 level-up burst + label (PT2-T07)
+        if (pl != null && mon.level > pl) { sfx("levelup"); emit({ x: selfRender.x, y: selfRender.y, n: 14, color: [255, 220, 120], speed: 70, life: 0.7, size: 3, gravity: -40, drag: 1.5 }); emitText({ x: selfRender.x, y: selfRender.y - 22, text: `${mon.name || "Monster"} Lv ${mon.level}`, color: [255, 224, 130], size: 13 }); }
         prevLevels.set(mon.id, mon.level);
       }
       const curChests = net.state.chests || [];
-      if (prevChests && prevChests !== curChests) { // only diff when the snapshot replaced the array
+      if (prevChests && prevChests !== curChests) {
         const sx = net.state.self.x, sy = net.state.self.y;
         for (const pc of prevChests) {
-          if (!curChests.some((c) => c.x === pc.x && c.y === pc.y) && Math.hypot(pc.x - sx, pc.y - sy) < 56) { sfx("chest"); emit({ x: pc.x, y: pc.y, n: 12, color: [245, 210, 90], speed: 55, life: 0.6, size: 2.8, gravity: -30, drag: 1.5 }); emitText({ x: pc.x, y: pc.y - 18, text: "Chest opened!", color: [245, 214, 110], size: 14 }); } // PV-T12 chest-open sparkle + label (PT2-T07)
+          if (!curChests.some((c) => c.x === pc.x && c.y === pc.y) && Math.hypot(pc.x - sx, pc.y - sy) < 56) { sfx("chest"); emit({ x: pc.x, y: pc.y, n: 12, color: [245, 210, 90], speed: 55, life: 0.6, size: 2.8, gravity: -30, drag: 1.5 }); emitText({ x: pc.x, y: pc.y - 18, text: "Chest opened!", color: [245, 214, 110], size: 14 }); }
         }
       }
       prevChests = curChests;
-      // Loot naming: when a NEW chain type lands in your inventory mid-round (chest
-      // loot), name it with a floater — the chest-open sparkle only said "opened", not
-      // WHAT you got. First frame seeds the set (no false floater on entry); a refill of
-      // an already-owned chain (same id) is intentionally quiet.
-      // Only diff when the snapshot actually REPLACED the chains array (m.you.chains arrived) — between
-      // those it's unchanged, so skip the per-frame .map() array + new Set() allocation. Mirrors the
-      // chest reference-gate above. First frame seeds the set (prevChainIds null → no false floater).
       const curChains = net.state.chains || NO_CHAINS;
       if (curChains !== prevChainsRef) {
         if (prevChainIds) {
@@ -1432,11 +1043,6 @@ export default function onlineGameScene(k) {
         prevChainsRef = curChains;
       }
 
-      // Storm-damage hit feedback (PV-T13): the continuous danger border tells you
-      // you're *in* danger, but nothing marked the *moment* the storm actually drained
-      // HP. Detect a team-HP drop while you're outside the safe circle (and not in a
-      // duel, so combat damage isn't misattributed) → discrete red flash + burst +
-      // haptic + a "STORM -N" floater. State-diff only, no extra snapshot payload.
       {
         const cir = net.state.circle, sf = net.state.self;
         const curTeamHp = (sf?.team || []).reduce((s, mo) => s + Math.max(0, mo.hp || 0), 0);
@@ -1445,16 +1051,12 @@ export default function onlineGameScene(k) {
         if (outside && prevTeamHp != null && curTeamHp < prevTeamHp) {
           stormHitT = k.time();
           haptic(20);
-          if (!prefersReducedMotion()) addShake(0.34); // PV-A5: the storm kicks the camera
+          if (!prefersReducedMotion()) addShake(0.34);
           const dmg = Math.round(prevTeamHp - curTeamHp);
           emit({ x: selfRender.x, y: selfRender.y, n: 10, color: [235, 70, 70], speed: 80, life: 0.5, size: 2.8, gravity: -10, drag: 2 });
           emitText({ x: selfRender.x, y: selfRender.y - 22, text: `Storm -${dmg}`, color: [255, 120, 120], size: 14 });
         }
         prevTeamHp = curTeamHp;
-        // Ambient storm particles: drifting ash/embers around the tamer while in the
-        // storm reinforce that you're being battered (pairs with the red border + STORM
-        // floater). Throttled so the shared 220-cap fx pool isn't starved; a11y: slower
-        // + sparser under reduce-motion.
         if (outside) {
           stormFxAcc += k.dt();
           const reduce = prefersReducedMotion();
@@ -1466,24 +1068,19 @@ export default function onlineGameScene(k) {
         }
       }
 
-      // Controller actions (gamepad): map buttons to the SAME handlers as keyboard/touch.
-      // Edge-detected, so gamepadPressed() must run exactly once per frame. Bindings:
-      // roaming: left stick/d-pad move · A/RT throw · START pause.  combat: A/B/X/Y = attack
-      // 1-4 · LB catch · RB flee · A dismiss the outcome.  pause menu: d-pad up/down select ·
-      // A confirm · B/START close.  result screen: A/START continue.  (TQ-459: menus/result/
-      // outcome/START were the gap — gameplay was already wired.)
+      // gamepadPressed() is edge-detected: call exactly once per frame
       const gpEdges = gamepadPressed();
       if (gpEdges.size) {
         if (net.state.roundResult) {
           if (gpEdges.has(BTN.A) || gpEdges.has(BTN.START)) exitAfterRun();
         } else if (menuOpen) {
           const btns = menuBtns();
-          if (gpEdges.has(12)) menuSel = (menuSel - 1 + btns.length) % btns.length; // d-pad up
-          if (gpEdges.has(13)) menuSel = (menuSel + 1) % btns.length;                // d-pad down
+          if (gpEdges.has(12)) menuSel = (menuSel - 1 + btns.length) % btns.length;
+          if (gpEdges.has(13)) menuSel = (menuSel + 1) % btns.length;
           if (gpEdges.has(BTN.A)) btns[Math.max(0, Math.min(btns.length - 1, menuSel))]?.act();
           else if (gpEdges.has(BTN.B) || gpEdges.has(BTN.START)) { menuOpen = false; leaveArm = false; }
         } else if (net.state.combat) {
-          if (net.state.combat.outcome) { if (gpEdges.has(BTN.A)) net.clearCombat(); } // dismiss the result card
+          if (net.state.combat.outcome) { if (gpEdges.has(BTN.A)) net.clearCombat(); }
           else {
             for (let i = 0; i < 4; i++) if (gpEdges.has(i)) { const a = net.state.combat.attacks?.[i]; if (a) act({ kind: "attack", attackName: a.name }); }
             if (gpEdges.has(BTN.LB)) act({ kind: "catch" });
@@ -1492,123 +1089,70 @@ export default function onlineGameScene(k) {
         } else if (onboard && onboardT > 0.3) {
           dismissOnboard();
         } else if (gpEdges.has(BTN.START)) {
-          menuOpen = true; menuSel = 0; leaveArm = false; // open the pause menu
+          menuOpen = true; menuSel = 0; leaveArm = false;
         } else if (gpEdges.has(BTN.A) || gpEdges.has(BTN.RT)) {
-          throwEquippedChain(); // PV-T11: shared throw (wind-up tell + guards)
+          throwEquippedChain();
         }
       }
 
-      // ── Client-side prediction + reconciliation for SELF (#10) ──
-      // Integrate the player's OWN input locally each frame so movement responds INSTANTLY
-      // instead of waiting a server round-trip (the old code only lerped toward the
-      // snapshot → your own character lagged your input by the ping). Uses the SAME rule as
-      // the server: BASE_SPEED × sprintMult, diagonals ×0.707, per-axis body-edge collision
-      // via the shared isWalkable against the (seeded, identical) client map — so predicting
-      // INTO a wall stops AT the wall exactly like the server (no penetrate-then-snap).
+      // Self prediction must mirror server movement (world.js) exactly, or it rubberbands
       const E = GAME.EFFECTIVE_TILE;
-      // TQ-382: predict stamina locally so the sprint gate flips at the SAME stamina the server
-      // enforces. The gate previously read net.state.stamina (the last snapshot's value — stale by
-      // ping + snapshot interval), so the client kept predicting sprint speed for a few frames after
-      // the server had already run dry and slowed to a walk → reconciliation yanked the player back
-      // (the "lag when sprinting" rubberband, worst at depletion where the snap is largest). Mirror
-      // the server's per-frame rp.stamina via the SHARED tickStamina (parity-guaranteed) and snap to
-      // the authoritative value on each fresh snapshot (self-correcting — can't drift). freshSnap is
-      // recomputed (not consumed) here; the rival loop below still owns the lastPlayersRef update.
+      // Read-only check: the rival loop below owns the lastPlayersRef update
       const staminaSnap = net.state.players !== lastPlayersRef;
       if (predStamina == null || staminaSnap) predStamina = net.state.stamina ?? GAME.SPRINT.STAMINA_MAX;
       const predicting = !net.state.combat && !menuOpen && (dx || dy);
       if (predicting) {
         let pdx = dx, pdy = dy;
-        if (pdx !== 0 && pdy !== 0) { pdx *= 0.707; pdy *= 0.707; } // match the server's diagonal handling
-        // Gate the predicted sprint by the SAME rule the server applies (sprintingNow: stamina floor
-        // + hysteresis) using the locally-PREDICTED stamina (above) rather than the stale snapshot
-        // value, then advance it one frame exactly as the server advances rp.stamina — so the gate
-        // flips off in lockstep with the server and reconciliation has nothing to yank back.
+        if (pdx !== 0 && pdy !== 0) { pdx *= 0.707; pdy *= 0.707; }
         const predSprint = sprintingNow({ sprint, moving: true, stamina: predStamina, wasSprinting: predWasSprinting }, GAME);
         predWasSprinting = predSprint;
-        predStamina = tickStamina(predStamina, predSprint, k.dt(), GAME); // drain while sprinting / regen otherwise, mirroring world.js:808
+        predStamina = tickStamina(predStamina, predSprint, k.dt(), GAME);
         const step = GAME.BASE_SPEED * sprintMult(predSprint, GAME) * k.dt();
-        // Match the SERVER's play-area bound exactly ((mapSize-1)*E, world.js) so prediction can't
-        // overshoot the authoritative clamp and rubberband at the far edge. (Latent today — the map
-        // always carves a non-walkable border ring, so isWalkable stops you first — but keep the two
-        // bounds identical so a future walkable-edge mapgen change can't expose a desync.) 0 when the
-        // map isn't loaded yet → the clamp falls through to lower-bound only, as before.
+        // Must equal the server's play-area clamp ((mapSize-1)*E in world.js)
         const R = GAME.PLAYER_RADIUS, maxXY = map?.mapSize ? (map.mapSize - 1) * E : 0;
-        // stepBody = the SAME step the server runs (leading-edge guard + corner forgiveness), so prediction
-        // slips around a corner exactly when the server does (no rubberband at corners).
         const st = stepBody(map, selfRender.x, selfRender.y, pdx, pdy, step, R, maxXY);
         selfRender.x = st.x; selfRender.y = st.y;
-        predWall = st.blocked; // DEV QA: a stop against a wall is not a stall
       } else {
-        predWasSprinting = false; // not moving → server resets rp.wasSprinting too (sprint must re-earn the MIN_TO_START floor)
-        predStamina = tickStamina(predStamina, false, k.dt(), GAME); // idle → regen one frame, mirroring the server
+        predWasSprinting = false;
+        predStamina = tickStamina(predStamina, false, k.dt(), GAME);
       }
-      // Reconcile toward the authoritative snapshot. Trust the local prediction within its LEGITIMATE
-      // lead; only correct a divergence BEYOND that lead (a real server clamp / desync); hard-snap a
-      // teleport. (TQ-85/TQ-178: trust within the lead whether moving or at rest — no backward drag; the
-      // lagging snapshot converges UP to the predicted position since it shares the sim + map.)
       const ex = net.state.self.x - selfRender.x, ey = net.state.self.y - selfRender.y;
       const err = Math.hypot(ex, ey);
-      // TQ-444: the authoritative snapshot LAGS the live prediction by ~RTT + the snapshot interval +
-      // a tick of server input buffering, so while MOVING the prediction legitimately LEADS it by
-      // (predicted speed × that lag). A FIXED 64px trust window was SMALLER than that lead at SPRINT
-      // speed (320px/s) under real ping (≈ 320 × (0.2 + RTT) ≈ 80-200px), so a normal sprint was mistaken
-      // for divergence and yanked back every frame — the prod "rubberband when moving fast" (reproduced
-      // at RTT 336ms: 13 backward jumps, 412px total). SCALE the trust window by the expected lead, with
-      // the old 64px as the floor so standing still / walking are unchanged. Self-correcting: the lagging
-      // snapshot converges up to the predicted position (same sim + map), so trusting within the lead
-      // leaves no drift; only a genuine divergence beyond it (or a teleport) still corrects.
-      const lagS = 0.2 + (net.state.rtt || 0) / 1000; // snapshot interval (~0.133) + server input/tick buffer (~0.067) + RTT
+      const lagS = 0.2 + (net.state.rtt || 0) / 1000;
       const leadSpeed = predicting ? GAME.BASE_SPEED * sprintMult(predWasSprinting, GAME) : 0;
-      const trustR = Math.max(64, leadSpeed * lagS + 24); // expected prediction lead + a small margin; never below the old 64px floor
-      const snapR = Math.max(220, trustR + 130);          // keep the hard teleport/respawn/desync snap comfortably above the trust window
-      // The history entry for the acked input (drop older ones — they can never be acked again).
-      // ACK-based reconciliation (engine/reconcile.js, unit-tested): compare the server with OUR position at the
-      // last input it applied; correct only real disagreement, smoothly, shifting the history with it.
+      const trustR = Math.max(64, leadSpeed * lagS + 24);
+      const snapR = Math.max(220, trustR + 130);
       const hAck = takeAcked(predHist, net.state.ack);
       if (hAck && !net.state.combat) {
         reconcileStep(selfRender, net.state.self, hAck, predHist, k.dt(), GAME.BASE_SPEED * sprintMult(true, GAME));
       }
-      else if (err > snapR) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; } // teleport / respawn / desync → snap
+      else if (err > snapR) { selfRender.x = net.state.self.x; selfRender.y = net.state.self.y; }
       else if (predicting) {
-        // TQ-523: while MOVING, split the error into ALONG-movement and CROSS-track. The legitimate
-        // prediction lead is ALONG the movement axis (the client is ahead by ~speed×lag); there is NO
-        // legitimate lead SIDEWAYS, so any cross-track error is pure client/server misalignment. In a
-        // 1-tile corridor that lateral offset is exactly what makes the two sides' per-axis edge
-        // collision (edgeClear*, samples ±R) DISAGREE — one slides through, the other clips → rubberband.
-        // Correct cross-track PROMPTLY (re-center where the server sees the body) but still trust the
-        // along-track lead within trustR, so collision stays in lockstep without a backward yank.
         const dl = Math.hypot(dx, dy) || 1, ux = dx / dl, uy = dy / dl;
-        const along = ex * ux + ey * uy, ax = along * ux, ay = along * uy; // along-error vector
-        const perpRate = Math.min(1, k.dt() * 22); // firm, frame-rate-independent cross-track re-centre
+        const along = ex * ux + ey * uy, ax = along * ux, ay = along * uy;
+        const perpRate = Math.min(1, k.dt() * 22);
         selfRender.x += (ex - ax) * perpRate; selfRender.y += (ey - ay) * perpRate;
-        if (Math.abs(along) > trustR) { const rate = Math.min(1, k.dt() * 18); selfRender.x += ax * rate; selfRender.y += ay * rate; } // only pull beyond the legitimate forward lead
+        if (Math.abs(along) > trustR) { const rate = Math.min(1, k.dt() * 18); selfRender.x += ax * rate; selfRender.y += ay * rate; }
       }
-      else if (err <= trustR) { /* at rest / no input → trust within the floor (no backward drag, TQ-85/178) */ }
-      else { const rate = Math.min(1, k.dt() * 18); selfRender.x += ex * rate; selfRender.y += ey * rate; } // genuine divergence beyond the lead → firm, frame-rate-independent pull
-      // Rivals: render INTERP_DELAY in the past, interpolated between buffered snapshots (TQ-478 jitter
-      // buffer — see the helpers above). A fresh snapshot is detected by the players-array reference
-      // changing (net replaces it each tick); each one appends a timestamped sample. moving/facing are
-      // derived from the active segment's velocity → drives the walk anim. No extra server payload.
+      else if (err <= trustR) {}
+      else { const rate = Math.min(1, k.dt() * 18); selfRender.x += ex * rate; selfRender.y += ey * rate; }
+      // Fresh snapshot = new players array ref (net.js replaces it, never mutates)
       const now = k.time();
-      const rt = now - interpDelay(); // the past time we render remote entities at
+      const rt = now - INTERP_DELAY;
       const freshSnap = net.state.players !== lastPlayersRef;
       lastPlayersRef = net.state.players;
-      const gen = ++liveGen; // mark-and-sweep epoch shared by the monster/projectile loops below — no per-frame Set + keys() spread
+      const gen = ++liveGen;
       for (const p of net.state.players) {
         let r = othersRender.get(p.id);
         if (!r) { r = { x: p.x, y: p.y, vx: 0, vy: 0, buf: [], moving: false, dir: { x: 0, y: 1 } }; othersRender.set(p.id, r); pushSample(r, now, p.x, p.y); }
         r.live = gen;
         if (freshSnap) pushSample(r, now, p.x, p.y);
         sampleBuf(r, rt);
-        r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → moving (drives walk anim + facing)
-        if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; } // mutate in place (r.dir always exists) — no per-frame object churn
+        r.moving = (r.vx * r.vx + r.vy * r.vy) > 16;
+        if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; }
       }
       for (const [id, r] of othersRender) if (r.live !== gen) othersRender.delete(id);
 
-      // Wild monsters: the SAME interpolation jitter buffer as rivals, so an approaching monster glides
-      // smoothly (the server moves only the "approacher" subset; most stay put → one repeated sample →
-      // idle). moving/facing are DERIVED from the active segment's velocity → standard walk animation.
       const freshMon = net.state.monsters !== lastMonstersRef;
       lastMonstersRef = net.state.monsters;
       for (const mo of net.state.monsters) {
@@ -1617,14 +1161,11 @@ export default function onlineGameScene(k) {
         r.live = gen;
         if (freshMon) pushSample(r, now, mo.x, mo.y);
         sampleBuf(r, rt);
-        r.moving = (r.vx * r.vx + r.vy * r.vy) > 16; // ~>4px/s → walk + facing
-        if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; } // mutate in place (r.dir always exists) — no per-frame object churn
+        r.moving = (r.vx * r.vx + r.vy * r.vy) > 16;
+        if (r.moving) { r.dir.x = r.vx; r.dir.y = r.vy; }
       }
       for (const [id, r] of monsterRender) if (r.live !== gen) monsterRender.delete(id);
 
-      // Spirit-chain projectiles: a fast chain is read by WHERE IT IS NOW, so it stays on velocity
-      // EXTRAPOLATION (not the interp delay used for players/monsters) — a render delay would visibly
-      // lag the chain behind its real position and hurt aim/hit reads. Nudges toward the latest truth.
       for (const pr of net.state.projectiles) {
         let r = projRender.get(pr.id);
         if (!r) { r = { x: pr.x, y: pr.y }; projRender.set(pr.id, r); }
@@ -1635,75 +1176,46 @@ export default function onlineGameScene(k) {
       }
       for (const [id, r] of projRender) if (r.live !== gen) projRender.delete(id);
 
-      const sh = shakeOffset(); // PV-A5: trauma-based camera nudge (zero at rest)
+      const sh = shakeOffset();
       k.camPos(selfRender.x + sh.x, selfRender.y + sh.y);
       const t = net.state.time || 0;
       const mm = Math.floor(t / 60), ss = String(t % 60).padStart(2, "0");
       const ping = net.state.rtt == null ? "" : `   ${net.state.rtt}ms`;
-      // P6-T3 player list: name the rivals currently in view. AoI-filtered, so it
-      // respects the "you only see those near you" design (Q13) — no full roster.
       const rivals = net.state.players || [];
-      // Names truncated + count-capped + a hard line cap: guest nicks reach 20 chars, so the
-      // un-bounded list (info label has no wrap width) sprawled across the whole screen with
-      // long/many names. Show up to 3 short names, then "+N"; trunc the whole line as a backstop.
       const rivalLine = rivals.length
         ? trunc(`Rivals in view (${rivals.length}): ${rivals.slice(0, 3).map((p) => trunc(p.name || "?", 10)).join(", ")}${rivals.length > 3 ? `, +${rivals.length - 3}` : ""}`, 36)
         : "No rivals in view";
-      // VS-8: keep gameplay info (timer/ping/name/rivals) but hide debug data
-      // (map seed + live coords) in production — seed leaks map knowledge.
+      // Never show seed/coords in prod: the seed leaks map knowledge
       const dev = import.meta.env.DEV;
-      // The m:ss timer is drawn by drawTimerChip (right-gutter chip); the player name sits in the gutter
-      // identity panel — this label keeps connection + rivals (and the DEV seed/coords line).
       void mm; void ss;
-      const narrowHud = k.width() < 560; // phones: drop the connection line (the chip row is tight) — rivals only
-      void rivalLine; void narrowHud; // the rivals line is drawn by drawInfoChip (glass chip); the label keeps the DEV line only
+      const narrowHud = k.width() < 560;
+      void rivalLine; void narrowHud;
       info.text = dev ? `\n\nseed ${net.state.seed ?? "?"}   (${Math.round(net.state.self.x)}, ${Math.round(net.state.self.y)})${ping}` : "";
 
-      // PT2-T10 objective line: contextual goal, hidden behind overlays.
       const circle = net.state.circle, self = net.state.self;
       const outsideZone = !!(circle && self && ((self.x - circle.x) ** 2 + (self.y - circle.y) ** 2) > circle.r * circle.r);
-      tutorialTick(); // TQ-518: advance the first-run tutorial from live state
+      tutorialTick();
       objective.text = tutorialText() ?? (net.state.adventure
-        ? `Adventure — explore and catch; the glowing rift leads to the next region${TOUCH ? "" : "  (ESC to return home)"}` // TQ-529
+        ? `Adventure — explore and catch; the glowing rift leads to the next region${TOUCH ? "" : "  (ESC to return home)"}`
         : objectiveText({ circleStarted: !!circle, portalsOpen: (net.state.portals || []).length > 0, outsideZone }));
-      // Hide the retained HUD labels behind combat / result overlays AND under the
-      // onboarding tutorial (they're at z=100 and otherwise bleed through the
-      // immediate-mode dim — SP fix landed in d1d4642; this is the MP parity). `disc` adds
-      // the connection-lost/reconnecting overlay (it dims the screen too).
       const disc = !net.state.connected;
-      // Design upgrade: the objective renders as an immediate-mode CHIP (drawObjectiveChip) so it gets a
-      // backing pill; the retained label stays as the text/wrap-width carrier but is never shown.
       objectiveVisible = !(net.state.combat || net.state.roundResult || onboard || menuOpen || disc);
       objective.hidden = true;
 
-      // Hide the movement hint behind the combat / result overlays + onboarding + pause + disconnect.
-      // Preserve the orientation gate set above (hint is square-aspect-only — in portrait/landscape
-      // it would collide with the gutter objective / chain HUD), then OR in the overlay conditions.
       hint.hidden = hint.hidden || !!(net.state.combat || net.state.roundResult || onboard || menuOpen || disc);
-      // Hide the top-left info on onboarding AND on the end-of-run result screen: the
-      // run is over there, so the "N:NN left" timer + "rivals in view" line are stale and
-      // clutter the result card (objective + hint are already hidden for the same reason).
-      // Kept visible during combat (live status still matters mid-fight).
       info.hidden = !!(onboard || net.state.roundResult || menuOpen || disc);
 
-      // Clear the "Resolving…" indicator once a turn result / end arrives.
       const cb = net.state.combat;
       if (cb) {
         if (cb.log.length !== lastLogLen || cb.outcome) {
-          // A turn we initiated with an ATTACK just resolved → play the standard attack lunge on
-          // the player's monster, then the enemy's counter-lunge a beat later (exercises the
-          // idle/walk/attack clip's ATTACK in combat). Guard on `awaiting` so only player-sent
-          // attacks trigger it, and not catch/flee/swap/item.
           if (awaiting && combatPress && combatPress.kind === "attack") {
             activeAtkT0 = k.time();
-            enemyAtkT0 = cb.outcome ? -1 : k.time() + ATTACK_DURATION * 0.55; // no counter once the fight's over
+            enemyAtkT0 = cb.outcome ? -1 : k.time() + ATTACK_DURATION * 0.55;
           }
-          // A catch we initiated just resolved → play the verdict on the held chain: snap-shut (caught) or
-          // blow-outward (broke free). The throw arc already started on the press (catchThrowT0).
           if (awaiting && combatPress && combatPress.kind === "catch" && catchThrowT0 >= 0) {
             catchResolveKind = cb.outcome === "caught" ? "caught" : "broke";
             catchResolveT0 = k.time();
-            if (catchResolveKind === "caught") sfx("catch"); else { sfx("miss"); haptic(20); } // caught jingle / broke-free thud + buzz
+            if (catchResolveKind === "caught") sfx("catch"); else { sfx("miss"); haptic(20); }
           }
           awaiting = false; lastLogLen = cb.log.length;
         }
@@ -1711,18 +1223,10 @@ export default function onlineGameScene(k) {
     });
 
     k.onDraw(() => {
-      // Seeded map — culled floor, now textured per tile type + rotation
-      // (src/render/tiles.js) instead of flat color rects.
-      revealAround(); // fog of war: reveal the disc around the player this frame
+      revealAround();
       drawTiles(k, map, net.state.self.x, net.state.self.y, tileCache, GAME.EFFECTIVE_TILE, isExplored);
 
-      // Safe zone (shrinking) + extraction portals.
-      // Storm wall (PV-T13): the closing safe-zone edge reads as a glowing, pulsing
-      // energy barrier — an outward glow band fading into the storm + a bright pulsing
-      // inner edge — instead of one flat thin outline.
       if (net.state.circle) {
-        // a11y: freeze the storm-wall breathing pulse under reduce-motion — the
-        // barrier stays fully visible (a critical danger landmark), just steady.
         const reduce = prefersReducedMotion();
         const c = net.state.circle, pulse = reduce ? 0.85 : 0.6 + 0.4 * Math.sin(k.time() * 3);
         for (let i = 3; i >= 1; i--) {
@@ -1731,93 +1235,63 @@ export default function onlineGameScene(k) {
         k.drawCircle({ pos: k.vec2(c.x, c.y), radius: c.r, fill: false, outline: { width: 3, color: k.rgb(...THEME.stormLite) }, opacity: reduce ? 0.7 : 0.55 + 0.25 * Math.sin(k.time() * 3) });
       }
       for (const p of net.state.portals) {
-        // First-seen time (client-side) drives the rise-from-the-ground animation
-        // when a portal pops into the snapshot.
         const key = `${p.x},${p.y}`;
         let born = portalSeen.get(key);
         if (born == null) { born = k.time(); portalSeen.set(key, born); }
         drawPortal(k, { x: p.x, y: p.y, t: k.time(), age: k.time() - born });
-        // TQ-529: in an adventure the rift TRAVELS (it doesn't extract) — say so on the ground beneath it.
         if (net.state.adventure) {
           k.drawText({ text: `Onward — Region ${(net.state.depth || 1) + 1}`, pos: k.vec2(p.x, p.y + 46), size: 12, font: "gameFontBold", anchor: "center", color: k.rgb(...THEME.portal), opacity: 0.9 });
         }
       }
 
       const now = k.time();
-      // Loot chests sit on the ground — drawn under the entities.
       for (const c of net.state.chests) drawChest(k, { x: c.x, y: c.y, t: now });
 
-      // Y-sorted entities (monsters + other players + you): nearer (lower y) draw
-      // on top of farther (higher y) ones, so overlaps read as depth rather than
-      // array/draw order (P-natural top-down look).
-      ents.length = 0; // reuse the scene-scoped array (declared above) — clear, then repopulate this frame
-      htmlEnts.length = 0; // TQ-262: same for the per-frame live-DOM monster list
-      const reduceMo = prefersReducedMotion(); // a11y: once per frame, freeze the idle bob
+      ents.length = 0;
+      htmlEnts.length = 0;
+      const reduceMo = prefersReducedMotion();
       const mSize = 128 * 0.45;
-      // Constant colours/tints used by the per-entity draw closures below — built once
-      // per frame instead of re-allocated inside each monster/player closure (which each
-      // run once per entity per frame). None are mutated by the draw helpers (verified:
-      // drawMonster reads tint[0..2]; drawCharacter spreads color; the draw adapter copies
-      // k.rgb channels out immediately).
       const shadowCol = k.rgb(0, 0, 0), monTint = [220, 180, 80], rivalBodyCol = [210, 90, 90], nameCol = k.rgb(...UI.text);
       for (const mo of net.state.monsters) {
         const r = monsterRender.get(mo.id) || { x: mo.x, y: mo.y, bx: mo.x, by: mo.y, moving: false, dir: { x: 1, y: 0 } };
-        // TQ-262: if this monster's TYPE carries a renderable html model, it renders via the DOM overlay
-        // (collected below + synced after the gate) instead of the canvas sprite — keep its shadow + Lv
-        // label on the canvas either way. usesDom is false for all current content (no html models yet).
         const mtype = getMonsterType(mo.typeName);
         const useDom = !!mtype && htmlOverlay.usesDom(mo.typeName, mtype);
         const facing = r.dir && r.dir.x < 0 ? -1 : 1;
         const moving = !reduceMo && r.moving;
         if (useDom) htmlEnts.push({ id: mo.id, typeName: mo.typeName, type: mtype, x: r.x, y: r.y, designSize: mSize, facing, moving, attacking: false });
         ents.push({ y: r.y, draw: () => {
-          k.drawEllipse({ pos: k.vec2(r.x, r.y + 20), radiusX: 15, radiusY: 5, color: shadowCol, opacity: 0.28 }); // ground shadow
-          // Standardized monster animation (render/monster.js): an APPROACHING monster (server moved
-          // it → non-zero interpolated velocity) plays WALK + faces its heading; a stationary one
-          // IDLES. Per-monster clock offset from its stable BIRTH position so they don't breathe in
-          // unison; a11y freezes the clock.
+          k.drawEllipse({ pos: k.vec2(r.x, r.y + 20), radiusX: 15, radiusY: 5, color: shadowCol, opacity: 0.28 });
           if (!useDom) {
             const anim = moving ? "walk" : "idle";
             const t = reduceMo ? 0 : now + (r.bx + r.by) * 0.013;
             drawMonster(k, { typeName: mo.typeName, x: r.x, y: r.y, size: mSize, anim, t, facing, tint: monTint });
           }
-          // TQ-362: the over-monster "Lv.N" threat label was removed from the overworld (combat HUD /
-          // roster / lobby level displays are intentionally kept).
         } });
       }
-      // TQ-452: the held chain vanishes from a tamer's hand while THEIR chain is in flight (it's the one
-      // that was thrown) and reappears when it returns. One owner-set per frame, read by self + rivals.
       const chainOutOwners = new Set((net.state.projectiles || []).map((pr) => pr.owner));
       for (const p of net.state.players) {
         const r = othersRender.get(p.id) || p;
         ents.push({ y: r.y, draw: () => {
-          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: rivalBodyCol, dir: r.dir, skin: getSkin(p.skinId), chainTier: p.chainTier ?? null, model: getCharacterSkin(p.charId).model, holdChain: !chainOutOwners.has(p.id) }); // CN-12: rival's own chain skin + body model; SC-tier: rival's equipped chain TIER core; TQ-452: hide the held ring while their chain is in flight
-          k.drawText({ text: trunc(p.name || "?", 14), pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: nameCol }); // cap the nick (guest names run to 20) so the floating nameplate can't sprawl / overlap a clustered rival
+          drawCharacter(k, { x: r.x, y: r.y, t: now + (p.id ? p.id.length : 0), moving: r.moving, color: rivalBodyCol, dir: r.dir, skin: getSkin(p.skinId), chainTier: p.chainTier ?? null, model: getCharacterSkin(p.charId).model, holdChain: !chainOutOwners.has(p.id) });
+          k.drawText({ text: trunc(p.name || "?", 14), pos: k.vec2(r.x, r.y - 40), size: 12, font: "gameFont", anchor: "center", color: nameCol });
         } });
       }
       ents.push({ y: selfRender.y, draw: () => {
-        const meCos = getEquippedCharacterSkin(); // your character cosmetic (accent + cloak) — mirrors SP; safe for self (camera-centered, no self/rival color-coding to preserve)
-        // TQ-451: throw wind-up (lean back ∝ charge) + release lunge (decays ~0.22s) along the aim.
+        const meCos = getEquippedCharacterSkin();
         const lungeFwd = throwLungeT0 >= 0 ? Math.max(0, 1 - (now - throwLungeT0) / 0.22) : 0;
         let selfThrowPose = null;
         if (throwCharge > 0.02 || lungeFwd > 0.01) { const aim = currentAimDir(); selfThrowPose = { back: throwCharge, fwd: lungeFwd, dx: aim.x, dy: aim.y }; }
-        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null, chainSpin: throwSpinPhase, holdChain: !chainOutOwners.has(net.state.playerId), throwPose: selfThrowPose }); // SC-tier: held chain core shows YOUR active slot's tier; TQ-450: chainSpin whirls the held chain while charging; TQ-452: hide the held ring while your chain is in flight; TQ-451: throw wind-up/lunge pose
-        // TQ-450: charge meter — a ring of ticks around the tamer that lights up (in the chain's colour) as
-        // the throw charges; a soft pulsing halo at full charge. Only while actively charging.
+        drawCharacter(k, { x: selfRender.x, y: selfRender.y, t: now, moving: selfMoving, color: meCos.accent, cloak: meCos.cloak, model: meCos.model, dir: selfDir, skin: getEquippedSkin(), chainTier: equippedChain()?.def?.tier ?? null, chainSpin: throwSpinPhase, holdChain: !chainOutOwners.has(net.state.playerId), throwPose: selfThrowPose });
         if (throwCharge > 0.02) {
           const ec = equippedChain(), col = ec && ec.def ? chainColor(ec.def) : [120, 220, 255];
           const N = 12, lit = Math.round(throwCharge * N), rad = 30, cyM = selfRender.y - 8;
           for (let i = 0; i < N; i++) {
-            const a = -Math.PI / 2 + (i / N) * Math.PI * 2; // top, clockwise
+            const a = -Math.PI / 2 + (i / N) * Math.PI * 2;
             const on = i < lit;
             k.drawCircle({ pos: k.vec2(selfRender.x + Math.cos(a) * rad, cyM + Math.sin(a) * rad), radius: on ? 2.6 : 1.4, color: k.rgb(...(on ? col : [80, 90, 100])), opacity: on ? 0.95 : 0.4 });
           }
-          if (throwCharge >= 0.999) k.drawCircle({ pos: k.vec2(selfRender.x, cyM), radius: rad + 4, color: k.rgb(...col), opacity: 0.12 + 0.1 * Math.sin(now * 12) }); // full-charge flash
+          if (throwCharge >= 0.999) k.drawCircle({ pos: k.vec2(selfRender.x, cyM), radius: rad + 4, color: k.rgb(...col), opacity: 0.12 + 0.1 * Math.sin(now * 12) });
         }
-        // TQ-517: bring the lobby's slim under-player sprint-stamina bar into the round too — world-space,
-        // shown only while draining/recovering (hidden at full so it's unobtrusive), teal → amber when low.
-        // Mirrors hub.js (TQ-89); uses the locally-predicted stamina for smoothness (the team-cluster HUD
-        // bar still shows the authoritative value). Not during combat — you're locked on the battle stage.
         const stam = predStamina ?? net.state.stamina ?? GAME.SPRINT.STAMINA_MAX;
         if (!net.state.combat && stam < GAME.SPRINT.STAMINA_MAX - 0.5) {
           const sr = Math.max(0, Math.min(1, stam / GAME.SPRINT.STAMINA_MAX)), bw = 34;
@@ -1826,60 +1300,29 @@ export default function onlineGameScene(k) {
         }
       } });
       ents.sort(byY);
-      // While the pause menu, the end-of-run result card, OR the CONNECTION LOST /
-      // RECONNECTING overlay is up, skip the LIVE actors (monsters / rivals / you) and
-      // particles: they're camera-centered and brightly lit (the glowing spirit chain, a
-      // wild monster's "Lv.N" label), so they punched through the dim — the chain behind the
-      // pause buttons, a wild monster above the result card, your own avatar + nameplate +
-      // chain ring behind CONNECTION LOST. The dimmed tiles/circle/portals stay as a calm
-      // backdrop. (overlay-bleed pattern — same gate as the HUD clusters use net.state.connected.)
       if (!menuOpen && !net.state.roundResult && net.state.connected) {
         for (const e of ents) e.draw();
-        drawFx(k); // world particles (footstep dust, etc.) — over the floor, under the HUD (PV-T12)
+        drawFx(k);
       }
-      // TQ-262: drive the live-DOM monster overlay. Sync only while the overworld actors are shown and
-      // not in the battle panel; otherwise hide the DOM nodes. Clipped to the play window so nodes never
-      // bleed into the HUD gutters. No-op for current content (no monster has an html model yet).
       if (!menuOpen && !net.state.roundResult && net.state.connected && !net.state.combat) {
         htmlOverlay.sync(htmlEnts, { clipDesign: playWindowRect(k.width(), k.height(), { maxAspect: winAspect() }) });
       } else if (!net.state.combat) {
-        htmlOverlay.clear(); // menu / result / disconnected — hide overworld nodes (combat owns the overlay itself, below)
+        htmlOverlay.clear();
       }
 
-      // In-flight spirit chains (in-air — over the entities). (Throw-line indicator removed — on PC you
-      // aim with the mouse cursor; on touch the throw goes along your heading.)
       for (const pr of projRender.values()) {
         drawSpiritChainProjectile(k, pr, chainColor(getSpiritChain(pr.chainId)), now);
       }
 
-      // Ambient atmosphere overlay (vignette + spirit-light glow + drifting motes/wisps) removed —
-      // the overworld round renders without ambiance/glow while walking around. The storm
-      // border/warning still draws on top via drawDanger (functional danger feedback, kept).
-
-      // Square play-window frame (user design 2026-06-08): mark the canonical square
-      // play area; the map stays visible outside it (peripheral context that grows with
-      // resolution). The HUD, minimap, combat panel and touch widgets all anchor to this
-      // square now (WIN-T2/T3 landed) and portrait is enabled (WIN-T4); `dim: 0` keeps the
-      // peripheral map fully visible (dim is a tunable). Drawn during combat too: the battle
-      // stage only fills the SQUARE, so in portrait the gutter BELOW the panel was showing the
-      // frozen world — the bezel covers it (no-op in landscape, where there are no T/B gutters).
-      // Still skipped under result/onboarding (those have their own full-screen dim). HUD/stage/
-      // panel all draw after this, so they stay on top of the bezel.
       if (!net.state.roundResult && !onboard) drawPlayWindow(k, { maxAspect: winAspect() });
 
-      // Virtual joystick (touch) — left side, hidden during combat / results.
       if (TOUCH && !net.state.combat && !net.state.roundResult) {
         const joyActive = joyId !== null;
-        // Standardized stick (shared with the hub): faint discoverable hint at rest, bright ring + knob when active.
         drawJoystick(k, { base: joyActive ? joyBase : joyRest(), thumb, active: joyActive, radius: JOY_R });
         const eqc = equippedChain();
-        // TQ-180: return-gated cooldown — the throw is disabled while this player's chain is still
-        // out (one in-flight chain at a time), re-enabling when the boomerang returns.
         const chainOut = (net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
         const hasChain = !!eqc && !chainOut;
-        const thrCol = eqc && eqc.def ? chainColor(eqc.def) : THEME.water; // throw pad tinted by the active chain
-        // TQ-526: the THROW pad FLOATS — drawn where the finger is while aiming, else a faint discoverable
-        // "home" hint on the right gutter inviting a touch-and-drag anywhere on the right half.
+        const thrCol = eqc && eqc.def ? chainColor(eqc.def) : THEME.water;
         if (throwAim && throwAim.id != null) {
           drawThrowPad(k, { origin: throwAim.origin, dir: throwAim.dir, dragged: throwAim.dragged, charge: throwCharge, accent: thrCol, enabled: throwAim.enabled !== false, radius: THROW_PAD_R });
         } else if (!onboard) {
@@ -1889,15 +1332,11 @@ export default function onlineGameScene(k) {
           k.drawText({ text: "Throw", pos: k.vec2(hp.x, hp.y + 2), size: 14, font: "gameFont", anchor: "center", color: k.rgb(...thrCol), opacity: hasChain ? 0.72 : 0.32, fixed: true });
           k.drawText({ text: "drag to aim", pos: k.vec2(hp.x, hp.y + 18), size: 9, font: "gameFont", anchor: "center", color: k.rgb(...THEME.textMut), opacity: 0.6, fixed: true });
         }
-        // TQ-488/TQ-526: dedicated FIXED chain-swap button (only when >1 chain is loaded) — colored by the
-        // active chain so the loadout reads at a glance; tap cycles to the next slot.
         if (!onboard && (net.state.equippedChainIds || []).length > 1) {
           const swCol = eqc && eqc.def ? chainColor(eqc.def) : THEME.teal;
           const tier = eqc && eqc.def ? eqc.def.tier : null;
           drawTouchButton(k, { pos: swapBtnC(), radius: SWAP_R, label: "Swap", accent: swCol, enabled: true, sub: tier != null ? `T${tier}` : null, icon: "swap" });
         }
-        // TQ-487: drag-to-aim indicator — an arrow from the player (square centre) showing the
-        // throw heading while the THROW button is being dragged.
         if (throwAim && throwAim.dragged) {
           const sq2 = hudSlots().square;
           const col = eqc && eqc.def ? chainColor(eqc.def) : [120, 220, 255];
@@ -1908,172 +1347,96 @@ export default function onlineGameScene(k) {
           k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a1) * head, tip.y + Math.sin(a1) * head), width: 4, color: k.rgb(...col), opacity: 0.85, fixed: true });
           k.drawLine({ p1: tip, p2: k.vec2(tip.x + Math.cos(a2) * head, tip.y + Math.sin(a2) * head), width: 4, color: k.rgb(...col), opacity: 0.85, fixed: true });
         }
-        // MB-11: touch pause button (top-center) — opens the pause/leave menu.
         if (!onboard) {
           const [pbx, pby, pbw, pbh] = pauseBtnRect();
-          // #68: route through THEME (was raw RGB) — matches the identical SP pause button
-          // (game.js) so the two stay consistent + adapt to palette changes.
           drawGlass(k, { rect: [pbx, pby, pbw, pbh], radius: 12, tint: 0.62, fill: 0.06, line: 0.14, fixed: true });
           k.drawRect({ pos: k.vec2(pbx + pbw / 2 - 7, pby + 10), width: 5, height: pbh - 20, radius: 2, color: k.rgb(...THEME.text), fixed: true });
           k.drawRect({ pos: k.vec2(pbx + pbw / 2 + 2, pby + 10), width: 5, height: pbh - 20, radius: 2, color: k.rgb(...THEME.text), fixed: true });
         }
       }
 
-      // Minimap + team HP + danger warning (hidden behind the round-result overlay).
-      // Gated on !onboard too: every sibling HUD cluster (team/chain/biome/objective/info)
-      // hides under the first-run tutorial dim, but the minimap was missed and bled through
-      // it in the top-right corner — the same first-impression inconsistency.
-      // Gated on !combat too (TQ fight-focus): the minimap is a roaming aid; during a fight
-      // the screen should be a focused battle stage + bottom panel, with NO side-gutter HUD
-      // ("the fight screen still has the old format and inventory menus on the side" — Dominik).
       if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawMinimap();
-      // (B) The team cluster grows DOWN from the square top; the combat panel rises from
-      // the square bottom. In a tight (portrait) viewport — the shim's design height is a
-      // fixed 720, so a phone-portrait square is only ~405 tall — the two collide. During
-      // combat, draw the cluster only if it clears the panel (landscape has room →
-      // unchanged; portrait combat → hidden, the panel + swap menu are the focus).
-      // Gated on !onboard too: the team + chain HUD are bright clusters that bled through
-      // the onboarding dim in the top-left while the objective/hint/info labels + biome
-      // chip were already hidden there — an inconsistency on the first-impression screen.
-      // Task: the lobby's identity+inventory panel in the cave's left gutter (landscape, roaming).
       const showLobby = lobbyPanelActive();
       if (showLobby) {
         const hud = hudSlots();
-        const gx = hud.team.x, gy = hud.team.y + 64;        // below the info line (timer/name/rivals)
+        const gx = hud.team.x, gy = hud.team.y + 64;
         const gw = Math.max(150, (hud.gutterW || 256) - 24);
-        // The left gutter's foot: the biome chip on desktop, the joystick on touch screens (the chip moves right).
         const footY = TOUCH ? hud.joystick.y - JOY_RADIUS - 10 : hud.biome.y - 18;
-        const gmaxH = Math.max(150, footY - gy); // stop above the gutter foot
-        drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH - 34, character: lobbyChar, title: "Your Tamer", measureIcons: false }); // in a run: never a pixel read-back (c1196e1)
-        if (!net.state.combat && !net.state.roundResult) drawAtRiskPill(gx, footY - 28); // the side panel replaces the chain HUD that carries it in portrait
+        const gmaxH = Math.max(150, footY - gy);
+        drawHubPanel(k, { x: gx, y: gy, w: gw, maxH: gmaxH - 34, character: lobbyChar, title: "Your Tamer", measureIcons: false });
+        if (!net.state.combat && !net.state.roundResult) drawAtRiskPill(gx, footY - 28);
       }
-      // Team HP cluster is a roaming HUD only. Hidden during combat (TQ fight-focus): the
-      // combat panel shows the active monster's HP and the Swap menu reaches the bench, so the
-      // side-gutter team cluster is the "inventory menu on the side" Dominik asked to remove.
       if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) {
-        if (!showLobby) drawTeamHp(); // the lobby panel already shows the team
+        if (!showLobby) drawTeamHp();
       }
       if (!showLobby && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawChainHud();
-      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); } // HUD-OUT: biome chip in the gutter
+      if (!net.state.combat && !net.state.roundResult && !onboard && !menuOpen && net.state.connected) { const b = hudSlots().biome; drawBiomeChip(k, { x: b.x, y: b.y, map, wx: selfRender.x, wy: selfRender.y }); }
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawTimerChip();
-      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected && !net.state.combat) drawInfoChip(); // UI v4: rivals / connection chip under the timer (roaming only) // design upgrade: the round clock as a gutter chip (kept during combat — the storm keeps closing)
-      drawObjectiveChip(); // design upgrade: objective line in a backing pill (visibility computed in onUpdate)
+      if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected && !net.state.combat) drawInfoChip();
+      drawObjectiveChip();
       if (!net.state.roundResult && !onboard && !menuOpen && net.state.connected) drawKillFeed();
-      drawCombatNotice(); // FGT-T1: transient "combat judge offline" toast
-      drawLootNotice();   // TQ-66: transient "bag full — item left behind" toast
-      if (!onboard && !menuOpen && net.state.connected) drawTutorialNotice(); // TQ-518: "Step done — next: …" toast
-      if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding(); // P8-T8 overlay over the HUD
-      // Gated on !menuOpen too: the "OUTSIDE SAFE ZONE" danger banner bled through the pause
-      // dim and collided with the "PAUSED" title (worst case of the overlay-bleed pattern).
+      drawCombatNotice();
+      drawLootNotice();
+      if (!onboard && !menuOpen && net.state.connected) drawTutorialNotice();
+      if (onboard && !net.state.combat && !net.state.roundResult) drawOnboarding();
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard && net.state.connected) drawDanger();
-      if (!net.state.roundResult && !onboard && net.state.connected) drawStormHit(); // PV-T13: discrete storm-damage flash (fades even after re-entering the zone)
+      if (!net.state.roundResult && !onboard && net.state.connected) drawStormHit();
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard && net.state.connected) drawPortalCompass();
       if (!net.state.combat && !net.state.roundResult && !menuOpen && !onboard && net.state.connected) drawTimeWarning();
 
-      // Combat overlay (server locks movement during a fight). Tappable buttons;
-      // keyboard 1-4 / C / F still work on desktop.
       const c = net.state.combat;
       if (c) {
-        // MB-4: content anchors `safeInset.bottom` above the screen edge (so the
-        // buttons/log clear the home-bar); the background fill (height H) still spans
-        // down to the very bottom behind it. At zero insets this is the old layout.
-        // WIN-T3: content (combatant rows + buttons + floaters) is laid out within the
-        // square play window; the dark panel bar stays full-width as a clean backdrop.
         const pw = playWindowRect(k.width(), k.height(), { maxAspect: winAspect() });
-        // WIN-T3 fix: vertical anchor follows the square (matches combatButtons()), so
-        // the panel + its content rise with the square in portrait. backdrop top+H lands
-        // on pw.bottom; landscape unchanged (pw.bottom === k.height()).
-        const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, H = COMBAT_H + safeInset.bottom, m = pw.x + 12, W = pw.w - 24; // TQ-494: rows span the full 4:3 width (was pw.size)
-        // Hit-flash bookkeeping: flash a row when its HP drops; reset per-side trackers
-        // on a new combat so a stale value can't false-trigger on the first frame.
+        const top = Math.min(k.height(), pw.bottom) - COMBAT_H - safeInset.bottom, H = COMBAT_H + safeInset.bottom, m = pw.x + 12, W = pw.w - 24;
         const tF = k.time();
-        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; newSpeciesT = -9; lastCombatId = c.combatId; battleIntroT0 = tF; catchThrowT0 = -9; catchResolveT0 = -9; catchResolveKind = null; combatInspect = null; sfx("throw"); if (c.enemy && !c.pvp) markEncountered(c.enemy.typeName); } // TQ-125: drop any open inspect when a new fight starts // bestiary "seen" state (wild only, not PvP) + kick off the entry cinematic (transition → chain throw → spawn)
-        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { const d = prevEnemyHp - c.enemy.currentHealth, fr = c.enemy.maxHealth ? Math.min(1, d / c.enemy.maxHealth) : 0; hitFlashE = tF; if (!prefersReducedMotion()) addShake(Math.min(0.6, 0.12 + fr * 0.45)); emit({ x: pw.cx, y: top + 26, n: 6 + Math.round(fr * 10), color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(d), col: [255, 210, 90], t0: tF }); } // hit-sparks + damage-scaled shake/sparks + number (PV-A5: your hit lands)
-        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth > prevEnemyHp) dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(c.enemy.currentHealth - prevEnemyHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
+        if (c.combatId !== lastCombatId) { prevEnemyHp = prevActiveHp = null; caughtFxDone = false; dmgFloaters = []; newSpeciesT = -9; lastCombatId = c.combatId; battleIntroT0 = tF; catchThrowT0 = -9; catchResolveT0 = -9; catchResolveKind = null; combatInspect = null; sfx("throw"); if (c.enemy && !c.pvp) markEncountered(c.enemy.typeName); }
+        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth < prevEnemyHp) { const d = prevEnemyHp - c.enemy.currentHealth, fr = c.enemy.maxHealth ? Math.min(1, d / c.enemy.maxHealth) : 0; hitFlashE = tF; if (!prefersReducedMotion()) addShake(Math.min(0.6, 0.12 + fr * 0.45)); emit({ x: pw.cx, y: top + 26, n: 6 + Math.round(fr * 10), color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(d), col: [255, 210, 90], t0: tF }); }
+        if (c.enemy && prevEnemyHp != null && c.enemy.currentHealth > prevEnemyHp) dmgFloaters.push({ x: pw.right - 92, y: top + 18, dmg: Math.round(c.enemy.currentHealth - prevEnemyHp), col: [120, 230, 150], t0: tF, heal: true });
         prevEnemyHp = c.enemy ? c.enemy.currentHealth : null;
-        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { const d = prevActiveHp - c.active.currentHealth, fr = c.active.maxHealth ? Math.min(1, d / c.active.maxHealth) : 0; hitFlashA = tF; haptic(15); if (!prefersReducedMotion()) addShake(Math.min(0.9, 0.2 + fr * 0.7)); emit({ x: pw.cx, y: top + 68, n: 6 + Math.round(fr * 10), color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 60, dmg: Math.round(d), col: [255, 90, 90], t0: tF }); } // hit-sparks + haptic + damage-scaled shake/sparks + number (PV-A5: you take a hit)
-        if (c.active && prevActiveHp != null && c.active.currentHealth > prevActiveHp) dmgFloaters.push({ x: pw.right - 92, y: top + 60, dmg: Math.round(c.active.currentHealth - prevActiveHp), col: [120, 230, 150], t0: tF, heal: true }); // VS-22: heal +N
+        if (c.active && prevActiveHp != null && c.active.currentHealth < prevActiveHp) { const d = prevActiveHp - c.active.currentHealth, fr = c.active.maxHealth ? Math.min(1, d / c.active.maxHealth) : 0; hitFlashA = tF; haptic(15); if (!prefersReducedMotion()) addShake(Math.min(0.9, 0.2 + fr * 0.7)); emit({ x: pw.cx, y: top + 68, n: 6 + Math.round(fr * 10), color: [255, 180, 120], speed: 110, life: 0.4, size: 2.5, drag: 2, fixed: true }); dmgFloaters.push({ x: pw.right - 92, y: top + 60, dmg: Math.round(d), col: [255, 90, 90], t0: tF }); }
+        if (c.active && prevActiveHp != null && c.active.currentHealth > prevActiveHp) dmgFloaters.push({ x: pw.right - 92, y: top + 60, dmg: Math.round(c.active.currentHealth - prevActiveHp), col: [120, 230, 150], t0: tF, heal: true });
         prevActiveHp = c.active ? c.active.currentHealth : null;
         const eF = Math.max(0, 1 - (tF - hitFlashE) / 0.3), aF = Math.max(0, 1 - (tF - hitFlashA) / 0.3);
-        // Catch-success sparkle (PV-T12, screen-space) — the taming payoff; burst once at the captured row.
         if (c.outcome === "caught" && !caughtFxDone) {
-          caughtFxDone = true; haptic([0, 30, 40, 60]); emit({ x: pw.cx, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true }); // MB-12: catch-success buzz
-          // PV-T15: first-ever capture of this species (persisted client-side, so it
-          // works without the vault the in-round client doesn't carry) → milestone
-          // chime + gold burst on top of the teal catch sparkle; banner drawn below.
-          // Skip when the catch was RELEASED (collection full): the monster wasn't kept,
-          // so it isn't "tamed" — marking the dex / firing NEW SPECIES would contradict
-          // the "RELEASED" line and the lifetime "caught" stat (which also skips it).
+          caughtFxDone = true; haptic([0, 30, 40, 60]); emit({ x: pw.cx, y: top + 26, n: 22, color: [120, 240, 255], speed: 95, life: 0.85, size: 3, gravity: -25, drag: 1.5, fixed: true });
           if (c.enemy && c.placement !== "released" && markDiscovered(c.enemy.typeName)) { newSpeciesT = tF; sfx("levelup"); emit({ x: pw.cx, y: top + 26, n: 24, color: [255, 214, 110], speed: 150, life: 1.1, size: 3, gravity: 120, drag: 0.6, fixed: true }); }
         }
-        // Frame the fight: fill the full stage width with the stage's base backdrop colour BEFORE the
-        // square battle stage draws, so the FROZEN overworld can't bleed through the side gutters around
-        // the centred square (very visible in landscape — the square is height-bound, leaving wide
-        // gutters). THEME.bg matches drawBattleStage's own base fill, so there's no seam; the battle
-        // reads as one clean, intentional scene instead of a square floating over the paused world.
         k.drawRect({ pos: k.vec2(0, pw.y), width: k.width(), height: Math.max(0, top - pw.y), color: k.rgb(...THEME.bg), fixed: true });
-        // Pokémon-style battle stage (over the frozen world, above the panel) + the
-        // entry cinematic: a transition wipe, the enemy already on the field, then the
-        // tamer throwing the equipped spirit chain to summon THEIR OWN monster (it bursts
-        // out of the chain). The tamer wears the player's equipped character colours.
-        combatHtmlEnts.length = 0; // TQ-262: rebuilt by drawBattleStage for combatants with an html model
+        combatHtmlEnts.length = 0;
         if (c.enemy) {
-          // 0..1 progress of each side's one-shot attack lunge (0 when not mid-lunge).
           const atkPhase = (t0) => (t0 >= 0 && tF >= t0 && tF < t0 + ATTACK_DURATION) ? (tF - t0) / ATTACK_DURATION : 0;
-          // TQ-502: tint the fancy HTML/CSS fight backdrop by the biome the player is fighting in.
           const _bx = net.state.self?.x ?? 0, _by = net.state.self?.y ?? 0;
           drawBattleStage(k, {
             rect: pw, stageBottom: top, enemy: c.enemy, active: c.active,
             biomeName: map ? biomeNameAt(map, _bx, _by) : null,
             biomeAccent: map ? biomeTintAt(map, Math.floor(_bx / GAME.EFFECTIVE_TILE), Math.floor(_by / GAME.EFFECTIVE_TILE)) : null,
             chainCol: chainColor(getSpiritChain(net.state.equippedChainId)),
-            chainTier: getSpiritChain(net.state.equippedChainId)?.tier ?? null, // SC-tier: combat tamer's held core = active slot tier (the chain "available in combat")
+            chainTier: getSpiritChain(net.state.equippedChainId)?.tier ?? null,
             charSkin: getEquippedCharacterSkin(),
             time: tF, introElapsed: tF - battleIntroT0, reducedMotion: prefersReducedMotion(),
             activeAttack: prefersReducedMotion() ? 0 : atkPhase(activeAtkT0),
             enemyAttack: prefersReducedMotion() ? 0 : atkPhase(enemyAtkT0),
             htmlSink: combatHtmlEnts,
-            // Catch cinematic: chain thrown AT the enemy (catchThrowT0), then the verdict (catchResolveKind).
             catchElapsed: catchThrowT0 >= 0 ? tF - catchThrowT0 : -1,
             catchResolve: catchResolveKind,
             catchResolveElapsed: catchResolveT0 >= 0 ? tF - catchResolveT0 : -1,
           });
         }
-        // TQ-262: sync the live-DOM overlay with the combatants (screen-space, no play-window clip). The
-        // battle panel draws over the world, so combat owns the overlay here (the overworld branch above
-        // skips clearing while in combat). Empty sink (no html-model combatant) → nodes culled.
-        // TQ-500: the live-DOM combatants sit ABOVE the canvas, so a canvas-drawn modal (the monster-
-        // detail inspect popup, the pause menu, the round-result card, or the disconnect overlay) can't
-        // occlude them — they'd bleed OVER it. Hide the DOM combatants while any such modal is up (the
-        // inspect popup shows its OWN monster image; the others want the stage hidden anyway).
+        // DOM combatants sit above the canvas: hide them while any canvas modal is up
         if (combatInspect || menuOpen || net.state.roundResult || !net.state.connected) htmlOverlay.clear();
         else htmlOverlay.sync(combatHtmlEnts, { fixed: true });
-        // Design upgrade: the battle panel is a lifted material slab (top-lit gradient + a hairline catch-light
-        // along its top edge) instead of a flat near-black wash.
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: H, color: k.rgb(...THEME.bg), opacity: 0.96, fixed: true,
           gradient: { dir: "v", stops: [[0, THEME.surface, 0.97], [0.5, THEME.bg, 0.97], [1, THEME.bgAlt, 0.98]] } });
         k.drawRect({ pos: k.vec2(0, top), width: k.width(), height: 1, color: k.rgb(255, 255, 255), opacity: 0.14, fixed: true });
-        // c.enemy / c.active can be absent if a malformed/skewed combatStart set state.combat
-        // without them (net.js:44 guards the same protocol-skew class). drawCombatant no-ops on a
-        // null mon, but the TITLE strings deref first — guard them so onDraw can't throw and blank
-        // the whole round every frame (mirrors the guarded reads at 1158/1166).
+        // c.enemy/c.active may be missing: guard, or onDraw throws every frame
         const enemyTitle = !c.enemy ? "" : c.pvp ? `${c.opponent || "Rival"}: ${c.enemy.typeName}` : `Wild ${c.enemy.typeName}`;
         drawCombatant(c.enemy, top + 8, enemyTitle, m, W, eF, "enemy");
         drawCombatant(c.active, top + 50, c.active?.name, m, W, aF, "self");
-        // TQ-125: remember the two header rows' screen rects so a tap can open the shared detail popup.
         combatRowRects = { enemy: [m - 8, top + 5, W + 16, 42], active: [m - 8, top + 47, W + 16, 42] };
         const nowC = k.time();
-        // Input is locked while the AI judge resolves the turn (~1-2s) or we await a
-        // PvP opponent's move — dim the action buttons so they read as inactive
-        // (taps are no-ops here) rather than looking live but doing nothing.
         const inputLocked = !c.outcome && (awaiting || c.waiting);
         const lockDim = inputLocked ? 0.4 : 1;
         const cbtns = combatButtons();
-        // UI v4: every ATTACK pill uses ONE name size (the smallest any of them needs), so a short name isn't
-        // big next to a tiny long one. Same per-pill fit as below: shrink to ~2 lines, then to the 2-line
-        // budget above the footer when the name wraps.
-        // Word-aware line count for a name at size `s` in a pill `w` wide: greedy wrap by MEASURED width (the
-        // renderer wraps at width w-10 the same way); a char estimate only when measureText is unavailable.
         const textW = (t, s) => (typeof k.measureText === "function" ? k.measureText(t, s, FONT_BOLD) : t.length * s * 0.54);
         const wrapLines = (label, w, s) => {
           const maxW = w - 12;
@@ -2085,7 +1448,6 @@ export default function onlineGameScene(k) {
           return lines;
         };
         const perLineAt = (w, s) => Math.max(4, Math.floor((w - 12) / (s * 0.54)));
-        // Largest size (14 down to 9) at which the name fits on ONE line, or on TWO lines that clear the footer row.
         const pillFit = (b) => {
           const [, , w, h] = b.rect;
           for (let s = 14; s > 9; s -= 0.5) {
@@ -2098,33 +1460,19 @@ export default function onlineGameScene(k) {
         for (const b of cbtns) {
           const [x, y, w, h] = b.rect;
           const aff = b.affordable !== false;
-          // UI v3: action pills are GLASS over the combat slab (dark tint + white wash + hairline; the wash lifts
-          // on hover / press); CATCH is the one filled ember primary. Unaffordable / locked fold into the opacity.
           const pressed = combatPress && combatPress.kind === b.action.kind && combatPress.name === (b.action.attackName || b.action.kind) && nowC - combatPress.t < 0.18;
           const isCatch = b.action.kind === "catch";
           const hov = !TOUCH && inRect(k.mousePos(), b.rect);
           if (isCatch) drawButton(k, { rect: b.rect, text: "", fill: THEME.primary, radius: 14, hover: hov, pressed, disabled: !aff, opacity: lockDim, fixed: true });
           else drawGlass(k, { rect: b.rect, radius: 14, tint: 0.35 * lockDim, fill: (pressed ? 0.16 : hov ? 0.11 : 0.06) * (aff ? 1 : 0.5) * lockDim, line: (aff ? (hov || pressed ? 0.24 : 0.14) : 0.08) * lockDim, fixed: true });
           const inkCol = isCatch && aff ? THEME.textInv : UI.text;
-          // Auto-shrink the label so a long attack name ("Riddle of the Sands") fits ~2 lines in
-          // a narrow button instead of wrapping to 3-4 lines that overflow + bury the EN cost.
-          // Wide (landscape) buttons keep size 14; only cramped ones shrink (min 10).
           const mnSize = Math.max(10, Math.min(14, 2 * (w - 12) * 14 / (7.5 * Math.max(1, b.label.length))));
-          // Then cap to a 2-LINE budget at that size: at min font a 27-char name still word-wrapped
-          // to 3 lines on a narrow portrait button, and the 3rd line ("Tempest") collided with the
-          // EN cost row. Attack buttons (cost shown) get 2 lines; the cost-less Catch/Swap/Flee get 3.
           let perLine = Math.max(4, Math.floor((w - 12) / (mnSize * 0.54)));
-          // Phone fix: a 2-line name at size 14 (block ≈36px, centred at h/2-10) ran INTO the EN row on a
-          // 52px-tall portrait pill ("Thorny Swipe" over "EN 20"). When the name needs 2 lines on a cost
-          // button, size it so both lines fit above the EN row and anchor the block to the TOP instead.
           let nmSize = b.cost != null && b.label.length > perLine ? Math.max(9, Math.min(mnSize, (h - 28) / 2.6)) : mnSize;
-          if (b.cost != null) { nmSize = atkSize; perLine = perLineAt(w, nmSize); } // the shared attack size
-          const wraps = b.cost != null && wrapLines(b.label, w, nmSize) > 1; // measured: a name that fits one line stays centred
+          if (b.cost != null) { nmSize = atkSize; perLine = perLineAt(w, nmSize); }
+          const wraps = b.cost != null && wrapLines(b.label, w, nmSize) > 1;
           if (wraps) perLine = Math.max(4, Math.floor((w - 12) / (nmSize * 0.54)));
           const lbl = trunc(b.label, (b.cost != null ? 2 : 3) * perLine);
-          // TQ-356: on a cost button, nudge the name up + the EN row down so a 2-line attack name
-          // ("Riddle of the Sands") clears the cost instead of touching it (was h/2-7 name / h-13 EN).
-          // UI v4: action icons (catch / swap / flee / back / bag) sit left of the label on the cost-less buttons.
           const ACTION_ICON = { catch: "catch", swap: "swap", openSwap: "swap", flee: "flee", closeSwap: "chevronL", closeItems: "chevronL", openItems: "bag", items: "bag", useItem: "bag" };
           const aIcon = b.cost == null ? ACTION_ICON[b.action.kind] : null;
           const lblW = aIcon && typeof k.measureText === "function" ? k.measureText(lbl, nmSize, FONT_BOLD) : 0;
@@ -2133,8 +1481,6 @@ export default function onlineGameScene(k) {
           if (wraps) k.drawText({ text: lbl, pos: k.vec2(x + w / 2, y + 5), size: nmSize, font: FONT_BOLD, anchor: "top", align: "center", color: k.rgb(...inkCol), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
           else k.drawText({ text: lbl, pos: k.vec2(x + w / 2 + tdx, y + (b.cost != null ? h / 2 - 9 : h / 2)), size: nmSize, font: FONT_BOLD, anchor: "center", color: k.rgb(...inkCol), width: w - 10, opacity: (aff ? 1 : 0.55) * lockDim, fixed: true });
           if (b.cost != null) {
-            // UI v4 attack pill footer: sword + damage (left) and bolt + energy (right); a small key cap with the
-            // hotkey in the top-left corner on desktop; an ember accent stripe along the left edge when affordable.
             const fo = (aff ? 0.95 : 0.5) * lockDim, fy = y + h - 10;
             if (aff) k.drawRect({ pos: k.vec2(x + 1, y + 10), width: 3, height: h - 20, radius: 1.5, color: k.rgb(...THEME.primary), opacity: 0.75 * lockDim, fixed: true });
             if (w >= 120) {
@@ -2142,7 +1488,7 @@ export default function onlineGameScene(k) {
               const cs = `${b.cost}`, cw = typeof k.measureText === "function" ? k.measureText(cs, 11, FONT_BOLD) : 14;
               drawIcon(k, "bolt", { x: x + w - cw - 24, y: fy, size: 11, color: aff ? THEME.amber : UI.mut, opacity: fo, fixed: true });
               k.drawText({ text: cs, pos: k.vec2(x + w - 12, fy), size: 11, font: FONT_BOLD, anchor: "right-center", color: k.rgb(...(aff ? THEME.amber : UI.mut)), opacity: fo, fixed: true });
-            } else { // narrow pills (portrait): compact damage (left) + energy (right) when there's room, else energy only
+            } else {
               const cs = `${b.cost}`, cw = typeof k.measureText === "function" ? k.measureText(cs, 10, FONT_BOLD) : 12;
               if (b.damage != null && w >= 72) {
                 drawIcon(k, "sword", { x: x + 12, y: fy, size: 10, color: UI.body, opacity: fo, fixed: true });
@@ -2160,8 +1506,6 @@ export default function onlineGameScene(k) {
             }
           }
         }
-        // TQ-71: full attack description preview — hovered (desktop) or long-pressed (touch). Floating
-        // box sized to its text + clamped to the panel, flips below the button when there's no room above.
         let atkTip = null;
         if (!TOUCH) {
           const mp = k.mousePos();
@@ -2183,29 +1527,16 @@ export default function onlineGameScene(k) {
           drawGlass(k, { rect: [tx, ty, tW, tH], radius: 12, tint: 0.86, fill: 0.06, line: 0.16, fixed: true });
           k.drawText({ text: atkTip.desc, pos: k.vec2(tx + 10, ty + 7), size: 11, font: "gameFont", width: tW - 20, lineSpacing: 2, color: k.rgb(...UI.text), fixed: true });
         }
-        // The combat log line sits at the panel's bottom edge — but the swap/items sub-menu
-        // fills the panel down to that same edge, so its "Back" row overlapped the log text.
-        // Hide the log while a sub-menu is open (a focused choice; the log returns on Back).
         if (!swapOpen && !itemsOpen) {
           const last = c.log[c.log.length - 1] || (c.pvp ? "A rival challenges you!" : "A wild monster appeared!");
-          // A full team+vault drops the catch (engine/inventory.js). The server still reports
-          // outcome "caught", so without this the player is told they caught a monster that
-          // actually vanished — say "released, collection full" instead of a bare "CAUGHT!".
-          // TQ-554: the outcome + dismiss prompt live on the end-of-fight overview card now; the log line
-          // keeps just the judge's narrative (a "lost" fight ends the run via the died overlay instead).
           const line = last;
-          // The judge's per-turn outcome is the key feedback each round, but it was a faint 13px line
-          // crammed at the panel's bottom edge — easy to miss over the battle stage. Give it a
-          // legibility backing strip + a slightly larger size so the outcome text clearly reads.
-          const ly = top + COMBAT_H - 28; // sits in the clear band below the action buttons (which end ~top+216)
+          const ly = top + COMBAT_H - 28;
           drawGlass(k, { rect: [m - 4, ly - 5, W + 8, 26], radius: 13, tint: 0.35, fill: 0.05, line: 0.1, fixed: true });
           drawIcon(k, "info", { x: m + 10, y: ly + 8, size: 12, color: UI.body, fixed: true });
-          // UI v4: a narrative longer than the strip SCROLLS (hold 1.2 s, glide at 40 px/s, hold 1.5 s, repeat) inside
-          // a clip, instead of being cut off mid-word on phones; reduced motion keeps the truncated line.
           const availW = W - 30, lw = typeof k.measureText === "function" ? k.measureText(line, 13, FONT_BOLD) : line.length * 7.2;
           if (line !== logTicker.line) { logTicker.line = line; logTicker.t0 = k.time(); }
           if (lw <= availW || prefersReducedMotion() || typeof k.pushClip !== "function") {
-            k.drawText({ text: lw <= availW ? line : trunc(line, Math.max(20, Math.floor((W - 36) / 7.2))), pos: k.vec2(m + 22, ly), size: 13, font: FONT_BOLD, width: W - 30, color: k.rgb(...UI.text), fixed: true }); // MB-4: content-bottom, not the home-bar-inflated H
+            k.drawText({ text: lw <= availW ? line : trunc(line, Math.max(20, Math.floor((W - 36) / 7.2))), pos: k.vec2(m + 22, ly), size: 13, font: FONT_BOLD, width: W - 30, color: k.rgb(...UI.text), fixed: true });
           } else {
             const over = lw - availW + 8, HOLD0 = 1.2, HOLD1 = 1.5, SPD = 40, period = HOLD0 + over / SPD + HOLD1;
             const tt = (k.time() - logTicker.t0) % period;
@@ -2214,35 +1545,26 @@ export default function onlineGameScene(k) {
             try { k.drawText({ text: line, pos: k.vec2(m + 22 - off, ly), size: 13, font: FONT_BOLD, color: k.rgb(...UI.text), fixed: true }); } finally { k.popClip(); }
           }
         }
-        if (c.outcome && !combatInspect && !menuOpen) drawFightSummary(c, pw, top); // TQ-554: end-of-fight overview over the stage
-        // Core-loop latency feedback: AI-resolved combat takes ~1-2s. A single small
-        // "Resolving…" line was easy to miss (combat looked frozen / taps felt dead),
-        // so show a prominent animated badge (spinner + label) centered on the dimmed
-        // buttons while input is locked — for both the AI turn and the PvP wait.
+        if (c.outcome && !combatInspect && !menuOpen) drawFightSummary(c, pw, top);
         if (inputLocked) {
           const bx = pw.cx, by = top + 158, bw = 232, bh = 44;
           drawGlass(k, { rect: [bx - bw / 2, by - bh / 2, bw, bh], radius: bh / 2, tint: 0.7, fill: 0.07, line: 0.16, fixed: true });
-          const sr = 11, sx = bx - 82, sn = 8, head = (k.time() * 1.5) % 1; // 8-dot rotating spinner (ember)
+          const sr = 11, sx = bx - 82, sn = 8, head = (k.time() * 1.5) % 1;
           for (let i = 0; i < sn; i++) {
             const a = (i / sn) * Math.PI * 2 - Math.PI / 2;
-            let d = i / sn - head; d -= Math.floor(d); // 0..1 trailing distance behind the head
+            let d = i / sn - head; d -= Math.floor(d);
             k.drawCircle({ pos: k.vec2(sx + Math.cos(a) * sr, by + Math.sin(a) * sr), radius: 2.2, color: k.rgb(...THEME.teal), opacity: 0.15 + 0.85 * (1 - d), fixed: true });
           }
           k.drawText({ text: c.waiting ? "Waiting for opponent" : "Resolving the turn", pos: k.vec2(bx + 18, by), size: 15, font: FONT_BOLD, anchor: "center", color: k.rgb(...UI.text), fixed: true });
         }
-        // Floating damage/heal numbers — make each hit's magnitude readable (was only
-        // an HP-bar change). Rise + fade over ~0.8s; -N amber on the enemy / red on
-        // you, +N green for heals (CB-2 heal moves).
         const DMG_LIFE = 0.8;
-        for (let i = dmgFloaters.length - 1; i >= 0; i--) if (tF - dmgFloaters[i].t0 >= DMG_LIFE) { dmgFloaters[i] = dmgFloaters[dmgFloaters.length - 1]; dmgFloaters.pop(); } // in-place compaction (order-free) — no new array per combat frame
+        for (let i = dmgFloaters.length - 1; i >= 0; i--) if (tF - dmgFloaters[i].t0 >= DMG_LIFE) { dmgFloaters[i] = dmgFloaters[dmgFloaters.length - 1]; dmgFloaters.pop(); }
         for (const f of dmgFloaters) {
           if (f.dmg <= 0) continue;
           const age = tF - f.t0, op = 1 - age / DMG_LIFE;
           k.drawText({ text: `${f.heal ? "+" : "-"}${f.dmg}`, pos: k.vec2(f.x, f.y - age * 34), size: 18, font: "gameFont", anchor: "center", color: k.rgb(f.col[0], f.col[1], f.col[2]), opacity: op, fixed: true });
         }
-        drawFxScreen(k); // screen-space particles (catch sparkle) over the combat panel (PV-T12)
-        // PV-T15: "NEW SPECIES!" milestone banner — holds ~1.6s then fades (~0.4s).
-        // Static text (no motion gate needed); mirrors the SP fight-scene banner.
+        drawFxScreen(k);
         const nsAge = tF - newSpeciesT;
         if (nsAge >= 0 && nsAge < 2.0) {
           const nsA = nsAge < 1.6 ? 1 : Math.max(0, 1 - (nsAge - 1.6) / 0.4);
@@ -2250,9 +1572,7 @@ export default function onlineGameScene(k) {
         }
       }
 
-      // ESC pause/settings overlay (drawn over everything; world keeps running).
       if (menuOpen && !net.state.roundResult) {
-        // UI v3: a frosted pause sheet (the world blurs behind it) with the eyebrow + title header.
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.45, fixed: true });
         if (k.requestFrost && k.frostReady && !k.frostReady()) k.requestFrost();
         const pmW = Math.min(360, k.width() - 32), pmH = 350, pmX = k.width() / 2 - pmW / 2, pmY = k.height() / 2 - 150;
@@ -2261,49 +1581,32 @@ export default function onlineGameScene(k) {
         drawEyebrow(k, { x: k.width() / 2, y: pmY + 38, text: "Round in progress", size: 10, color: THEME.amber, anchor: "center", fixed: true });
         k.drawText({ text: "Paused", pos: k.vec2(k.width() / 2, pmY + 66), size: 32, font: FONT_BOLD, anchor: "center", color: k.rgb(...THEME.text), fixed: true });
         const menuMp = k.mousePos();
-        const _menuBtns = menuBtns(); // TQ-459: index for the gamepad selection highlight
+        const _menuBtns = menuBtns();
         const gpNav = gamepadConnected();
         for (let mi = 0; mi < _menuBtns.length; mi++) {
           const b = _menuBtns[mi];
-          // Routed through the shared drawButton family (was a hand-rolled rect + manual
-          // sheen + label with no hover/press feedback) so the pause menu matches every
-          // other menu button — shadow + sheen + hover glow. The danger variant (armed
-          // "Leave") keeps its red outline + glow via the outline/glow overrides.
-          // TQ-459: a connected gamepad highlights the d-pad-selected row like a hover.
           drawButton(k, { rect: b.rect, text: b.label, size: 18, radius: 14, fill: mi === 0 ? THEME.primary : b.danger ? THEME.danger : THEME.surfaceAlt, textColor: mi === 0 || b.danger ? THEME.textInv : UI.text,
             hover: inRect(menuMp, b.rect) || (gpNav && mi === menuSel), fixed: true });
         }
-        // y0 = H/2-64, three 56px buttons + 16 gaps → the 3rd button bottom is H/2+136, so
-        // the old +130 sat the hint INSIDE that button (visible against the armed red border).
-        // +160 clears it with a small gap.
         k.drawText({ text: `${TOUCH ? "Tap Resume" : "ESC"} to resume. The round keeps going.`, pos: k.vec2(k.width() / 2, k.height() / 2 + 168), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), fixed: true });
       }
 
-      // Round result (extracted / died) overlay.
       const rr = net.state.roundResult;
       if (rr) {
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: 0.5, fixed: true });
         const win = rr.outcome === "extracted";
-        const title = rr.reason === "returned" ? "Home again" : rr.reason === "fainted" ? "Carried home" : win ? "Extracted!" : "Run Over"; // TQ-529: adventure outcomes
-        const accent = win ? THEME.success : THEME.danger; // was raw success/danger triples
-        // The server sends a RAW reason code (extracted/defeat/zone/timeout/disconnect); map it
-        // to a readable sentence so the card doesn't just say "defeat". Unknown codes pass through.
+        const title = rr.reason === "returned" ? "Home again" : rr.reason === "fainted" ? "Carried home" : win ? "Extracted!" : "Run Over";
+        const accent = win ? THEME.success : THEME.danger;
         const REASON_TEXT = { extracted: "You reached a portal and escaped with your haul.", defeat: "Your team was defeated in battle.", zone: "The storm closed in and took you.", timeout: "The run ran out of time.", disconnect: "You were disconnected from the run.", left: "You left the run. The team you took in is lost.",
-          returned: "You made it home with everything you found.", fainted: "Your team fainted and you were carried back to the village — see the Healer." }; // TQ-529 adventure outcomes
-        const lostN = rr.outcome === "died" ? (rr.lostCatches || 0) : 0; // catches that went to the vault this run are lost on death too
-        const lostI = rr.outcome === "died" ? (rr.lostItems || 0) : 0;   // and items looted from chests this run
+          returned: "You made it home with everything you found.", fainted: "Your team fainted and you were carried back to the village — see the Healer." };
+        const lostN = rr.outcome === "died" ? (rr.lostCatches || 0) : 0;
+        const lostI = rr.outcome === "died" ? (rr.lostItems || 0) : 0;
         const reasonText = REASON_TEXT[rr.reason] || rr.reason || "";
-        // Narrow card: the reason wraps in a flowing column, so the loss reads as a sentence there; the wide card
-        // shows it as a red "Lost N catches" chip in the run row instead (keeps the centred reason one line).
         const reasonNarrow = reasonText + (lostN ? ` ${lostN === 1 ? "The monster" : `The ${lostN} monsters`} you caught this run ${lostN === 1 ? "was" : "were"} lost.` : "")
           + (lostI ? ` ${lostI === 1 ? "The item" : `The ${lostI} items`} you found ${lostI === 1 ? "was" : "were"} lost.` : "");
-        // Result card — frames the outcome as a designed screen (win/loss-tinted
-        // border + top accent bar) instead of text floating on the scrim.
         const cardX = k.width() / 2, cardW = Math.min(600, k.width() - 32);
-        // P8-T3: per-run gains summary (caught / XP / level-ups / survival time).
         const g = rr.gains;
         const st = net.state.stats || {};
-        // THIS RUN chips + LIFETIME tiles, shared by the wide and narrow layouts.
         const runChips = [];
         if (g) {
           if (g.caught) runChips.push(["catch", `Caught ${g.caught}`, lostN ? THEME.textMut : THEME.success]);
@@ -2315,7 +1618,6 @@ export default function onlineGameScene(k) {
         }
         const lifeTiles = [["trophy", st.extractions || 0, "Extracted", THEME.success], ["skull", st.deaths || 0, "Deaths", THEME.danger], ["catch", st.caught || 0, "Caught", THEME.teal], ["sword", st.pvpWins || 0, "PvP wins", THEME.violet], ["flag", st.runs || 0, "Runs", THEME.textBody]];
         const chipW = (t, sz) => (typeof k.measureText === "function" ? k.measureText(t, sz, FONT_BOLD) : t.length * sz * 0.6) + sz * 3;
-        // Narrow: greedy rows of chips that fit the card's inner width.
         const chipRows = (maxW, sz) => {
           const rows = []; let row = [], w = 0;
           for (const c of runChips) { const cw = chipW(c[1], sz); if (row.length && w + 6 + cw > maxW) { rows.push(row); row = []; w = 0; } row.push([c, cw]); w += (row.length > 1 ? 6 : 0) + cw; }
@@ -2323,26 +1625,17 @@ export default function onlineGameScene(k) {
           return rows;
         };
         const lifeT = `LIFETIME     Extractions ${st.extractions || 0}     Deaths ${st.deaths || 0}     Caught ${st.caught || 0}     PvP wins ${st.pvpWins || 0}     Runs ${st.runs || 0}`;
-        // Narrow phone: the wide single-line title + stats clipped off the card, so shrink the
-        // title and WRAP the body/stat lines, flowing top-down with an adaptive card height.
         const narrowR = k.width() < 480;
-        // Narrow: size the card to its flowed content (title + wrapped reason + hint + run line + wrapped
-        // lifetime line) instead of a fixed height that left a dead band under the text.
         const innerW0 = cardW - 26, nl0 = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW0));
         const nRows = narrowR ? chipRows(cardW - 26, 10).length : 0;
         const cardH = narrowR ? (34 + 36 + nl0(reasonNarrow, 12) * 17 + 10 + nRows * 28 + 8 + 16 + 54 + 26) : (g ? 284 : 248);
         const cardY = k.height() / 2 + 18;
-        // Design upgrade: the shared panel material (gradient + highlight + soft shadow) with the
-        // outcome-tinted border, an accent glow bloom behind the card and the win/loss top bar.
         k.drawRect({ pos: k.vec2(cardX, cardY), width: cardW, height: cardH, radius: 18, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), opacity: 0.001, fixed: true,
           shadow: { blur: 40, color: accent, alpha: 0.35 } });
         if (k.requestFrost && k.frostReady && !k.frostReady()) k.requestFrost();
         drawGlassSheet(k, { rect: [cardX - cardW / 2, cardY - cardH / 2, cardW, cardH], radius: 22, accent });
         drawIconTab(k, { x: cardX - 26, y: cardY - cardH / 2 - 26, size: 52, icon: rr.reason === "returned" ? "village" : rr.reason === "fainted" ? "heart" : win ? "trophy" : "skull", accent, fixed: true });
         if (narrowR) {
-          // UI v4 (phone): the same structure as the wide card, stacked: title, wrapped reason, THIS RUN chips in
-          // rows, the five LIFETIME tiles, and the dismiss hint at the bottom (it used to sit between two run-on
-          // stat lines).
           const innerW = cardW - 26, lh = (sz) => sz + 5;
           const nlines = (txt, sz) => Math.max(1, Math.ceil((txt.length * sz * 0.56) / innerW));
           let ty = cardY - cardH / 2 + 34;
@@ -2372,8 +1665,6 @@ export default function onlineGameScene(k) {
           const dPulseN = prefersReducedMotion() ? 0.85 : 0.5 + 0.4 * Math.sin(k.time() * 3.5);
           k.drawText({ text: "tap to return", pos: k.vec2(cardX, cardY + cardH / 2 - 16), size: 11, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), opacity: dPulseN, fixed: true });
         } else {
-          // UI v4: headline + narrative, then THIS RUN as icon chips and LIFETIME as five stat tiles (icon,
-          // big number, label) instead of two long text lines.
           const topY = cardY - cardH / 2;
           k.drawText({ text: title, pos: k.vec2(cardX, topY + 54), size: 44, font: FONT_BOLD, anchor: "center", color: k.rgb(accent[0], accent[1], accent[2]), fixed: true });
           k.drawText({ text: reasonText, pos: k.vec2(cardX, topY + 100), size: 16, font: "gameFont", anchor: "center", width: cardW - 60, align: "center", color: k.rgb(...UI.text), fixed: true });
@@ -2399,26 +1690,19 @@ export default function onlineGameScene(k) {
             k.drawText({ text: lbl, pos: k.vec2(x + tw2 / 2, ty0 + 48), size: 10, font: "gameFont", anchor: "top", color: k.rgb(...UI.mut), fixed: true });
           });
           void lifeT;
-          const dPulse = prefersReducedMotion() ? 0.85 : 0.5 + 0.4 * Math.sin(k.time() * 3.5); // a11y: static dismiss hint under reduce-motion
+          const dPulse = prefersReducedMotion() ? 0.85 : 0.5 + 0.4 * Math.sin(k.time() * 3.5);
           k.drawText({ text: "tap / space to return", pos: k.vec2(cardX, cardY + cardH / 2 - 18), size: 12, font: "gameFont", anchor: "center", color: k.rgb(...UI.mut), opacity: dPulse, fixed: true });
         }
       }
 
-      // Dropped connection: auto-reconnect resumes the round within the server's
-      // 120s grace (P6-T1/Q12). Show "Reconnecting…" while retrying; only offer the
-      // bail-to-menu once we've given up.
       if (!net.state.connected) {
         const reconnecting = net.state.reconnecting;
         const reduce = prefersReducedMotion();
         k.drawRect({ pos: k.vec2(0, 0), width: k.width(), height: k.height(), color: k.rgb(0, 0, 0), opacity: reconnecting ? 0.62 : 0.82, fixed: true });
-        const tSize = k.width() < 480 ? 28 : 38; // shrink so "Connection lost" doesn't clip on a phone
-        // Breathe the title while actively retrying so the screen reads as "working", not frozen
-        // (a static "RECONNECTING…" over a dead-still dim looked like a crash during the 120s grace).
+        const tSize = k.width() < 480 ? 28 : 38;
         const titleOp = reconnecting && !reduce ? 0.72 + 0.28 * (0.5 + 0.5 * Math.sin(now * 3.0)) : 1;
         k.drawText({ text: reconnecting ? "Reconnecting…" : "Connection lost", pos: k.vec2(k.width() / 2, k.height() / 2 - 24), size: tSize, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: reconnecting ? k.rgb(...UI.amber) : k.rgb(...UI.danger), opacity: titleOp, fixed: true });
         k.drawText({ text: reconnecting ? "resuming your run…" : "tap / space to return to the village", pos: k.vec2(k.width() / 2, k.height() / 2 + 28), size: k.width() < 480 ? 15 : 18, font: "gameFont", anchor: "center", width: k.width() - 24, align: "center", color: k.rgb(...UI.text), fixed: true });
-        // Animated retry indicator — three dots pulsing in a wave (steady under reduce-motion),
-        // an unambiguous "still trying" signal so a stalled reconnect never reads as a freeze.
         if (reconnecting) {
           const dy = k.height() / 2 + 58;
           for (let d = 0; d < 3; d++) {
@@ -2428,9 +1712,6 @@ export default function onlineGameScene(k) {
         }
       }
 
-      // Extraction climax (PV juice — MP parity with SP game.js): a flash burst the
-      // moment you escape, over the result card. One-time transient, but a full-
-      // screen white-out → skip it under reduce-motion (photosensitivity).
       const rrf = net.state.roundResult;
       if (rrf && rrf.outcome === "extracted" && !extractSfxDone) { extractSfxDone = true; sfx("extract"); haptic([0, 25, 45, 70]); }
       if (rrf && rrf.outcome === "extracted" && extractFlashT == null && !prefersReducedMotion()) extractFlashT = k.time();
@@ -2439,10 +1720,6 @@ export default function onlineGameScene(k) {
         if (fp < 1) drawExtractFlash(k, { x: k.width() / 2, y: k.height() / 2, p: fp });
       }
 
-      // TQ-125: the shared monster-detail popup (epic TQ-87) for the in-combat enemy / your active
-      // monster — drawn last so it's over the battle stage + panel. Reads the species TYPE for full
-      // details (falls back to the live combat mon if the type isn't in the client pool — getMonsterStats
-      // degrades to finite fallbacks, never throws) and overlays the live HP/EN as vitals.
       if (net.state.combat && combatInspect && !menuOpen) {
         const cm = combatInspect === "enemy" ? net.state.combat.enemy : net.state.combat.active;
         if (cm) {
@@ -2452,127 +1729,92 @@ export default function onlineGameScene(k) {
       }
     });
 
-    // Combat controls (movement is locked server-side during a fight).
     const act = (action) => {
       if (!action) return;
-      // While the battle-entry cinematic (transition → chain throw → spawn) is still
-      // playing, the first action instead SKIPS it (snaps the monster in) and is
-      // swallowed — so the intro never blocks a hurried player, but also can't be
-      // accidentally "acted through" before the enemy has appeared.
       if (net.state.combat && !net.state.combat.outcome && k.time() - battleIntroT0 < BATTLE_INTRO_DURATION) {
         battleIntroT0 = k.time() - BATTLE_INTRO_DURATION; haptic(6); return;
       }
-      // FGT-T4: open/close the Swap picker locally (no server round-trip).
       if (action.kind === "openSwap") { if (benchList().length) { swapOpen = true; itemsOpen = false; haptic(8); sfx("click"); } return; }
       if (action.kind === "closeSwap") { swapOpen = false; haptic(8); sfx("back"); return; }
-      // #61: open/close the Items picker locally (mutually exclusive with Swap).
       if (action.kind === "openItems") { if ((net.state.items || []).length) { itemsOpen = true; swapOpen = false; haptic(8); sfx("click"); } return; }
       if (action.kind === "closeItems") { itemsOpen = false; haptic(8); sfx("back"); return; }
-      // Capture is disabled in PvP — you can't catch another player's monster. The
-      // action row already hides the Catch button for pvp combats; this also blocks the
-      // keyboard (C) and gamepad (LB) catch paths so no input can send it (the server
-      // rejects it too, but never offer an action that will be dropped). FGT-T6 / PvP.
       if (action.kind === "catch" && net.state.combat?.pvp) return;
-      // Items are PvE-only (see combatButtons): block the open/use paths in PvP so an item
-      // can't be sent in a duel where resolveTurn would silently waste the turn.
       if ((action.kind === "openItems" || action.kind === "item") && net.state.combat?.pvp) return;
       const c = net.state.combat;
       if (c && !c.outcome && !c.waiting && !awaiting) {
         awaiting = true;
-        combatPress = { kind: action.kind, name: action.attackName || action.kind, t: k.time() }; // tap feedback
-        haptic(8); sfx("click"); // MB-12 / P8-T6: tactile + audible combat-action tap (immediate-mode buttons miss theme.addButton's click)
-        if (action.kind === "catch") { catchThrowT0 = k.time(); catchResolveT0 = -9; catchResolveKind = null; sfx("throw"); } // kick off the catch cinematic: chain flies at the enemy now; the verdict animation plays when the server replies
-        if (action.kind === "swap") swapOpen = false; // leaving the picker on a pick
-        if (action.kind === "item") itemsOpen = false; // #61: leaving the items picker on use
+        combatPress = { kind: action.kind, name: action.attackName || action.kind, t: k.time() };
+        haptic(8); sfx("click");
+        if (action.kind === "catch") { catchThrowT0 = k.time(); catchResolveT0 = -9; catchResolveKind = null; sfx("throw"); }
+        if (action.kind === "swap") swapOpen = false;
+        if (action.kind === "item") itemsOpen = false;
         net.combatAction(action);
       }
     };
     for (const n of [1, 2, 3, 4]) {
-      bindPress("attack" + n, () => { // TQ-458: keys bound to attack1..4 (default "1".."4")
-        if (swapOpen) { const b = benchList()[n - 1]; if (b) act({ kind: "swap", monsterId: b.m.id }); return; } // pick a bench monster
+      bindPress("attack" + n, () => {
+        if (swapOpen) { const b = benchList()[n - 1]; if (b) act({ kind: "swap", monsterId: b.m.id }); return; }
         const a = net.state.combat?.attacks?.[n - 1];
         if (a) act({ kind: "attack", attackName: a.name });
       });
     }
     bindPress("catch", () => act({ kind: "catch" }));
     bindPress("flee", () => act({ kind: "flee" }));
-    bindPress("swap", () => { if (net.state.combat && !net.state.combat.outcome) act({ kind: swapOpen ? "closeSwap" : "openSwap" }); }); // FGT-T4: toggle Swap picker
+    bindPress("swap", () => { if (net.state.combat && !net.state.combat.outcome) act({ kind: swapOpen ? "closeSwap" : "openSwap" }); });
 
-    // Throw the equipped spirit chain along the current heading (engages combat /
-    // PvP on hit). Cycle the equipped chain with [ / ]. Only while roaming.
-    // PT1-T06: Space is the primary throw key; Q kept as a legacy alias.
     const throwEquippedChain = (aimDir = null, charge = 0) => {
       if (net.state.combat || net.state.roundResult) return;
       const e = equippedChain();
-      // Boomerang: overworld throws are FREE — a chain is throwable while it has capture
-      // charges (durability) left; a depleted chain is already removed from the inventory.
-      // (!e.cs also hardens the e.cs.chainId deref below against a malformed chain entry.)
       if (!e || !e.cs || (e.cs.durability != null && e.cs.durability <= 0)) return;
-      // TQ-180: return-gated cooldown — can't throw again until the previous chain has returned. The
-      // server enforces it; mirror it here so a blocked press plays no wind-up/whoosh.
       if ((net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId)) return;
-      // On PC, AIM AT THE MOUSE: the player renders at the screen centre (camera centres on them), so
-      // the throw heading is the cursor relative to centre, normalised to a unit vector (the server
-      // clamps each axis to [-1,1] then normalises — a raw long vector would clamp to the wrong angle).
+      // Send a unit vector: server clamps each axis to [-1,1] before normalising
       let dir = selfDir;
       if (aimDir && (aimDir.x || aimDir.y)) {
-        // TQ-487: explicit touch drag-aim — fly the chain the way the player dragged the THROW button.
         const al = Math.hypot(aimDir.x, aimDir.y) || 1; dir = { x: aimDir.x / al, y: aimDir.y / al };
       } else if (!TOUCH) {
         const m = k.mousePos(), ax = m.x - k.width() / 2, ay = m.y - k.height() / 2, al = Math.hypot(ax, ay);
         if (al > 4) dir = { x: ax / al, y: ay / al };
       }
-      // TQ-452: loose the wind-up tell from the tamer's HAND (the held-ring offset) so the chain reads as
-      // leaving the hand, not the chest. flip matches drawCharacter's facing flip.
       const hflip = (dir.x < -0.15) ? -1 : 1;
-      playThrowWindup(selfRender.x + 15 * hflip, selfRender.y + 2, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw"); // PV-T11 wind-up tell + whoosh
-      throwLungeT0 = k.time(); // TQ-451: kick the release-lunge pose
-      net.throwChain(dir, e.cs.chainId, Math.max(0, Math.min(1, charge || 0))); // TQ-450: send the hold-to-charge level (server scales range/speed)
+      playThrowWindup(selfRender.x + 15 * hflip, selfRender.y + 2, e.def ? chainColor(e.def) : [120, 220, 255]); sfx("throw");
+      throwLungeT0 = k.time();
+      net.throwChain(dir, e.cs.chainId, Math.max(0, Math.min(1, charge || 0)));
     };
-    // TQ-450: can a throw be loosed right now? (chain equipped + has durability + not return-gated + roaming.)
     const canThrowNow = () => {
       if (net.state.combat || net.state.roundResult) return false;
       const e = equippedChain();
       if (!e || !e.cs || (e.cs.durability != null && e.cs.durability <= 0)) return false;
       return !(net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
     };
-    // TQ-450: Space now CHARGES on hold — press starts the wind-up, release (handled in onUpdate) throws
-    // with the accumulated charge. A quick tap charges ~0 → the original instant throw.
-    bindPress("throw", () => { if (kbCharge == null && canThrowNow()) kbCharge = { t0: k.time() }; }); // TQ-458 default Space; q/] cycle chains
+    bindPress("throw", () => { if (kbCharge == null && canThrowNow()) kbCharge = { t0: k.time() }; });
     function cycleChain(dir) {
-      // CHAIN_SLOTS: hot-swap only among the 3-slot loadout (set in the inventory), not the
-      // whole owned inventory. nextChainId expects [{chainId}] items, so wrap the slot ids.
       const slots = (net.state.equippedChainIds || []).map((id) => ({ chainId: id }));
       const next = nextChainId(slots, net.state.equippedChainId, dir);
       if (!next) return;
-      net.state.equippedChainId = next; // optimistic; server echoes in snapshot
+      net.state.equippedChainId = next;
       net.setEquippedChain(next);
     }
-    bindPress("chainPrev", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(-1); }); // TQ-458: default "["
-    bindPress("chainNext", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); });  // TQ-458: default "q" + "]" (3-slot loadout)
+    bindPress("chainPrev", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(-1); });
+    bindPress("chainNext", () => { if (!net.state.combat && !net.state.roundResult) cycleChain(1); });
     k.onKeyPress("space", () => {
-      if (combatInspect) { combatInspect = null; return; } // TQ-125: close the inspect popup first
+      if (combatInspect) { combatInspect = null; return; }
       if (net.state.roundResult) { exitAfterRun(); return; }
       if (!net.state.connected && !net.state.reconnecting) { exitAfterRun(); return; }
       const cc = net.state.combat;
       if (cc && cc.outcome) net.clearCombat();
     });
 
-    bindPress("pause", () => { if (combatInspect) { combatInspect = null; return; } if (net.state.roundResult) { exitAfterRun(); } else { menuOpen = !menuOpen; leaveArm = false; } }); // TQ-458 (default Esc); TQ-125: closes the inspect popup first
-    bindPress("mute", () => toggleMuted()); // P8-T6: mute toggle (persisted); TQ-458 default "m"
+    bindPress("pause", () => { if (combatInspect) { combatInspect = null; return; } if (net.state.roundResult) { exitAfterRun(); } else { menuOpen = !menuOpen; leaveArm = false; } });
+    bindPress("mute", () => toggleMuted());
 
-    // Pointer/touch input: during combat, taps hit the action buttons; otherwise
-    // the left-side virtual joystick drives movement. Works for touch and mouse.
     function pointerDown(id, p) {
       if (menuOpen) { for (const b of menuBtns()) { const [x, y, w, h] = b.rect; if (p.x >= x && p.x <= x + w && p.y >= y && p.y <= y + h) { b.act(); return; } } return; }
       if (net.state.roundResult) { exitAfterRun(); return; }
       if (!net.state.connected && !net.state.reconnecting) { exitAfterRun(); return; }
       const cc = net.state.combat;
       if (cc) {
-        // TQ-125: an open monster-detail popup eats the next tap to close (before any combat action).
         if (combatInspect) { combatInspect = null; sfx("click"); return; }
         if (cc.outcome) { net.clearCombat(); return; }
-        // TQ-125: tap the enemy / your-monster header row to inspect it in the shared popup.
         const hitRow = (r) => r && p.x >= r[0] && p.x <= r[0] + r[2] && p.y >= r[1] && p.y <= r[1] + r[3];
         if (combatRowRects) {
           if (cc.enemy && hitRow(combatRowRects.enemy)) { combatInspect = "enemy"; sfx("click"); return; }
@@ -2580,97 +1822,65 @@ export default function onlineGameScene(k) {
         }
         const b = hitButtonObj(p);
         if (b) {
-          // TQ-71: on touch, defer an ATTACK button to release so a long-press can preview its
-          // description instead of committing. All other buttons (and every desktop click) act on press.
           if (TOUCH && b.action.kind === "attack") { atkHold = { action: b.action, description: b.description || "", rect: b.rect, t0: k.time(), x: p.x, y: p.y }; return; }
           act(b.action);
         }
         return;
       }
-      // PT1-T24 parity: tap the minimap (top-right) to cycle zoom (1× → 2× → 4×). M is
-      // mute in MP, so tap is the cycle (works for mouse + touch).
-      { const mm = hudSlots().minimap; const mox = mm.x, moy = mm.y, ms = mm.size; // HUD-OUT: match the gutter-anchored radar draw
+      { const mm = hudSlots().minimap; const mox = mm.x, moy = mm.y, ms = mm.size;
         if (p.x >= mox - 4 && p.x <= mox + ms + 4 && p.y >= moy - 4 && p.y <= moy + ms + 4) { mmZoom = nextMinimapZoom(mmZoom); return; } }
-      // MB-11: tap the touch pause button → open the pause/leave menu (was ESC-only).
       if (TOUCH && !onboard) { const [px, py, pw, ph] = pauseBtnRect(); if (p.x >= px && p.x <= px + pw && p.y >= py && p.y <= py + ph) { menuOpen = true; return; } }
-      // CHAIN_SLOTS: tap the chain HUD panel to hot-swap to the next loadout chain (the
-      // touch equivalent of the [ / ] keys). Only when >1 chain is loaded.
       if (!onboard && (net.state.equippedChainIds || []).length > 1) {
         const [hx, hy, hw, hh] = chainHudRect();
         if (p.x >= hx && p.x <= hx + hw && p.y >= hy && p.y <= hy + hh) { cycleChain(1); haptic(8); return; }
       }
-      // TQ-488: dedicated touch chain-swap button — cycle the 3-slot loadout (the on-screen
-      // equivalent of [ / ]). Only when >1 chain is loaded (the button is drawn under the same gate).
       if (TOUCH && !onboard && (net.state.equippedChainIds || []).length > 1) {
         const sb = swapBtnC();
         if (Math.hypot(p.x - sb.x, p.y - sb.y) <= SWAP_R) { cycleChain(1); haptic(8); sfx("click"); return; }
       }
-      // TQ-526: the THROW pad FLOATS — touching anywhere on the RIGHT HALF spawns it at the touch point;
-      // a drag sets the throw direction (released in onTouchEnd), a plain tap throws along the heading.
-      // (Swap button + HUD taps were tested above and returned, so they win over the throw zone.)
-      // TQ-450: t0 starts the hold-to-charge wind-up.
       if (TOUCH && !onboard && p.x >= k.width() / 2) {
         const e = equippedChain();
         const chainOut = (net.state.projectiles || []).some((pr) => pr.owner === net.state.playerId);
         const throwable = !!e && !!e.cs && !(e.cs.durability != null && e.cs.durability <= 0) && !chainOut;
         throwAim = { id, origin: { x: p.x, y: p.y }, dir: { x: 0, y: 0 }, dragged: false, t0: k.time(), enabled: throwable };
         haptic(throwable ? 6 : 2);
-        return; // consume the touch — the right half is the throw zone, it never drives the movement stick
+        return;
       }
-      // The virtual movement joystick is a TOUCH-PRIMARY control only. Desktop mouse is AIM (throw
-      // direction) + UI taps — movement is WASD/gamepad. Gate joyStart on TOUCH (not just on the
-      // mouse id): on a mouse+touch device (e.g. a touchscreen laptop) touchPrimary is false, so the
-      // stick is hidden (it's not drawn — see the TOUCH-gated draw) — but the touch handlers below
-      // are always wired, so without this gate a screen touch would still drive the INVISIBLE stick.
-      // Touch ids only on a touch-primary device (a screen-touch on a mouse+touch laptop must not drive
-      // the invisible stick — 26f2a8e). The DESKTOP MOUSE ("m", wired only when !TOUCH) drives movement
-      // too, so a click/hold/drag in the play area walks toward the cursor (restored desktop mouse-move).
+      // Touch ids drive the stick only when TOUCH, else touch laptops move an invisible stick
       if (id === "m" || (TOUCH && id !== "m")) joyStart(id, p);
     }
     k.onTouchStart((p, t) => pointerDown(t?.identifier ?? 0, p));
     k.onTouchMove((p, t) => {
       const id = t?.identifier ?? 0;
-      // TQ-487: while aiming the THROW, the drag sets the throw direction (button-center → finger).
       if (throwAim && id === throwAim.id) {
-        const o = throwAim.origin; const dx = p.x - o.x, dy = p.y - o.y, len = Math.hypot(dx, dy); // TQ-526: pull from the spawn origin
+        const o = throwAim.origin; const dx = p.x - o.x, dy = p.y - o.y, len = Math.hypot(dx, dy);
         if (len > 14) { throwAim.dir = { x: dx / len, y: dy / len }; throwAim.dragged = true; } else { throwAim.dragged = false; }
         return;
       }
-      if (atkHold && Math.hypot(p.x - atkHold.x, p.y - atkHold.y) > 12) atkHold = null; // TQ-71: a drag cancels the attack press
+      if (atkHold && Math.hypot(p.x - atkHold.x, p.y - atkHold.y) > 12) atkHold = null;
       joyMove(id, p);
     });
     k.onTouchEnd((p, t) => {
       const id = t?.identifier ?? 0;
-      // TQ-487: release the THROW aim → fly the chain in the dragged direction (or along heading if it was a tap).
       if (throwAim && id === throwAim.id) {
         const aim = throwAim; throwAim = null;
-        const c = Math.min(1, (k.time() - (aim.t0 || k.time())) / GAME.SPIRIT_CHAIN.CHARGE_TIME_S); // TQ-450: charge from how long the button was held
+        const c = Math.min(1, (k.time() - (aim.t0 || k.time())) / GAME.SPIRIT_CHAIN.CHARGE_TIME_S);
         throwCharge = 0;
-        throwEquippedChain(aim.dragged ? aim.dir : null, c); // PV-T11: shared throw (wind-up tell + guards)
+        throwEquippedChain(aim.dragged ? aim.dir : null, c);
         return;
       }
-      // TQ-71: a short tap on the held attack button COMMITS it; a long-press was a description preview (no commit).
       if (atkHold) { if (k.time() - atkHold.t0 < 0.35) act(atkHold.action); atkHold = null; }
       joyEnd(id);
     });
-    // P8-T8: tap / click also dismisses the onboarding overlay (idempotent; in
-    // addition to moving). Grace (>0.3s) avoids an instant dismiss at spawn.
     k.onTouchStart(() => { if (onboard && onboardT > 0.3) dismissOnboard(); });
     k.onMousePress(() => { if (onboard && onboardT > 0.3) dismissOnboard(); });
     if (!TOUCH) {
-      // Desktop mouse (touch devices use the touch handlers; skip mouse to avoid synthesized double-fires):
-      //  • hold / drag → drive movement toward the cursor (joystick, invisible on desktop), and
-      //  • a quick CLICK in the play area → throw the equipped chain at the cursor.
-      // WASD/gamepad movement + Space-throw still work; UI hits (minimap/chain HUD/menu/combat) are
-      // consumed by pointerDown first, so they neither move nor throw. (Restores desktop mouse control
-      // the mobile refactor removed — Dominik 2026-06-16.)
+      // Mouse handlers only when !TOUCH: touch devices synthesize mouse events (double-fire)
       let mDownT = 0, mDownP = null;
       k.onMousePress(() => { mDownT = k.time(); mDownP = k.mousePos(); pointerDown("m", mDownP); });
       k.onMouseMove(() => { if (joyId === "m") joyMove("m", k.mousePos()); });
       k.onMouseRelease(() => {
         const p = k.mousePos();
-        // A tap = the press started MOVEMENT (joyId "m" → it wasn't consumed by a UI/combat hit) and was
-        // quick with negligible drag. Such a tap throws toward the cursor; a hold/drag was a move.
         const wasTap = joyId === "m" && mDownP && (k.time() - mDownT) < 0.22 && Math.hypot(p.x - mDownP.x, p.y - mDownP.y) < 8;
         joyEnd("m");
         if (wasTap && !net.state.combat && !net.state.roundResult && !onboard && !menuOpen) throwEquippedChain();

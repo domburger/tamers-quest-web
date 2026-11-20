@@ -5,17 +5,12 @@ import { makeRng } from "../src/engine/rng.js";
 import { normalizeGeneratedMonster, normalizeGenAttacks, assignAttacks } from "./gen.js";
 import { MONSTER_ANIMS } from "../src/systems/monsterAnim.js";
 
-// gen.js is now LLM-free CORE helpers only — the v1 single-call generator (aiGenerateMonster /
-// buildMonsterPrompt) was removed 2026-06-09 (generation is the multi-agent pipeline; its live
-// path is covered by genStages.test.js / genPipeline.test.js). These tests cover the pure helpers.
-
 const STAT_KEYS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
 
 test("normalizeGeneratedMonster declares the standard animation set (idle/walk/attack)", () => {
   const mt = normalizeGeneratedMonster({ typeName: "Cinder Stalker", element: "Fire" }, {});
   assert.deepEqual(mt.animations, MONSTER_ANIMS, "every generated monster declares the 3 standard clips");
   assert.deepEqual(mt.animations, ["idle", "walk", "attack"]);
-  // a fresh COPY (not the shared module array) so per-monster edits can't mutate the global set
   assert.notEqual(mt.animations, MONSTER_ANIMS);
 });
 
@@ -62,7 +57,6 @@ test("normalizeGeneratedMonster keeps a good record and fills all stat fields", 
   assert.equal(mt.typeName, "Cinder Wisp");
   assert.equal(mt.rarity, 3);
   assert.equal(mt.id, 500);
-  // Every base + scaling field exists and getMonsterStats yields finite numbers.
   for (const k of STAT_KEYS) {
     assert.equal(typeof mt[`base${k}`], "number");
     assert.equal(typeof mt[`${k.toLowerCase()}Scaling1`], "number");
@@ -74,7 +68,7 @@ test("normalizeGeneratedMonster keeps a good record and fills all stat fields", 
 
 test("normalizeGeneratedMonster clamps garbage and supplies defaults", () => {
   const mt = normalizeGeneratedMonster({
-    typeName: "Garble Test", // TQ-326: a real name; a BLANK typeName now rejects (see the dedicated test)
+    typeName: "Garble Test",
     rarity: 99, size: -4, baseHealth: "abc", baseStrength: 1e9,
     healthScaling1: NaN, healthScaling2: Infinity,
   }, {});
@@ -85,20 +79,16 @@ test("normalizeGeneratedMonster clamps garbage and supplies defaults", () => {
   assert.equal(mt.healthScaling1, 1, "NaN scaling → default");
   assert.equal(mt.healthScaling2, 1, "non-finite (Infinity) scaling → default");
   assert.ok(mt.typeName, "always has a name");
-  // Still consumable.
   for (const v of Object.values(getMonsterStats(mt, 3))) assert.ok(Number.isFinite(v));
 });
 
 test("TQ-326: a blank/missing typeName recovers a real name from inspiration, never 'Wild Beast'", () => {
-  // No name + an inspiration → recover a thematic, title-cased name (NOT the old "Wild Beast" placeholder).
   const a = normalizeGeneratedMonster({ element: "Fire" }, { inspiration: "smouldering ash wyrm" });
   assert.ok(a, "recovered, not rejected");
   assert.equal(a.typeName, "Smouldering Ash Wyrm");
   assert.notEqual(a.typeName, "Wild Beast");
-  // Whitespace-only name is treated as blank → same recovery.
   const b = normalizeGeneratedMonster({ typeName: "   " }, { inspiration: "glacier leviathan" });
   assert.equal(b.typeName, "Glacier Leviathan");
-  // A real name is kept as-is (recovery doesn't interfere).
   const c = normalizeGeneratedMonster({ typeName: "Cinderfang" }, { inspiration: "anything" });
   assert.equal(c.typeName, "Cinderfang");
 });
@@ -110,8 +100,6 @@ test("TQ-326: a nameless generation with NO inspiration is REJECTED (null), not 
 });
 
 test("normalizeGeneratedMonster caps scaling2 at 1.3 (CN-4 runaway-stat ceiling, gen path)", () => {
-  // A high scaling2 would give runaway high-level stats; generation must honor the
-  // same 1.3 ceiling CN-4 enforces on the hand-authored data (its regression test).
   const mt = normalizeGeneratedMonster({ typeName: "Scale Test", strengthScaling2: 2.7, healthScaling2: 2.0, speedScaling2: 1.3 }, {});
   assert.equal(mt.strengthScaling2, 1.3, "2.7 → capped to 1.3");
   assert.equal(mt.healthScaling2, 1.3, "2.0 → capped to 1.3");
@@ -150,15 +138,12 @@ test("assignAttacks handles a small/empty pool gracefully", () => {
 
 test("normalizeGeneratedMonster trims long lore/effects on a clean boundary (no mid-word chop)", () => {
   const sentence = "It stalks the ashen wastes and feeds on cinders. ";
-  const longDesc = sentence.repeat(20); // ~960 chars, well over the 600 cap
-  const longEffect = "Burns every foe in range for several turns and ".repeat(10); // > 240
+  const longDesc = sentence.repeat(20);
+  const longEffect = "Burns every foe in range for several turns and ".repeat(10);
   const mt = normalizeGeneratedMonster({ typeName: "Ashmaw", description: longDesc, passiveEffect: longEffect }, {});
   assert.ok(mt.description.length <= 600, "description within cap");
   assert.ok(mt.passiveEffect.length <= 243, "passive within cap + ellipsis");
-  // The description cap lands inside a repeated sentence whose end (". ") sits in the
-  // back of the window, so it should end cleanly on punctuation, no ellipsis.
   assert.ok(/[.!?]$/.test(mt.description), `description ends cleanly: ${JSON.stringify(mt.description.slice(-20))}`);
-  // No field chops a word: each ends with either sentence punctuation or "..." (never a bare partial token).
   for (const v of [mt.description, mt.passiveEffect]) {
     assert.ok(/[.!?]$/.test(v) || v.endsWith("..."), `clean end: ${JSON.stringify(v.slice(-12))}`);
   }

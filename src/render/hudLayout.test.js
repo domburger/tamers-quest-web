@@ -3,36 +3,30 @@ import assert from "node:assert/strict";
 import { hudLayout } from "./hudLayout.js";
 import { playWindowLayout } from "./playWindow.js";
 
-// The whole point of HUD-OUT: every cluster must sit in a GUTTER, never over the square.
 test("hudLayout landscape: HUD clusters live in the left/right gutters, not over the square", () => {
   const W = 1280, H = 720;
   const L = hudLayout(W, H);
-  const sq = playWindowLayout(W, H).square; // x=280, right=1000
+  const sq = playWindowLayout(W, H).square;
   assert.equal(L.orientation, "landscape");
-  // Left gutter: team / chain / objective / biome
   assert.ok(L.team.x < sq.x, "team in the left gutter");
   assert.ok(L.chain.x < sq.x, "chain in the left gutter");
   assert.ok(L.objective.x < sq.x, "objective centered in the left gutter");
   assert.ok(L.biome.x < sq.x, "biome in the left gutter");
-  // Right gutter: timer + minimap
   assert.ok(L.timer.x > sq.right, "timer in the right gutter");
   assert.ok(L.minimap.x >= sq.right, "minimap starts at/after the square's right edge");
   assert.ok(L.minimap.x + L.minimap.size <= W, "minimap fits inside the right gutter");
-  // pause sits at the top-right of the right gutter
   assert.ok(L.pause.x >= sq.right && L.pause.x + L.pause.w <= W, "pause in the right gutter");
 });
 
 test("hudLayout portrait: HUD clusters live in the top/bottom gutters, not over the square", () => {
   const W = 414, H = 896;
   const P = hudLayout(W, H);
-  const sq = playWindowLayout(W, H).square; // y=241, bottom=655
+  const sq = playWindowLayout(W, H).square;
   assert.equal(P.orientation, "portrait");
-  // Top gutter: team / timer / minimap / objective
   assert.ok(P.team.y < sq.y, "team in the top gutter");
   assert.ok(P.timer.y < sq.y, "timer in the top gutter");
   assert.ok(P.minimap.y + P.minimap.size <= sq.y, "minimap fits within the top gutter");
   assert.ok(P.minimap.x + P.minimap.size <= W, "minimap fits within the screen width");
-  // Bottom gutter: chain / biome / controls
   assert.ok(P.chain.y >= sq.bottom, "chain in the bottom gutter");
   assert.ok(P.biome.y >= sq.bottom && P.biome.y <= H, "biome in the bottom gutter");
   assert.ok(P.joystick.y >= sq.bottom, "joystick in the bottom gutter");
@@ -53,7 +47,6 @@ test("hudLayout: memoizes identical (W,H,inset) calls and returns a frozen, deep
   assert.equal(a, b, "same inputs return the cached layout (no per-call rebuild)");
   assert.ok(Object.isFrozen(a), "layout wrapper is frozen");
   assert.ok(Object.isFrozen(a.team) && Object.isFrozen(a.minimap), "each slot is frozen (read-only contract)");
-  // A different inset must recompute (and not corrupt the previously returned object).
   const c = hudLayout(1280, 720, { inset: { top: 30 } });
   assert.notEqual(c, a, "different inset → fresh layout");
   assert.ok(c.team.y > a.team.y, "the inset actually applied");
@@ -63,22 +56,18 @@ test("hudLayout: memoizes identical (W,H,inset) calls and returns a frozen, deep
 test("hudLayout square aspect: falls back to the square edges (no gutters)", () => {
   const S = hudLayout(600, 600);
   assert.equal(S.orientation, "square");
-  // everything keys off the square; minimap stays inside it
   assert.ok(S.minimap.x + S.minimap.size <= S.square.right);
   assert.ok(S.team.x >= S.square.x && S.team.y >= S.square.y);
 });
 
-// TQ-96: when the scene passes maxAspect (≈4:3, the roaming window), the HUD must anchor to the
-// SAME wider window drawPlayWindow draws — so the gutters line up and the layout still fits.
 const A43 = 4 / 3;
 
 test("hudLayout maxAspect 4:3: matches the wider window and keeps a wide-canvas HUD in the (smaller) gutters", () => {
   const W = 1280, H = 720;
-  const sq = playWindowLayout(W, H, { maxAspect: A43 }).square; // 4:3 → 960 wide, x=160, right=1120
+  const sq = playWindowLayout(W, H, { maxAspect: A43 }).square;
   const L = hudLayout(W, H, { maxAspect: A43 });
   assert.equal(L.square.right, sq.right, "HUD layout uses the SAME 4:3 window as drawPlayWindow");
   assert.equal(L.orientation, "landscape", "1280×720 @4:3 still has a usable 160px side gutter (≥150)");
-  // Clusters must stay in the now-narrower gutters, never over the wider square.
   assert.ok(L.team.x < sq.x, "team still in the left gutter");
   assert.ok(L.timer.x > sq.right, "timer still in the right gutter");
   assert.ok(L.minimap.x >= sq.right && L.minimap.x + L.minimap.size <= W, "minimap fits the narrower right gutter");
@@ -86,13 +75,11 @@ test("hudLayout maxAspect 4:3: matches the wider window and keeps a wide-canvas 
 });
 
 test("hudLayout maxAspect 4:3: narrow canvas drops below MIN_SIDE_GUTTER → graceful tuck onto the window edges", () => {
-  // 1024×720 @4:3: window = 960 wide, side gutter = 32px (< MIN_SIDE_GUTTER 150) → tuck fallback.
   const W = 1024, H = 720;
   const sq = playWindowLayout(W, H, { maxAspect: A43 }).square;
   const L = hudLayout(W, H, { maxAspect: A43 });
   assert.ok(sq.x < 150, "precondition: the 4:3 side gutter is too small to host the HUD");
   assert.equal(L.orientation, "square", "falls back to tucking onto the window edges (no spill into a 32px gutter)");
-  // Tucked clusters stay within the window, not off-canvas.
   assert.ok(L.team.x >= sq.x && L.team.y >= sq.y, "team tucked inside the window");
   assert.ok(L.minimap.x + L.minimap.size <= sq.right, "minimap tucked inside the window's right edge");
 });

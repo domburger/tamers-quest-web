@@ -1,16 +1,8 @@
-// Fight-agent observability (TQ-40): in-memory counters for AI combat-turn judging — call volume,
-// engine-fallback rate, timeout rate, v1/v2 split, and latency — so /api/admin/stats can surface
-// the judge's health and a fallback-rate spike is visible to live-ops. In-memory + process-lifetime
-// (resets on restart); monitoring doesn't need persistence. Pure + dependency-free → unit-testable.
-
-const FALLBACK_RATE_ALERT = 0.2; // >=20% of judged turns falling back to the engine = degraded
-const ALERT_MIN_SAMPLE = 10; // don't trip the alert until there's a meaningful sample
+const FALLBACK_RATE_ALERT = 0.2;
+const ALERT_MIN_SAMPLE = 10;
 
 const m = { calls: 0, fallbacks: 0, timeouts: 0, totalLatencyMs: 0, maxLatencyMs: 0, v1: 0, v2: 0, since: null };
 
-// Record one combat-turn judge attempt. ok=false ⇒ it threw and the deterministic engine resolved
-// the turn (a fallback); timeout=true marks the AI_TIMEOUT_MS abort case. latencyMs is the wall time
-// of the attempt (success OR failure). version is "v1" | "v2".
 export function recordTurn({ ok, timeout = false, latencyMs = 0, version = "v1" } = {}) {
   if (m.since == null) m.since = Date.now();
   m.calls++;
@@ -22,8 +14,6 @@ export function recordTurn({ ok, timeout = false, latencyMs = 0, version = "v1" 
   if (timeout) m.timeouts++;
 }
 
-// A snapshot for the admin stats panel: raw counters + derived rates + an `alert` flag that trips
-// once the fallback rate crosses the threshold over a meaningful sample.
 export function aiMetricsSnapshot() {
   const calls = m.calls;
   const fallbackRate = calls ? m.fallbacks / calls : 0;
@@ -44,7 +34,6 @@ export function aiMetricsSnapshot() {
   };
 }
 
-// Test hook — reset the process-lifetime counters.
 export function resetAiMetrics() {
   Object.assign(m, { calls: 0, fallbacks: 0, timeouts: 0, totalLatencyMs: 0, maxLatencyMs: 0, v1: 0, v2: 0, since: null });
 }

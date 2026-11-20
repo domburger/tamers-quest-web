@@ -50,7 +50,6 @@ test("TQ-288 comp constructors return descriptors; k.add(comp list) builds a cor
   assert.equal(k.rect(100, 40, { radius: 8 }).__kcomp, "rect");
   assert.equal(k.color(10, 20, 30).color.r, 10);
   assert.deepEqual(k.color([1, 2, 3]).color, { r: 1, g: 2, b: 3 }, "array color");
-  // a real button-shaped k.add(comps)
   const o = k.add([
     k.rect(200, 60, { radius: 12 }), k.pos(50, 80), k.anchor("center"),
     k.color(60, 70, 110), k.outline(2, [70, 230, 198]), k.opacity(0.9), k.z(10), "btn",
@@ -77,7 +76,6 @@ test("TQ-288 k.add comps: text (wrap), circle, sprite kinds; flat record still p
   assert.equal(c.kind, "circle"); assert.equal(c.radius, 30);
   const s = k.add([k.sprite("hero"), k.pos(1, 1)]);
   assert.equal(s.kind, "sprite"); assert.equal(s.sprite, "hero");
-  // a plain flat record (harness usage) still works
   const flat = k.add({ kind: "rect", x: 1, y: 2, w: 3, h: 4 });
   assert.equal(flat.kind, "rect"); assert.equal(flat.w, 3);
 });
@@ -89,17 +87,15 @@ test("TQ-289 k.wait: fires cb after sec (frame-driven via _tickTimers); cancelab
   k._tickTimers(0.3); assert.equal(fired, 0, "not yet (0.3 < 0.5)");
   k._tickTimers(0.3); assert.equal(fired, 1, "fired once 0.6 >= 0.5");
   k._tickTimers(1.0); assert.equal(fired, 1, "fires only once");
-  // cancel before it fires
   let fired2 = 0;
   const h = k.wait(0.5, () => fired2++);
   h.cancel();
   k._tickTimers(1.0); assert.equal(fired2, 0, "cancelled wait never fires");
-  // scene switch clears pending waits
   let fired3 = 0;
   k.scene("a", () => {}); k.scene("b", () => {});
   k.go("a");
   k.wait(0.5, () => fired3++);
-  k.go("b"); // clears the pending wait
+  k.go("b");
   k._tickTimers(1.0); assert.equal(fired3, 0, "go() drops the old scene's pending waits");
 });
 
@@ -108,7 +104,6 @@ test("TQ-290 camera: camPos/getCamPos, k.fixed comp marks screen-anchored, world
   assert.deepEqual(k.getCamPos(), { x: 640, y: 360 }, "default cam = screen centre (no scroll)");
   k.camPos(800, 500);
   assert.deepEqual(k.getCamPos(), { x: 800, y: 500 });
-  // k.fixed() comp → the retained object is screen-anchored
   assert.equal(k.add([k.rect(10, 10), k.pos(5, 5), k.fixed()]).fixed, true);
   assert.equal(k.add([k.rect(10, 10), k.pos(5, 5)]).fixed, false, "default is world (not fixed)");
   assert.equal(k.worldToScreen(100, 100), null, "no mapping before start()");
@@ -118,7 +113,7 @@ test("TQ-289 k.loadFont: returns a Promise; no-op without a DOM (does not throw)
   const k = makeCanvasShim();
   const r = k.loadFont("GameFont", "/fonts/game.woff2");
   assert.ok(r && typeof r.then === "function", "returns a thenable");
-  await assert.doesNotReject(() => r); // headless (no FontFace) resolves quietly
+  await assert.doesNotReject(() => r);
 });
 
 test("TQ-287 input + draw are safe no-ops before start() (no DOM, no throw)", () => {

@@ -1,20 +1,7 @@
-// TQ-262: the scene-facing glue for the live-DOM monster render path. Owns a body-mounted, play-window
-// -clipped overlay <div> and a pooled htmlMonsterLayer, and each frame maps a scene's visible monsters
-// (world-space design coords) to page CSS px via k.worldToScreen, sanitizes their stored html model
-// (TQ-261, cached per monster type), and drives layer.sync(). A scene wires this in three lines: create
-// on enter, sync() each frame with the monsters it's drawing, destroy() on leave.
-//
-// SAFE BY CONSTRUCTION: only monsters whose TYPE carries a renderable html model (hasHtmlModel) ever
-// take the DOM path — every other monster is ignored here and keeps its rasterized sprite (drawMonster).
-// No monster ships an html model today, so this is dormant: sync() maps nothing and touches no DOM.
-
 import { createHtmlMonsterLayer } from "./htmlMonsterLayer.js";
 import { hasHtmlModel } from "../systems/htmlModel.js";
 import { sanitizeHtmlModel } from "../systems/htmlSanitize.js";
 
-// CSS clip-path inset() that clips the full-viewport overlay to a page-px rect (the play window), so DOM
-// monsters never bleed into the opaque HUD gutters. rect in page CSS px; vw/vh the viewport CSS size.
-// Pure. A null rect → "none" (no clip, e.g. the combat stage which fills the screen).
 export function clipInset(rect, vw, vh) {
   if (!rect) return "none";
   const top = Math.max(0, rect.y);
@@ -24,20 +11,16 @@ export function clipInset(rect, vw, vh) {
   return `inset(${top}px ${right}px ${bottom}px ${left}px)`;
 }
 
-// Pick the animation state for a monster from its motion flags. attack (one-shot) wins over move; a
-// stationary monster idles. Each maps to an authored html state (idle/move/attack fall back to base).
 export function motionState({ attacking = false, moving = false } = {}) {
   if (attacking) return "attack";
   if (moving) return "move";
   return "idle";
 }
 
-// Create the overlay for the active scene. `zIndex` places it above the canvas; the per-frame clip keeps
-// it visually behind the (canvas-drawn) HUD gutters. No-ops without a DOM (tests/SSR).
 export function createHtmlMonsterOverlay(k, { zIndex = 5 } = {}) {
   const hasDom = typeof document !== "undefined";
   let mount = null, layer = null;
-  const sanCache = new Map(); // typeName -> { src: type.html, model: sanitized|null }
+  const sanCache = new Map();
 
   if (hasDom) {
     mount = document.createElement("div");
@@ -50,8 +33,6 @@ export function createHtmlMonsterOverlay(k, { zIndex = 5 } = {}) {
     layer = createHtmlMonsterLayer(mount);
   }
 
-  // The sanitized model for a monster type, cached until the type's html object changes. Returns null
-  // when the type has no usable model after sanitising (→ caller keeps the sprite path).
   function sanitizedModel(typeName, type) {
     const c = sanCache.get(typeName);
     if (c && c.src === type.html) return c.model;
@@ -60,17 +41,10 @@ export function createHtmlMonsterOverlay(k, { zIndex = 5 } = {}) {
     return model;
   }
 
-  // entries: [{ id, typeName, type, x, y, designSize, facing, moving, attacking, opacity }]
-  //   type: the monster TYPE (getMonsterType) carrying .html · x,y: world-space design centre
-  // clipDesign: the play-window rect ({x,y,right,bottom} design px, screen-anchored) to clip + cull to.
-  // `fixed`: false (default) places nodes in WORLD space (overworld monsters move with the camera);
-  // true places them in SCREEN space (the combat stage draws its combatants fixed:true). When fixed,
-  // clipDesign is typically null — the battle panel already fills the screen.
   function sync(entries, { clipDesign = null, fixed = false } = {}) {
     if (!hasDom || !layer || !k || !k.worldToScreen) return;
     try { syncInner(entries, clipDesign, fixed); }
-    catch { /* a render-path failure must never break the live overworld/combat — monsters without a
-               DOM node still render via the canvas sprite path; degrade silently to no overlay. */ }
+    catch {}
   }
 
   function syncInner(entries, clipDesign, fixed) {
@@ -85,13 +59,13 @@ export function createHtmlMonsterOverlay(k, { zIndex = 5 } = {}) {
         mount.style.clipPath = clipInset(rectPx, vw, vh);
       }
     } else {
-      mount.style.clipPath = "none"; // no clip (combat stage fills the screen)
+      mount.style.clipPath = "none";
     }
     const mapped = [];
     for (const e of entries || []) {
       if (!e || !e.type || !hasHtmlModel(e.type)) continue;
       const model = sanitizedModel(e.typeName, e.type);
-      if (!model) continue; // sanitised to nothing → sprite path
+      if (!model) continue;
       const p = k.worldToScreen(e.x, e.y, { fixed });
       if (!p) continue;
       mapped.push({
@@ -102,14 +76,12 @@ export function createHtmlMonsterOverlay(k, { zIndex = 5 } = {}) {
         size: (e.designSize || 64) * p.scale,
         facing: e.facing || 1,
         opacity: e.opacity ?? 1,
-        z: Math.round(100000 - e.y), // lower y (nearer) draws on top — mirrors the canvas y-sort
+        z: Math.round(100000 - e.y),
       });
     }
     layer.sync(mapped, { rect: rectPx });
   }
 
-  // True if any monster type seen so far actually produced a renderable sanitized model — lets a scene
-  // cheaply decide whether to skip the sprite draw for a given monster (see usesDom).
   function usesDom(typeName, type) {
     return hasHtmlModel(type) && !!sanitizedModel(typeName, type);
   }
@@ -117,7 +89,7 @@ export function createHtmlMonsterOverlay(k, { zIndex = 5 } = {}) {
   function clear() { if (layer) layer.clear(); }
   function destroy() {
     if (layer) layer.destroy();
-    if (mount && mount.remove) { try { mount.remove(); } catch { /* detached */ } }
+    if (mount && mount.remove) { try { mount.remove(); } catch {} }
     mount = null; layer = null; sanCache.clear();
   }
 

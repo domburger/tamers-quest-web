@@ -1,11 +1,6 @@
-// Procedural sprite generation — replaces the PNG asset pipeline with
-// deterministic canvas art driven by game data. Every generator returns an
-// HTMLCanvasElement, which Kaboom's loadSprite() accepts directly.
-
 import { makeRng as rngFor } from "../engine/rng.js";
 import { BODY_SHAPES } from "./monsterModel.js";
 
-// ─── Color helpers ───
 function rgb(c) {
   return `rgb(${c[0] | 0}, ${c[1] | 0}, ${c[2] | 0})`;
 }
@@ -13,7 +8,6 @@ function rgba(c, a) {
   return `rgba(${c[0] | 0}, ${c[1] | 0}, ${c[2] | 0}, ${a})`;
 }
 function shade(c, amt) {
-  // amt < 0 darkens, > 0 lightens
   return [
     Math.max(0, Math.min(255, c[0] + 255 * amt)),
     Math.max(0, Math.min(255, c[1] + 255 * amt)),
@@ -28,7 +22,6 @@ const SPRITE_PALETTES = {
   light:     { base: [240, 220, 122], accent: [255, 250, 224], dark: [186, 152, 58] },
   dark:      { base: [112, 72, 152],  accent: [184, 134, 222], dark: [46, 28, 70] },
   neutral:   { base: [150, 150, 162], accent: [212, 212, 224], dark: [78, 78, 92] },
-  // Expanded palette set so monsters read distinctly (was all-gray before).
   air:       { base: [120, 195, 225], accent: [205, 238, 248], dark: [58, 118, 150] },
   ice:       { base: [142, 208, 236], accent: [220, 246, 255], dark: [62, 124, 160] },
   earth:     { base: [176, 128, 72],  accent: [224, 190, 132], dark: [94, 64, 34] },
@@ -40,14 +33,10 @@ const SPRITE_PALETTES = {
   metal:     { base: [152, 166, 186], accent: [212, 222, 236], dark: [82, 94, 112] },
 };
 
-// Deterministic visual theme per monster. TQ-349 removed the "element" concept, so a
-// monster's palette / eye-glow / flair are now seeded from a stable hash of its NAME (so
-// it always renders the same way) instead of an element. The palette KEYS are just
-// internal colour-theme ids, not a game-facing taxonomy.
 const PALETTE_KEYS = Object.keys(SPRITE_PALETTES);
 export function visualKey(typeName) {
   const s = String(typeName || "");
-  let h = 2166136261 >>> 0; // FNV-1a → a stable index into PALETTE_KEYS
+  let h = 2166136261 >>> 0;
   for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
   return PALETTE_KEYS[(h >>> 0) % PALETTE_KEYS.length] || "neutral";
 }
@@ -62,24 +51,9 @@ function makeCanvas(w, h) {
   return c;
 }
 
-// ─── Monster sprites ───
-// PT1-T21 / P5-T5 (user: "brutal, not cute, not all egg-shaped"). Every monster
-// is built from one of six ANIMAL ARCHETYPES, each with its own silhouette,
-// stance and visual weight — quadruped beast, avian raptor, sprawling saurian,
-// finned leviathan, segmented arthropod, hulking brute — so a random lineup
-// reads as a menagerie of distinct predators rather than a row of eggs. The
-// archetype is chosen deterministically from the monster's name/description
-// (with colour-theme + seeded fallbacks), so the same monster always looks identical.
-// (This supersedes the earlier traceBlob/drawLegs/drawTail "egg + limbs" pass —
-// that produced one silhouette family; archetypes give real silhouette variety.)
-
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-// Pick an animal archetype from the monster's name + flavour text, falling back
-// to a colour-theme default and finally a seeded choice so rosters vary. Pure + seeded.
 export function archetypeFor(mt, ckey, rng) {
-  // The archetype renderer is the FALLBACK for monsters with no authored shape model (the offline
-  // seed bundle): pick a silhouette from the name/description, then a theme default, then seeded.
   const txt = (String(mt.typeName || "") + " " + String(mt.description || "")).toLowerCase();
   const has = (...ws) => ws.some((w) => txt.includes(w));
   if (has("golem", "titan", "colossus", "ogre", "troll", "brute", "giant", "construct",
@@ -101,7 +75,6 @@ export function archetypeFor(mt, ckey, rng) {
           "fur", "feline", "canine", "tiger", "panther", "stag", "mammoth", "ape", "fang", "maw",
           "prowl", "claw"))
     return "beast";
-  // Theme-tilted default — nudges the silhouette by colour theme, but isn't a hard rule.
   const byEl = {
     water: "leviathan", ice: "leviathan", air: "raptor", celestial: "raptor", light: "raptor",
     earth: "brute", metal: "brute", poison: "arthropod", nature: "arthropod",
@@ -111,18 +84,15 @@ export function archetypeFor(mt, ckey, rng) {
   return BODY_SHAPES[rng.int(0, BODY_SHAPES.length - 1)];
 }
 
-// A darker, heavier palette derived from the theme palette: body desaturated +
-// dimmed for "weight," accent kept bright for the rim/eyes/features.
 function menacePalette(pal0) {
   return {
     base: shade(pal0.base, -0.10),
     dark: shade(pal0.dark, -0.05),
     accent: pal0.accent,
-    bone: [228, 222, 206], // fangs / claws / horns
+    bone: [228, 222, 206],
   };
 }
 
-// A luminous, threatening eye colour per colour-theme (red for the sinister themes).
 export function eyeGlowFor(ckey) {
   switch (ckey) {
     case "fire": return [255, 176, 56];
@@ -135,11 +105,6 @@ export function eyeGlowFor(ckey) {
   }
 }
 
-// Where this archetype's themed flair (flames/shards/leaves/rings) should anchor:
-// `top` ≈ the silhouette's highest point so "above" flair hugs the creature, `cy`
-// ≈ its vertical centre for the side/ring flair, `halfW` ≈ its half-width. Kept as
-// cheap approximations of each archetype's proportions (tall vs low, wide vs narrow)
-// so the flair no longer floats at a fixed canvas height above the shorter bodies.
 function flairAnchor(arch, ground, bulk) {
   switch (arch) {
     case "raptor":    return { top: ground - 40 * bulk - 30, cy: ground - 40 * bulk, halfW: 17 * bulk };
@@ -147,11 +112,10 @@ function flairAnchor(arch, ground, bulk) {
     case "brute":     return { top: ground - 76 * bulk - 6,  cy: ground - 44 * bulk, halfW: 26 * bulk };
     case "saurian":   return { top: ground - 24 * bulk - 22, cy: ground - 26 * bulk, halfW: 26 * bulk };
     case "arthropod": return { top: ground - 24 * bulk - 16, cy: ground - 24 * bulk, halfW: 24 * bulk };
-    default:          return { top: ground - 30 * bulk - 24, cy: ground - 30 * bulk, halfW: 26 * bulk }; // beast
+    default:          return { top: ground - 30 * bulk - 24, cy: ground - 30 * bulk, halfW: 26 * bulk };
   }
 }
 
-// ── Low-level drawing primitives shared by the archetypes ──
 function limbPath(ctx, x1, y1, x2, y2, w1, w2) {
   const a = Math.atan2(y2 - y1, x2 - x1);
   const px = Math.cos(a + Math.PI / 2), py = Math.sin(a + Math.PI / 2);
@@ -190,7 +154,6 @@ function drawHorn(ctx, bx, by, tx, ty, w, col) {
   ctx.lineTo(bx - px * w, by - py * w);
   ctx.closePath(); ctx.fill();
 }
-// A toothy maw: a dark mouth gap with bone fangs top & (optionally) bottom.
 function drawMaw(ctx, x, y, w, h, bone, underbite = false) {
   ctx.fillStyle = "rgba(14,8,12,0.92)";
   ctx.beginPath(); ctx.ellipse(x, y, w, h, 0, 0, Math.PI * 2); ctx.fill();
@@ -204,7 +167,6 @@ function drawMaw(ctx, x, y, w, h, bone, underbite = false) {
     ctx.lineTo(fx, y - h * 0.7 + h * (underbite ? 1.4 : 1.1));
     ctx.closePath(); ctx.fill();
     if (underbite) {
-      // tusks jutting up from the lower jaw
       ctx.beginPath();
       ctx.moveTo(fx - 1.6, y + h * 0.7);
       ctx.lineTo(fx + 1.6, y + h * 0.7);
@@ -213,7 +175,6 @@ function drawMaw(ctx, x, y, w, h, bone, underbite = false) {
     }
   }
 }
-// Body silhouette helper: fill+rim a built path with the menace gradient.
 function paintBody(ctx, pal, topY, botY, build) {
   const grad = ctx.createLinearGradient(0, topY, 0, botY);
   grad.addColorStop(0, rgb(shade(pal.base, 0.12)));
@@ -228,21 +189,15 @@ function paintBody(ctx, pal, topY, botY, build) {
   ctx.strokeStyle = rgba(pal.accent, 0.4); ctx.lineWidth = 1.4; ctx.stroke();
 }
 
-// Menacing eyes (glowing, slit-pupilled, heavy-browed) placed on the head a given
-// archetype reports. `front` → two eyes; otherwise a single forward profile eye.
 function drawMenaceFace(ctx, pal, eyeGlow, head) {
   const { x, y, r, front } = head;
   const positions = front ? [-1, 1].map((s) => [x + s * r * 0.52, y, s]) : [[x, y, 1]];
   for (const [ex, ey, s] of positions) {
-    const dir = front ? -s : 1; // inner edge toward the centre line
-    // Recessed dark socket — the eye glares out of a shadowed hollow, not off a
-    // bright round bead (the round glowing eye was the main "cute" tell).
+    const dir = front ? -s : 1;
     ctx.fillStyle = rgba(shade(pal.dark, -0.18), 0.85);
     ctx.beginPath(); ctx.ellipse(ex, ey, r * 0.5, r * 0.34, -dir * 0.3, 0, Math.PI * 2); ctx.fill();
-    // Tight glow (smaller than before so it reads as a hot ember, not a halo).
     ctx.fillStyle = rgba(eyeGlow, 0.34);
     ctx.beginPath(); ctx.arc(ex, ey, r * 0.5, 0, Math.PI * 2); ctx.fill();
-    // Narrow, angled almond + vertical slit — a predator's eye, not a wide bead.
     ctx.save();
     ctx.translate(ex, ey); ctx.rotate(-dir * 0.22);
     ctx.fillStyle = rgb(eyeGlow);
@@ -250,10 +205,8 @@ function drawMenaceFace(ctx, pal, eyeGlow, head) {
     ctx.fillStyle = "rgba(8,5,10,0.95)";
     ctx.beginPath(); ctx.ellipse(0, 0, r * 0.09, r * 0.17, 0, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
-    // Tiny cold glint.
     ctx.fillStyle = "rgba(255,255,255,0.75)";
     ctx.beginPath(); ctx.arc(ex - r * 0.12, ey - r * 0.08, r * 0.05, 0, Math.PI * 2); ctx.fill();
-    // Heavy brow, low + angled down toward the centre line (a hard scowl).
     ctx.strokeStyle = rgb(shade(pal.dark, -0.16));
     ctx.lineWidth = Math.max(2.2, r * 0.28); ctx.lineCap = "round";
     ctx.beginPath();
@@ -263,7 +216,6 @@ function drawMenaceFace(ctx, pal, eyeGlow, head) {
   }
 }
 
-// Scattered battle scars + spots drawn on the torso box (menace + asymmetry).
 function drawBattleMarks(ctx, pal, rng, mt, box) {
   const { x, y, w, h } = box;
   const spots = Math.min(7, (mt.rarity || 1) + rng.int(0, 1));
@@ -273,7 +225,7 @@ function drawBattleMarks(ctx, pal, rng, mt, box) {
     const sy = y + rng.float(-h * 0.4, h * 0.45);
     ctx.beginPath(); ctx.arc(sx, sy, rng.float(2, 4.5), 0, Math.PI * 2); ctx.fill();
   }
-  if (rng.chance(0.4)) { // battle scar — a short stitched slash
+  if (rng.chance(0.4)) {
     const sa = rng.float(-0.6, 0.6);
     const scx = x + rng.float(-w * 0.25, w * 0.3), scy = y + rng.float(-h * 0.2, h * 0.25);
     const len = h * rng.float(0.5, 0.8);
@@ -289,13 +241,7 @@ function drawBattleMarks(ctx, pal, rng, mt, box) {
   }
 }
 
-// Supersample factor for the monster sprite bitmap. Combat displays a monster at ~0.26–0.3× the
-// square play window (≈216px on a 1280×720 design canvas, more on HiDPI), so a flat 128px bitmap
-// was magnified ~1.5–3.4× → soft/blurry. We render the SAME 128-unit art onto a RES× canvas
-// (ctx.scale), keeping every draw coordinate unchanged, so the texture stays crisp when upscaled.
-// Callers that draw the sprite at its natural texture size (charselect/lobby thumbnails via
-// k.scale) divide their display scale by this. RES=2 (256px) is the memory-vs-sharpness sweet spot
-// across ~115 preloaded types; the player sprite mirrors this pattern at RES=3 (one sprite).
+// Callers drawing at native texture size must divide their scale by this.
 export const MONSTER_SPRITE_RES = 2;
 
 export function generateMonsterSprite(mt) {
@@ -303,12 +249,7 @@ export function generateMonsterSprite(mt) {
   const RES = MONSTER_SPRITE_RES;
   const c = makeCanvas(S * RES, S * RES);
   const ctx = c.getContext("2d");
-  ctx.scale(RES, RES); // draw in 128-unit space; output bitmap is RES× sharper
-  // Procedural archetype renderer: this BAKES every hand-authored SEED monster's sprite at boot
-  // (a name-seeded colour theme + a name-seeded silhouette from one of the BODY_SHAPES archetypes).
-  // AI-generated monsters are NOT drawn here — they carry an authored SVG model (mt.svg, TQ-245)
-  // that drawMonster lazily rasterizes into a sprite at runtime (TQ-246). The old LLM-authored-SHAPES
-  // path (modelRender.drawAuthoredModel) was removed in the SVG cutover (TQ-242).
+  ctx.scale(RES, RES);
   const ckey = visualKey(mt.typeName);
   const pal0 = paletteFor(ckey);
   const pal = menacePalette(pal0);
@@ -325,13 +266,11 @@ export function generateMonsterSprite(mt) {
   const dir = rng.chance(0.5) ? 1 : -1;
   const g = { cx, ground, bulk, heavy, lean, pal, eyeGlow, rng };
 
-  // Ground shadow
   ctx.fillStyle = "rgba(0,0,0,0.24)";
   ctx.beginPath();
   ctx.ellipse(cx, ground + 4, 30 * bulk, 7 * bulk, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Soft accent-tinted aura.
   const auraR = 56 * bulk;
   const aura = ctx.createRadialGradient(cx, ground - 38, 8, cx, ground - 38, auraR);
   aura.addColorStop(0, rgba(pal0.accent, 0.26));
@@ -340,13 +279,9 @@ export function generateMonsterSprite(mt) {
   ctx.fillStyle = aura;
   ctx.beginPath(); ctx.arc(cx, ground - 38, auraR, 0, Math.PI * 2); ctx.fill();
 
-  // Themed flair sits behind the body (flames/leaves/shards above; fins/rocks
-  // to the sides). Anchored to THIS archetype's silhouette top so the flair hugs
-  // the creature instead of floating at a fixed canvas height above low bodies.
   const fa = flairAnchor(arch, ground, bulk);
   drawThemeFeatures(ctx, ckey, pal0, rng, cx, fa.cy, fa.halfW, fa.cy - fa.top);
 
-  // Draw the creature facing `dir` (mirror the whole rig for variety).
   ctx.save();
   if (dir < 0) { ctx.translate(cx, 0); ctx.scale(-1, 1); ctx.translate(-cx, 0); }
   let head;
@@ -365,12 +300,6 @@ export function generateMonsterSprite(mt) {
   return c;
 }
 
-// ── Archetype silhouettes (all drawn facing right; mirrored by the caller) ──
-// Each returns { x, y, r, front, body:{x,y,w,h} } describing where the face goes
-// and the torso box used for scars/spots.
-
-// Quadruped predator — wolf / big cat: low horizontal body, four legs, jaws,
-// pointed ears, spiked dorsal ridge, lashing tail.
 function drawBeast(ctx, g) {
   const { cx, ground, bulk, heavy, lean, pal, rng } = g;
   const cy = ground - 30 * bulk;
@@ -379,14 +308,11 @@ function drawBeast(ctx, g) {
   const hipX = cx - halfLen * 0.7, shX = cx + halfLen * 0.6;
   const bone = pal.bone;
 
-  // Far legs (behind, darker)
   fillLimb(ctx, pal, shX - 4, cy + bodyR * 0.3, shX - 6, ground, 4.5 * heavy, 3, true);
   fillLimb(ctx, pal, hipX + 2, cy + bodyR * 0.3, hipX, ground, 5 * heavy, 3.5, true);
 
-  // Lashing tail
   fillLimb(ctx, pal, hipX, cy - bodyR * 0.2, hipX - 18, cy - bodyR * 1.4, 5, 1.5, true);
 
-  // Torso
   paintBody(ctx, pal, cy - bodyR, cy + bodyR, () => {
     ctx.beginPath();
     ctx.moveTo(hipX - bodyR * 0.7, cy);
@@ -395,7 +321,6 @@ function drawBeast(ctx, g) {
     ctx.closePath();
   });
 
-  // Dorsal spike ridge (menace)
   const ns = rng.int(4, 6);
   for (let i = 0; i < ns; i++) {
     const t = i / (ns - 1);
@@ -404,18 +329,15 @@ function drawBeast(ctx, g) {
     drawHorn(ctx, rx, ry, rx + 2, ry - rng.float(7, 12), 2.6, rgb(shade(pal.dark, -0.04)));
   }
 
-  // Near legs (front)
   fillLimb(ctx, pal, shX, cy + bodyR * 0.4, shX + 2, ground, 5.5 * heavy, 3.5);
   fillLimb(ctx, pal, hipX + 6, cy + bodyR * 0.5, hipX + 7, ground, 6 * heavy, 4);
   drawClaws(ctx, shX + 2, ground, 3, 4, 3, rgb(bone));
   drawClaws(ctx, hipX + 7, ground, 3, 4, 3, rgb(bone));
 
-  // Head + snout, low and forward
   const hx = shX + bodyR * 0.9, hy = cy - bodyR * 0.6, hr = bodyR * 0.8;
   paintBody(ctx, pal, hy - hr, hy + hr, () => {
     ctx.beginPath(); ctx.ellipse(hx, hy, hr, hr * 0.92, 0, 0, Math.PI * 2); ctx.closePath();
   });
-  // Snout
   paintBody(ctx, pal, hy, hy + hr, () => {
     ctx.beginPath();
     ctx.moveTo(hx + hr * 0.2, hy - hr * 0.4);
@@ -424,24 +346,20 @@ function drawBeast(ctx, g) {
     ctx.lineTo(hx + hr * 0.1, hy + hr * 0.7);
     ctx.closePath();
   });
-  // Pointed ears
   drawHorn(ctx, hx - hr * 0.2, hy - hr * 0.8, hx - hr * 0.7, hy - hr * 1.7, 3.5, rgb(shade(pal.base, -0.04)));
   drawHorn(ctx, hx + hr * 0.4, hy - hr * 0.85, hx + hr * 0.5, hy - hr * 1.7, 3.5, rgb(shade(pal.base, -0.04)));
-  // Fangs at the snout tip
   drawMaw(ctx, hx + hr * 1.15, hy + hr * 0.32, hr * 0.34, hr * 0.2, bone);
 
   return { x: hx + hr * 0.1, y: hy - hr * 0.18, r: hr * 0.62, front: false,
            body: { x: cx - 2, y: cy, w: halfLen * 1.4, h: bodyR * 2 } };
 }
 
-// Bird of prey — upright raptor: hooked beak, fanned wings, crest, taloned feet.
 function drawRaptor(ctx, g) {
   const { cx, ground, bulk, lean, pal, rng } = g;
   const cy = ground - 40 * bulk;
   const bodyW = 14 * bulk, bodyH = 24 * bulk * clamp(lean, 0.8, 1.3);
   const bone = pal.bone;
 
-  // Spread wings behind the body (jagged trailing feathers)
   for (const s of [-1, 1]) {
     const far = s < 0;
     ctx.fillStyle = rgb(shade(far ? pal.dark : pal.base, far ? -0.05 : -0.02));
@@ -458,17 +376,14 @@ function drawRaptor(ctx, g) {
     ctx.closePath(); ctx.fill(); ctx.stroke();
   }
 
-  // Taloned legs
   fillLimb(ctx, pal, cx - 5, cy + bodyH * 0.6, cx - 6, ground, 3, 2.5);
   fillLimb(ctx, pal, cx + 5, cy + bodyH * 0.6, cx + 6, ground, 3, 2.5);
   drawClaws(ctx, cx - 6, ground, 3, 4, 3.5, rgb(bone));
   drawClaws(ctx, cx + 6, ground, 3, 4, 3.5, rgb(bone));
 
-  // Upright body
   paintBody(ctx, pal, cy - bodyH, cy + bodyH, () => {
     ctx.beginPath(); ctx.ellipse(cx, cy, bodyW, bodyH, 0, 0, Math.PI * 2); ctx.closePath();
   });
-  // Chest feather ruffle
   ctx.strokeStyle = rgba(pal.accent, 0.3); ctx.lineWidth = 1.4;
   for (let i = 0; i < 3; i++) {
     ctx.beginPath();
@@ -476,15 +391,12 @@ function drawRaptor(ctx, g) {
     ctx.stroke();
   }
 
-  // Head + hooked beak + crest
   const hx = cx, hy = cy - bodyH * 0.95, hr = bodyW * 1.05;
   paintBody(ctx, pal, hy - hr, hy + hr, () => {
     ctx.beginPath(); ctx.ellipse(hx, hy, hr, hr, 0, 0, Math.PI * 2); ctx.closePath();
   });
-  // Crest spikes
   for (let i = -1; i <= 1; i++)
     drawHorn(ctx, hx + i * hr * 0.4, hy - hr * 0.7, hx + i * hr * 0.4 + i * 3, hy - hr * (1.5 + rng.float(0, 0.4)), 2.4, rgb(shade(pal.dark, -0.04)));
-  // Hooked beak (bone)
   ctx.fillStyle = rgb(bone);
   ctx.beginPath();
   ctx.moveTo(hx + hr * 0.5, hy - hr * 0.2);
@@ -497,8 +409,6 @@ function drawRaptor(ctx, g) {
            body: { x: cx, y: cy, w: bodyW * 2, h: bodyH * 1.6 } };
 }
 
-// Sprawling reptile / drake: long low body, splayed clawed limbs, long fanged
-// snout, jagged dorsal plates, heavy tail.
 function drawSaurian(ctx, g) {
   const { cx, ground, bulk, heavy, lean, pal, rng } = g;
   const cy = ground - 24 * bulk;
@@ -507,14 +417,11 @@ function drawSaurian(ctx, g) {
   const tailX = cx - halfLen * 0.8, headX = cx + halfLen * 0.7;
   const bone = pal.bone;
 
-  // Far splayed legs
   fillLimb(ctx, pal, headX - 8, cy + bodyR * 0.5, headX - 12, ground, 4, 2.5, true);
   fillLimb(ctx, pal, tailX + 8, cy + bodyR * 0.5, tailX + 4, ground, 4.5, 2.5, true);
 
-  // Long heavy tail
   fillLimb(ctx, pal, tailX + bodyR, cy, tailX - 16, cy + bodyR * 0.4, 7, 1.5);
 
-  // Low body
   paintBody(ctx, pal, cy - bodyR, cy + bodyR, () => {
     ctx.beginPath();
     ctx.moveTo(tailX, cy);
@@ -523,7 +430,6 @@ function drawSaurian(ctx, g) {
     ctx.closePath();
   });
 
-  // Jagged dorsal plates
   const np = rng.int(5, 8);
   ctx.fillStyle = rgb(shade(pal.dark, -0.05));
   for (let i = 0; i < np; i++) {
@@ -536,13 +442,11 @@ function drawSaurian(ctx, g) {
     ctx.closePath(); ctx.fill();
   }
 
-  // Near splayed legs + claws
   fillLimb(ctx, pal, headX - 4, cy + bodyR * 0.7, headX - 7, ground, 5, 3);
   fillLimb(ctx, pal, tailX + 12, cy + bodyR * 0.7, tailX + 9, ground, 5.5, 3);
   drawClaws(ctx, headX - 7, ground, 3, 4.5, 3.5, rgb(bone));
   drawClaws(ctx, tailX + 9, ground, 3, 4.5, 3.5, rgb(bone));
 
-  // Head + long snout
   const hx = headX + bodyR * 0.6, hy = cy - bodyR * 0.5, hr = bodyR * 0.85;
   paintBody(ctx, pal, hy - hr, hy + hr, () => {
     ctx.beginPath();
@@ -552,9 +456,7 @@ function drawSaurian(ctx, g) {
     ctx.lineTo(hx - hr * 0.6, hy + hr);
     ctx.closePath();
   });
-  // Brow horn
   drawHorn(ctx, hx, hy - hr * 0.6, hx - hr * 0.4, hy - hr * 1.7, 2.8, rgb(shade(pal.dark, -0.05)));
-  // Toothy jaw line (fangs along the snout)
   ctx.fillStyle = rgb(bone);
   for (let i = 0; i < 4; i++) {
     const fx = hx + hr * (0.5 + i * 0.45);
@@ -568,8 +470,6 @@ function drawSaurian(ctx, g) {
            body: { x: cx, y: cy, w: halfLen * 1.3, h: bodyR * 2 } };
 }
 
-// Finned leviathan — rearing sea-serpent: sinuous S-body, no legs, dorsal/side
-// fins, a wide fanged maw and a fluked tail. Aquatic "weight."
 function drawLeviathan(ctx, g) {
   const { cx, ground, bulk, lean, pal, rng } = g;
   const baseY = ground - 6;
@@ -577,7 +477,6 @@ function drawLeviathan(ctx, g) {
   const segW = 13 * bulk * clamp(lean, 0.7, 1.2);
   const bone = pal.bone;
 
-  // Sinuous body as a thick wavy ribbon around a spine.
   const pts = [];
   const segs = 7;
   for (let i = 0; i <= segs; i++) {
@@ -604,7 +503,6 @@ function drawLeviathan(ctx, g) {
   ctx.strokeStyle = rgb(shade(pal.dark, -0.10)); ctx.lineWidth = 3; ctx.lineJoin = "round";
   ctx.fill(); ctx.stroke();
 
-  // Tail fluke at the base
   ctx.fillStyle = rgb(shade(pal.accent, -0.04));
   const [bx, by] = pts[0];
   ctx.beginPath();
@@ -614,7 +512,6 @@ function drawLeviathan(ctx, g) {
   ctx.lineTo(bx + 4, by - 4);
   ctx.closePath(); ctx.fill();
 
-  // Dorsal fin ridge along the spine
   ctx.fillStyle = rgba(shade(pal.accent, -0.02), 0.9);
   ctx.strokeStyle = rgb(pal.dark); ctx.lineWidth = 1;
   for (let i = 1; i < pts.length - 1; i++) {
@@ -624,7 +521,6 @@ function drawLeviathan(ctx, g) {
     ctx.closePath(); ctx.fill(); ctx.stroke();
   }
 
-  // Side fins near the head
   const [hxBase, hyBase] = pts[pts.length - 1];
   ctx.fillStyle = rgba(shade(pal.accent, 0.02), 0.85);
   for (const s of [-1, 1]) {
@@ -634,32 +530,26 @@ function drawLeviathan(ctx, g) {
     ctx.closePath(); ctx.fill();
   }
 
-  // Head with wide fanged maw
   const hr = segW * 1.25;
   const hx = hxBase, hy = topY + hr * 0.2;
   paintBody(ctx, pal, hy - hr, hy + hr, () => {
     ctx.beginPath(); ctx.ellipse(hx, hy, hr * 1.15, hr, 0, 0, Math.PI * 2); ctx.closePath();
   });
-  // Frill horns swept back
   for (const s of [-1, 1])
     drawHorn(ctx, hx + s * hr * 0.7, hy - hr * 0.4, hx + s * hr * 1.4, hy - hr * 1.2, 3, rgb(shade(pal.dark, -0.04)));
-  // Wide toothy maw
   drawMaw(ctx, hx, hy + hr * 0.45, hr * 0.7, hr * 0.34, bone);
 
   return { x: hx, y: hy - hr * 0.25, r: hr * 0.62, front: true,
            body: { x: cx, y: (topY + baseY) / 2, w: segW * 2.4, h: (baseY - topY) * 0.5 } };
 }
 
-// Segmented arthropod — spider / scorpion / beetle: domed carapace, many splayed
-// legs, raised pincers + mandibles, optional stinger tail.
 function drawArthropod(ctx, g) {
   const { cx, ground, bulk, heavy, pal, rng } = g;
   const cy = ground - 24 * bulk;
   const bodyW = 20 * bulk * clamp(heavy, 0.8, 1.3), bodyH = 13 * bulk;
   const bone = pal.bone;
-  const legN = 3; // pairs
+  const legN = 3;
 
-  // Splayed legs (far + near) radiating from the thorax
   for (const s of [-1, 1]) {
     for (let i = 0; i < legN; i++) {
       const t = i / (legN - 1);
@@ -673,7 +563,6 @@ function drawArthropod(ctx, g) {
     }
   }
 
-  // Optional segmented stinger tail (scorpion) arching over the back
   if (rng.chance(0.5)) {
     let px = cx - bodyW * 0.7, py = cy - bodyH * 0.2;
     ctx.fillStyle = rgb(shade(pal.base, -0.02));
@@ -683,10 +572,9 @@ function drawArthropod(ctx, g) {
       ctx.beginPath(); ctx.arc((px + nx) / 2, (py + ny) / 2, 4 - i * 0.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       px = nx; py = ny;
     }
-    drawHorn(ctx, px, py, px + 6, py - 8, 2.5, rgb(bone)); // stinger
+    drawHorn(ctx, px, py, px + 6, py - 8, 2.5, rgb(bone));
   }
 
-  // Domed carapace (segmented)
   paintBody(ctx, pal, cy - bodyH, cy + bodyH, () => {
     ctx.beginPath(); ctx.ellipse(cx, cy, bodyW, bodyH, 0, 0, Math.PI * 2); ctx.closePath();
   });
@@ -697,12 +585,10 @@ function drawArthropod(ctx, g) {
     ctx.stroke();
   }
 
-  // Head + raised mandibles/pincers
   const hx = cx + bodyW * 0.85, hy = cy - bodyH * 0.2, hr = bodyH * 0.78;
   paintBody(ctx, pal, hy - hr, hy + hr, () => {
     ctx.beginPath(); ctx.ellipse(hx, hy, hr, hr * 0.9, 0, 0, Math.PI * 2); ctx.closePath();
   });
-  // Mandibles (bone hooks)
   ctx.fillStyle = rgb(bone);
   for (const s of [-1, 1]) {
     ctx.beginPath();
@@ -716,8 +602,6 @@ function drawArthropod(ctx, g) {
            body: { x: cx, y: cy, w: bodyW * 1.6, h: bodyH * 1.6 } };
 }
 
-// Hulking brute — golem / ogre: massive shoulders & arms, sunken head, stubby
-// legs, huge clawed fists, jagged horns. Maximum visual weight, front-facing.
 function drawBrute(ctx, g) {
   const { cx, ground, bulk, heavy, pal, rng } = g;
   const w = 24 * bulk * clamp(heavy, 0.9, 1.4);
@@ -726,13 +610,11 @@ function drawBrute(ctx, g) {
   const hipY = ground - 26 * bulk;
   const bone = pal.bone;
 
-  // Stubby legs
   fillLimb(ctx, pal, cx - w * 0.45, hipY, cx - w * 0.5, ground, 8 * heavy, 7);
   fillLimb(ctx, pal, cx + w * 0.45, hipY, cx + w * 0.5, ground, 8 * heavy, 7);
   drawClaws(ctx, cx - w * 0.5, ground, 3, 4, 5, rgb(bone));
   drawClaws(ctx, cx + w * 0.5, ground, 3, 4, 5, rgb(bone));
 
-  // Massive arms hanging to the ground, fists with claws
   for (const s of [-1, 1]) {
     const far = s < 0;
     const fistY = ground - 14;
@@ -743,7 +625,6 @@ function drawBrute(ctx, g) {
     drawClaws(ctx, cx + s * w * 1.05, fistY + 6 * heavy, 3, 5, 4, rgb(bone));
   }
 
-  // Torso — broad trapezoid, wider at the shoulders
   paintBody(ctx, pal, topY, hipY + 8, () => {
     ctx.beginPath();
     ctx.moveTo(cx - w, shY - 6);
@@ -752,22 +633,18 @@ function drawBrute(ctx, g) {
     ctx.quadraticCurveTo(cx, hipY + 16, cx - w * 0.6, hipY + 8);
     ctx.closePath();
   });
-  // Cracked plating lines (golem weight)
   ctx.strokeStyle = rgba(pal.dark, 0.5); ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.moveTo(cx - w * 0.5, shY + 6); ctx.lineTo(cx, shY + 18); ctx.lineTo(cx + w * 0.4, shY + 8);
   ctx.moveTo(cx, shY + 18); ctx.lineTo(cx, hipY); ctx.stroke();
 
-  // Sunken head between the shoulders
   const hr = w * 0.45;
   const hx = cx, hy = shY - 4;
   paintBody(ctx, pal, hy - hr, hy + hr, () => {
     ctx.beginPath(); ctx.ellipse(hx, hy, hr, hr * 0.95, 0, 0, Math.PI * 2); ctx.closePath();
   });
-  // Jagged horns
   for (const s of [-1, 1])
     drawHorn(ctx, hx + s * hr * 0.6, hy - hr * 0.5, hx + s * hr * 1.3, hy - hr * (1.4 + rng.float(0, 0.4)), 3.5, rgb(shade(pal.dark, -0.05)));
-  // Heavy underbite jaw with tusks
   drawMaw(ctx, hx, hy + hr * 0.5, hr * 0.55, hr * 0.26, bone, true);
 
   return { x: hx, y: hy - hr * 0.1, r: hr * 0.62, front: true,
@@ -778,7 +655,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
   const top = cy - bodyH;
   switch (ckey) {
     case "fire": {
-      // Flame spikes along the top
       const n = rng.int(3, 5);
       for (let i = 0; i < n; i++) {
         const fx = cx + (i - (n - 1) / 2) * (bodyW / n) * 1.4;
@@ -793,7 +669,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "water": {
-      // Side fins + tail
       ctx.fillStyle = rgb(shade(pal.accent, -0.02));
       for (const dir of [-1, 1]) {
         ctx.beginPath();
@@ -806,7 +681,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "nature": {
-      // Leaves sprouting from the top
       const n = rng.int(2, 4);
       ctx.fillStyle = rgb(shade(pal.accent, -0.05));
       for (let i = 0; i < n; i++) {
@@ -823,7 +697,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "dark": {
-      // Horns
       ctx.fillStyle = rgb(shade(pal.dark, -0.04));
       for (const dir of [-1, 1]) {
         const hx = cx + dir * bodyW * 0.45;
@@ -837,7 +710,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "light": {
-      // Halo / radiating rays behind body
       ctx.strokeStyle = rgba(pal.accent, 0.5);
       ctx.lineWidth = 3;
       const n = 10;
@@ -851,7 +723,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "air": {
-      // Soft translucent wings on each side
       ctx.fillStyle = rgba(shade(pal.accent, 0.08), 0.5);
       for (const dir of [-1, 1]) {
         ctx.beginPath();
@@ -864,7 +735,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "ice": {
-      // Sharp crystal shards along the top
       const n = rng.int(3, 5);
       ctx.fillStyle = rgba(shade(pal.accent, 0.12), 0.92);
       ctx.strokeStyle = rgb(pal.dark);
@@ -883,7 +753,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "earth": {
-      // Chunky rocks clustered at the lower sides
       ctx.fillStyle = rgb(shade(pal.dark, 0.05));
       ctx.strokeStyle = rgb(shade(pal.dark, -0.06));
       ctx.lineWidth = 2;
@@ -903,7 +772,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "electric": {
-      // Jagged lightning bolts above
       ctx.strokeStyle = rgb(shade(pal.accent, 0.1));
       ctx.lineWidth = 3;
       ctx.lineJoin = "round";
@@ -920,7 +788,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "poison": {
-      // Rising bubbles
       ctx.fillStyle = rgba(shade(pal.accent, 0.08), 0.7);
       ctx.strokeStyle = rgb(pal.dark);
       ctx.lineWidth = 1.5;
@@ -936,7 +803,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "arcane": {
-      // Orbiting motes on a tilted ring
       ctx.strokeStyle = rgba(pal.accent, 0.5);
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -953,7 +819,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "celestial": {
-      // Halo ring overhead + scattered sparkles
       ctx.strokeStyle = rgba(shade(pal.accent, 0.1), 0.75);
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -969,7 +834,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "metal": {
-      // Plated bumps with rivets
       ctx.fillStyle = rgb(shade(pal.accent, 0.05));
       ctx.strokeStyle = rgb(pal.dark);
       ctx.lineWidth = 2;
@@ -988,7 +852,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     case "chaos": {
-      // Asymmetric jagged spikes radiating out
       ctx.fillStyle = rgb(shade(pal.dark, -0.02));
       const n = rng.int(5, 8);
       for (let i = 0; i < n; i++) {
@@ -1007,7 +870,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
       break;
     }
     default: {
-      // Neutral / unknown — rounded ears
       ctx.fillStyle = rgb(pal.base);
       ctx.strokeStyle = rgb(pal.dark);
       ctx.lineWidth = 2;
@@ -1022,12 +884,6 @@ function drawThemeFeatures(ctx, ckey, pal, rng, cx, cy, bodyW, bodyH) {
 }
 
 
-// ─── Canvas backdrops (shared recursive tree helper + the two generators below) ───
-// Menu backdrop — shared atmospheric background for canvas menu scenes so they match the
-// HTML title's standard (dark gradient + faint glow + spirit motes + gnarled corner trees +
-// vignette); calm enough to keep UI readable. Combat arena backdrop (PV-T6) — atmospheric
-// duel stage: dark violet field, a central spirit glow behind the VS, glowing platform pads
-// under each combatant, side silhouettes, ground fog, motes and a vignette.
 function canvasTree(ctx, x, y, ang, len, w, depth) {
   if (depth <= 0 || len < 7) return;
   const x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;
@@ -1043,27 +899,22 @@ function canvasTree(ctx, x, y, ang, len, w, depth) {
 export function generateMenuBackground(w = 1280, h = 720) {
   const c = makeCanvas(w, h);
   const ctx = c.getContext("2d");
-  // Almost-black NEUTRAL charcoal vertical gradient (no blue tint).
   const g = ctx.createLinearGradient(0, 0, 0, h);
   g.addColorStop(0, "rgb(21,21,22)"); g.addColorStop(0.5, "rgb(12,12,12)"); g.addColorStop(1, "rgb(5,5,5)");
   ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
-  // Faint EMBER glow up top (behind headings) — subtle so text stays readable.
   const gl = ctx.createRadialGradient(w / 2, h * 0.12, 0, w / 2, h * 0.12, h * 0.6);
   gl.addColorStop(0, "rgba(240,90,60,0.10)"); gl.addColorStop(1, "rgba(240,90,60,0)");
   ctx.fillStyle = gl; ctx.fillRect(0, 0, w, h);
-  // Gnarled trees in the bottom corners (thick, dark — matches the title forest).
   canvasTree(ctx, w * 0.05, h + 8, -Math.PI / 2 + 0.16, h * 0.2, 30, 8);
   canvasTree(ctx, w * 0.95, h + 8, -Math.PI / 2 - 0.16, h * 0.2, 30, 8);
   canvasTree(ctx, w * 0.16, h + 8, -Math.PI / 2 + 0.08, h * 0.15, 20, 7);
   canvasTree(ctx, w * 0.84, h + 8, -Math.PI / 2 - 0.08, h * 0.15, 20, 7);
-  // Ember spirit-motes (warm, drifting embers).
   const rng = rngFor("menu-bg");
   for (let i = 0; i < 70; i++) {
     const x = rng.float(0, w), y = rng.float(0, h), r = rng.float(0.6, 1.8);
     ctx.fillStyle = `rgba(255,180,130,${rng.float(0.05, 0.3)})`;
     ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
-  // Vignette.
   const vg = ctx.createRadialGradient(w / 2, h / 2, h * 0.34, w / 2, h / 2, h * 0.9);
   vg.addColorStop(0, "rgba(4,3,7,0)"); vg.addColorStop(1, "rgba(3,3,5,0.8)");
   ctx.fillStyle = vg; ctx.fillRect(0, 0, w, h);

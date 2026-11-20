@@ -36,5 +36,5 @@ test("currentBundleHash: reads the loaded <script> via a doc-like stub; null whe
 test("initAutoReload: no-op (returns a stop fn) outside the browser", () => {
   const stop = initAutoReload({ getInRun: () => false });
   assert.equal(typeof stop, "function");
-  stop(); // must not throw
+  stop();
 });

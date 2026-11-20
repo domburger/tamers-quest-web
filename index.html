@@ -44,14 +44,12 @@
     }
     canvas { display:block; }
 
-    /* ─── Title screen (pure HTML/CSS/SVG, fills any resolution, no borders) ─── */
     #title{ position:fixed; inset:0; z-index:50; overflow:hidden;
       display:flex; flex-direction:column; align-items:center; justify-content:center;
       background:radial-gradient(130% 100% at 50% 36%, #161618 0%, #0b0b0c 48%, #050505 100%);
-      color:var(--ink); padding:max(env(safe-area-inset-top),20px) 20px calc(max(env(safe-area-inset-bottom),14px) + 44px); /* bottom: footer band (links at bottom:14px) + 30px gap, so the centred stage sits above the Privacy / How to Play / Pricing row on short phones */
+      color:var(--ink); padding:max(env(safe-area-inset-top),20px) 20px calc(max(env(safe-area-inset-bottom),14px) + 44px);
       transition:opacity .6s ease, visibility .6s ease; }
     #title.hidden{ opacity:0; visibility:hidden; pointer-events:none; }
-    /* vignette: darken toward the edges so the centred stage reads lit */
     #title::after{ content:""; position:absolute; inset:0; pointer-events:none; z-index:2;
       background:radial-gradient(120% 90% at 50% 45%, rgba(0,0,0,0) 40%, rgba(0,0,0,.35) 75%, rgba(0,0,0,.7) 100%); }
     #title .layer{ position:absolute; inset:0; pointer-events:none; }
@@ -82,7 +80,6 @@
     @keyframes spin{ to{ transform:rotate(360deg);} }
     @keyframes breathe{ 0%,100%{ transform:scale(1); opacity:.85;} 50%{ transform:scale(1.07); opacity:1;} }
 
-    /* scenery (fractal trees + ground) — strongest parallax */
     .scenery{ transform:translate(calc(var(--px)*1.3), calc(var(--py)*.6)); transition:transform .25s ease-out; }
     .scenery .treesvg{ position:absolute; inset:0; width:100%; height:100%; }
     .scenery .ground{ position:absolute; left:-2%; right:-2%; bottom:-1px; width:104%; height:auto; }
@@ -91,25 +88,17 @@
     @keyframes rise{ 0%{ transform:translateY(0) translateX(0); opacity:0;} 12%{opacity:.85;}
       100%{ transform:translateY(-106vh) translateX(var(--dx,0)); opacity:0;} }
 
-    /* Spirit wisps — a few larger, slow-wandering bioluminescent orbs hovering in the
-       background among the trees (the world's ambient "spirits"). Distinct from the
-       rising ember motes: bigger, softer, and they drift/breathe in place. */
     .wisp{ position:absolute; border-radius:50%; filter:blur(.5px); pointer-events:none;
       animation:wisp-float var(--fd,16s) ease-in-out infinite, wisp-glow var(--gd,5s) ease-in-out infinite; }
     @keyframes wisp-float{ 0%,100%{ transform:translate(0,0);} 25%{ transform:translate(16px,-20px);}
       50%{ transform:translate(-12px,-34px);} 75%{ transform:translate(-18px,-14px);} }
     @keyframes wisp-glow{ 0%,100%{ opacity:.10;} 50%{ opacity:var(--o,.42);} }
 
-    /* one-time "portal awakens" intro */
     .intro::after{ content:""; position:absolute; inset:0; background:radial-gradient(circle at 50% 38%, rgba(255,240,228,.55), transparent 46%); animation:flash 1s ease-out both; }
     .intro::before{ content:""; position:absolute; top:38%; left:50%; transform:translate(-50%,-50%); width:20px; height:20px; border-radius:50%; border:3px solid rgba(255,160,110,.85); animation:shock 1.3s cubic-bezier(.15,.7,.2,1) both; }
     @keyframes flash{ 0%{opacity:0;} 8%{opacity:1;} 100%{opacity:0;} }
     @keyframes shock{ 0%{ width:20px;height:20px;opacity:0;} 9%{opacity:.9;} 100%{ width:170vmax;height:170vmax;opacity:0;border-width:1px;} }
 
-    /* Scale-to-fit wrapper: the stage keeps its natural (design) proportions and
-       is uniformly scaled by JS so it always fits the viewport on any resolution
-       or aspect ratio — no clipping on short/landscape screens, no enlarging
-       past the design caps on huge ones. Composition stays identical everywhere. */
     .fit{ position:relative; z-index:3; transform-origin:center center; will-change:transform; }
     .stage{ position:relative; z-index:3; display:flex; flex-direction:column; align-items:center;
       gap:clamp(12px,2.2vh,26px); animation:risein 1.1s cubic-bezier(.2,.8,.2,1) both; }
@@ -145,29 +134,21 @@
     .hint{ font-family:var(--font-soft); color:#fff; opacity:.85; font-size:clamp(11px,1.5vh,14px); letter-spacing:.04em; margin-top:2px; animation:blink 2.4s ease-in-out infinite; }
     @keyframes blink{ 0%,100%{ opacity:.4;} 50%{ opacity:.95;} }
 
-    /* login placeholders */
     .logins{ display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:8px; }
     .sep{ font-family:var(--font-soft); color:#fff; opacity:.5; font-size:clamp(10px,1.4vh,13px); letter-spacing:.22em; margin-top:2px; }
     .btn.login{ font-family:var(--font-soft); font-weight:600; width:clamp(230px,32vh,320px); padding:11px 18px;
       font-size:clamp(13px,1.7vh,16px); background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.14); box-shadow:inset 0 1px 0 rgba(255,255,255,.1);
       display:flex; align-items:center; justify-content:center; gap:10px; }
     .btn.login:hover{ border-color:var(--teal); box-shadow:0 0 18px rgba(240,83,61,.18); background:rgba(255,255,255,.09); }
-    /* Brand/provider icons sit left of the label; pointer-events:none so the click
-       target is always the button (dataset.login) regardless of where you tap. */
     .btn.login svg{ width:18px; height:18px; flex:0 0 auto; pointer-events:none; }
     .btn.login span{ pointer-events:none; }
-    /* A provider the server reports as not-configured: dimmed + a "soon" tag, and the
-       hover lift is suppressed so it reads as inactive (clicking just toasts). */
     .btn.login.unavailable{ opacity:.5; }
     .btn.login.unavailable:hover{ border-color:rgba(255,255,255,.14); box-shadow:none; background:rgba(255,255,255,.05); transform:none; }
     .btn.login .soon{ pointer-events:none; font-size:.68em; opacity:.75; letter-spacing:.12em; }
-    /* "Stay signed in" — a remember-me toggle shared by all three login methods. */
     .stay{ display:flex; align-items:center; gap:8px; margin-top:8px; cursor:pointer; user-select:none;
       font-family:var(--font-soft); font-size:clamp(12px,1.6vh,14px); color:#fff; opacity:.82; transition:opacity .2s; }
     .stay:hover{ opacity:1; }
     .stay input{ width:16px; height:16px; accent-color:var(--teal); cursor:pointer; }
-    /* Resume state: a returning logged-in player (or an in-flight OAuth round-trip) skips the
-       login UI — show a quiet "signing you in" line instead of flashing the buttons during load. */
     .resume-note{ display:none; flex-direction:column; align-items:center; gap:14px; margin-top:14px;
       font-family:var(--font-soft); color:#fff; }
     .resume-note .spin{ width:34px; height:34px; border-radius:50%;
@@ -175,14 +156,12 @@
     .resume-note span{ letter-spacing:.06em; font-size:clamp(13px,1.8vh,16px); opacity:.92; }
     #title.resuming .actions{ display:none; }
     #title.resuming .resume-note{ display:flex; }
-    /* Already signed in on this device: swap the guest/login menu for "Enter as <name>" + "Log out". */
     .returning{ display:none; flex-direction:column; align-items:center; gap:8px; margin-top:2px; }
     .returning .who{ font-family:var(--font-soft); color:#fff; opacity:.6; font-size:clamp(10px,1.4vh,13px);
       letter-spacing:.2em; }
     #logoutBtn{ width:auto; padding:9px 20px; font-size:clamp(12px,1.6vh,14px); }
     #title.signed-in #guestBtn, #title.signed-in .logins{ display:none; }
     #title.signed-in .returning{ display:flex; }
-    /* toast */
     #toast{ position:fixed; left:50%; bottom:34px; z-index:60; font-family:var(--font-soft); color:#fff;
       background:rgba(35,28,24,.96); border:1px solid rgba(255,255,255,.12); border-radius:12px; padding:10px 16px;
       font-size:14px; opacity:0; pointer-events:none; transform:translateX(-50%) translateY(12px); transition:opacity .25s ease, transform .25s ease; }
@@ -219,7 +198,7 @@
     .leaderboard ol{ list-style:none; display:flex; flex-direction:column; gap:5px; }
     .leaderboard li{ display:flex; justify-content:space-between; gap:14px; color:#fff; }
     .leaderboard li span:last-child{ color:var(--teal-bright); font-weight:700; }
-    .version{ position:absolute; right:max(16px,env(safe-area-inset-right)); bottom:calc(max(14px,env(safe-area-inset-bottom)) + 20px); z-index:4; font-family:var(--font-soft); color:#fff; font-size:11px; opacity:.45; } /* sits ABOVE the Pricing link (both were pinned to the same bottom-right spot and overprinted) */
+    .version{ position:absolute; right:max(16px,env(safe-area-inset-right)); bottom:calc(max(14px,env(safe-area-inset-bottom)) + 20px); z-index:4; font-family:var(--font-soft); color:#fff; font-size:11px; opacity:.45; }
     .legal{ position:absolute; left:max(16px,env(safe-area-inset-left)); bottom:max(14px,env(safe-area-inset-bottom)); z-index:5; font-family:var(--font-soft); color:#fff; font-size:12px; opacity:.55; text-decoration:none; }
     .legal:hover{ opacity:.95; text-decoration:underline; }
 
@@ -229,7 +208,6 @@
   </style>
 </head>
 <body>
-  <!-- ─── Animated HTML title (game elements, any resolution, no borders) ─── -->
   <div id="title">
     <div class="layer rays" aria-hidden="true"></div>
     <div class="layer fog" aria-hidden="true"><div class="fb fb1"></div><div class="fb fb2"></div></div>
@@ -258,27 +236,22 @@
         style="width:clamp(130px,19vh,210px);height:auto;filter:drop-shadow(0 12px 28px rgba(0,0,0,.6))">
         <defs><filter id="eglow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3"/></filter></defs>
         <ellipse cx="104" cy="288" rx="66" ry="9" fill="rgba(0,0,0,.5)"/>
-        <!-- lower cloak + tattered hem -->
         <ellipse cx="104" cy="188" rx="72" ry="98" fill="#181522"/>
         <g fill="#0e0c16">
           <rect x="44" y="250" width="22" height="30" rx="4"/><rect x="70" y="250" width="22" height="40" rx="4"/>
           <rect x="96" y="250" width="22" height="46" rx="4"/><rect x="122" y="250" width="22" height="40" rx="4"/>
           <rect x="148" y="250" width="22" height="30" rx="4"/>
         </g>
-        <!-- shoulders + cool rim light -->
         <ellipse cx="104" cy="120" rx="60" ry="66" fill="#181522"/>
         <ellipse cx="58" cy="128" rx="14" ry="74" fill="#f0533d" opacity=".16"/>
-        <!-- pointed hood -->
         <ellipse cx="104" cy="66" rx="54" ry="60" fill="#181522"/>
         <ellipse cx="104" cy="36" rx="33" ry="38" fill="#181522"/>
         <ellipse cx="80" cy="60" rx="14" ry="42" fill="#f0533d" opacity=".14"/>
-        <!-- shadowed face + glowing teal eyes -->
         <ellipse cx="104" cy="80" rx="32" ry="38" fill="#0c0a14"/>
         <g class="glow" style="transform-origin:104px 80px;animation:breathe 3s ease-in-out infinite">
           <circle cx="92" cy="80" r="8" fill="#ffd6c2" filter="url(#eglow)"/><circle cx="116" cy="80" r="8" fill="#ffd6c2" filter="url(#eglow)"/>
         </g>
         <circle cx="92" cy="80" r="6" fill="#fff0e8"/><circle cx="116" cy="80" r="6" fill="#fff0e8"/>
-        <!-- spirit-chain held to the side -->
         <path d="M150 150 L188 176" stroke="#181522" stroke-width="14" stroke-linecap="round"/>
         <g class="glow" style="transform-origin:188px 176px;animation:breathe 3.4s ease-in-out infinite">
           <circle cx="188" cy="176" r="44" fill="#f0533d" opacity=".12"/><circle cx="188" cy="176" r="30" fill="#f0533d" opacity=".2"/>
@@ -342,13 +315,9 @@
     </div>
   </div>
 
-  <!-- Native "Tamer's Account" email/password sign-in / sign-up (AUTH-T3). Posts to
-       /auth/{login,signup}; the toggle switches modes. Reuses the guest-modal styles. -->
   <div id="acct-modal" class="guest-modal" aria-hidden="true">
     <div class="guest-card">
       <h2 id="acct-title">Tamer's Account</h2>
-      <!-- Username: shown only when creating an account (the name other tamers see). Optional —
-           blank falls back to the email handle, which you can rename later in your profile. -->
       <input id="acct-username" type="text" maxlength="24" placeholder="Username" autocomplete="off"
         autocapitalize="words" autocorrect="off" enterkeyhint="next" style="display:none" />
       <input id="acct-email" type="email" placeholder="Email" autocomplete="email" autocapitalize="off" autocorrect="off" enterkeyhint="next" />
@@ -363,9 +332,6 @@
     </div>
   </div>
 
-  <!-- First-login username prompt (user request 2026-06-10): after a BRAND-NEW Google/Discord
-       sign-in (?new=1) the player picks the name other tamers will see, instead of being
-       auto-named from their email. POSTs to /account/username with the account session header. -->
   <div id="uname-modal" class="guest-modal" aria-hidden="true">
     <div class="guest-card">
       <h2>Choose your name</h2>
@@ -379,8 +345,6 @@
     </div>
   </div>
 
-  <!-- Password reset (TQ-59): the emailed /?reset=<token> link lands here to set a new password.
-       POSTs {token,password} to /auth/reset-password; the server consumes the single-use token. -->
   <div id="reset-modal" class="guest-modal" aria-hidden="true">
     <div class="guest-card">
       <h2>Set a new password</h2>
@@ -394,15 +358,8 @@
     </div>
   </div>
 
-
   <script>
-    // ── Smooth resume: decide SYNCHRONOUSLY (before the heavy async game boot) whether this load
-    // is a returning logged-in player or an OAuth return, and if so swap the title into a quiet
-    // "Signing you in…" state. Without this the login buttons flash for the whole asset load and
-    // then jump to character-select — the "weird / laggy login" the player saw. ──
-    // Is there a live, signed-in account on this device? Mirrors the boot logic in main.js
-    // (skip guests; honor "Stay signed in" — an ephemeral session whose browser-session sentinel
-    // is gone is treated as signed out). Returns the profile when signed in, else null.
+    // Mirrors the signed-in check in src/main.js boot; change both.
     function signedInProfile(){
       try{
         const prof=JSON.parse(localStorage.getItem("tamers_quest_save")||"{}").profile;
@@ -411,8 +368,6 @@
         return prof;
       }catch{ return null; }
     }
-    // Show the "Enter as <name> / Log out" panel for a returning signed-in player, else the
-    // normal guest/login menu. Re-run whenever we land back on the title (boot, Back, sign out).
     function syncSignedIn(){
       const t=document.getElementById("title"); if(!t) return false;
       const prof=signedInProfile();
@@ -434,15 +389,13 @@
       const t=document.getElementById("title"); if(!t) return;
       try{
         const q=new URLSearchParams(location.search);
-        if(q.get("token")||q.get("acct")){ window.__tqAuthPending=true; t.classList.add("resuming"); return; } // OAuth round-trip completing
+        if(q.get("token")||q.get("acct")){ window.__tqAuthPending=true; t.classList.add("resuming"); return; }
       }catch{}
-      // A returning signed-in player gets the "Enter as … / Log out" choice (no auto-skip, no spinner).
       try{ syncSignedIn(); }catch{}
     })();
 
     (function(){
       const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-      // Rising embers.
       const m = document.getElementById("motes");
       const emberCols = ["#FF7A52","#FF7A52","#FF7A52","#E0A85C","#E8B25E"];
       for (let i=0;i<38;i++){
@@ -453,8 +406,6 @@
         m.appendChild(d);
       }
 
-      // Spirit wisps — a few slow, glowing orbs drifting among the trees (ambient
-      // world spirits). Skipped under reduce-motion, like the embers.
       const w = document.getElementById("wisps");
       if (w && !reduce){
         const wispCols=["#FF7A52","#E8B25E","#F0533D"];
@@ -472,7 +423,6 @@
         }
       }
 
-      // ── Fractal trees: recursive gnarled branching (an L-system-style tree) ──
       const NS="http://www.w3.org/2000/svg";
       function buildTrees(){
         const svg=document.getElementById("treesvg"); if(!svg) return;
@@ -494,7 +444,6 @@
             grow(x2,y2,a,len*(0.72+Math.random()*0.13),w*0.74,depth-1);
           }
         }
-        // Full-width jagged ground (covers the entire page width on any desktop).
         const gy = H * 0.9; let gd = `M0 ${H} L0 ${gy.toFixed(0)}`;
         const segs = Math.max(24, Math.round(W / 70));
         for (let i = 0; i <= segs; i++) {
@@ -506,8 +455,6 @@
         const ground = document.createElementNS(NS, "path");
         ground.setAttribute("d", gd); ground.setAttribute("fill", "#070510"); frag.appendChild(ground);
 
-        // Massive gnarled "scary dark-forest" trees — 2-3x thicker, randomized
-        // position / size / lean so no two title loads look the same.
         const L = Math.min(H * 0.24, 260), R = gy + 6;
         const defs = [[0.05, 150], [0.95, 150], [0.17, 116], [0.83, 116], [0.30, 86], [0.70, 86], [0.42, 60], [0.58, 60]];
         for (const [fx0, bw] of defs) {
@@ -526,15 +473,12 @@
       }
       buildTrees();
 
-      // ── Scale-to-fit: uniformly scale the stage so it always fits the viewport
-      // at its natural proportions (never clips on short/landscape screens, never
-      // grows past the design caps on large ones) → identical layout everywhere. ──
       function fitStage(){
         const fit=document.getElementById("fit"); if(!fit) return;
-        fit.style.transform="scale(1)";                 // measure at natural size
+        fit.style.transform="scale(1)";
         const stage=fit.firstElementChild; if(!stage) return;
         const sh=stage.offsetHeight, sw=stage.offsetWidth; if(!sh||!sw) return;
-        const availH=innerHeight-Math.max(84, (innerHeight*0.04)+44); // breathing room + the fixed footer band (Privacy · Terms / How to Play / Pricing) so the stage's last row never lands on it
+        const availH=innerHeight-Math.max(84, (innerHeight*0.04)+44);
         const availW=innerWidth-32;
         const k=Math.min(1, availH/sh, availW/sw);
         fit.style.transform=`scale(${k.toFixed(4)})`;
@@ -545,7 +489,6 @@
       let rt; addEventListener("resize", ()=>{ clearTimeout(rt); rt=setTimeout(()=>{ buildTrees(); fitStage(); }, 220); fitStage(); }, {passive:true});
       window.__fitStage=fitStage;
 
-      // Parallax depth.
       if(!reduce && matchMedia("(pointer:fine)").matches){
         const root=document.documentElement;
         addEventListener("pointermove",(ev)=>{
@@ -556,41 +499,33 @@
     })();
 
     function launch(dest){
-      window.__tqAuthPending=false; // any navigation away ends the resume/auth-return window
-      // The player chose to leave the title. If they clicked DURING boot (before window.tqGo exists),
-      // tqGo is queued below; this flag tells the boot (main.js) and the tq:title handler NOT to re-show
-      // the title over the pending navigation — the cause of the "have to click Enter twice" bug.
-      window.__tqLaunching=true;
+      window.__tqAuthPending=false;
+      window.__tqLaunching=true; // read by main.js: never re-show the title over a pending tqGo
       const t=document.getElementById("title"); if(t) t.classList.add("hidden");
       const tryGo=()=>{ if(window.tqGo){ window.tqGo(dest); window.__tqLaunching=false; } else { setTimeout(tryGo,80); } };
       tryGo();
     }
     document.querySelectorAll("#title [data-go]").forEach(b=>b.addEventListener("click",()=>launch(b.dataset.go)));
 
-    // ── "Stay signed in" preference (remember-me), shared by all three login methods. Persisted so
-    // it also survives the OAuth redirect round-trip (the checkbox state is gone after the reload). ──
     const STAY_KEY="tq_stay_signed_in";
     const stayBox=document.getElementById("stay-signed");
     function stayPref(){ try{ const v=localStorage.getItem(STAY_KEY); return v===null ? true : v==="1"; }catch{ return true; } }
     if(stayBox){ stayBox.checked=stayPref(); stayBox.addEventListener("change",()=>{ try{ localStorage.setItem(STAY_KEY, stayBox.checked?"1":"0"); }catch{} }); }
 
-    // ── Play as guest: nickname → guest profile (isGuest) → character select ──
     const guestModal=document.getElementById("guest-modal");
     const guestNick=document.getElementById("guest-nick");
     function openGuest(){
       if(!guestModal) return;
       guestNick.value=""; guestModal.classList.add("show");
-      // Focus IN-GESTURE (synchronously inside the tap handler) so the iOS soft
-      // keyboard opens — a deferred focus won't (PT1-T03).
       try{ guestNick.focus(); }catch{}
     }
     function closeGuest(){ if(guestModal) guestModal.classList.remove("show"); }
     function guestEnter(){
       const v=(guestNick.value||"").trim();
       if(!v){ guestNick.focus(); return; }
-      if(window.tqGuest) window.tqGuest(v);   // mark local profile guest + nickname
+      if(window.tqGuest) window.tqGuest(v);
       closeGuest();
-      launch("characterSelect");              // both title paths land in character select
+      launch("characterSelect");
     }
     document.getElementById("guestBtn")?.addEventListener("click", openGuest);
     document.getElementById("guest-go")?.addEventListener("click", guestEnter);
@@ -599,10 +534,8 @@
       if(e.key==="Enter"){ e.preventDefault(); guestEnter(); }
       else if(e.key==="Escape"){ e.preventDefault(); closeGuest(); }
     });
-    guestModal?.addEventListener("click",(e)=>{ if(e.target===guestModal) closeGuest(); }); // tap-outside
+    guestModal?.addEventListener("click",(e)=>{ if(e.target===guestModal) closeGuest(); });
 
-    // ── Returning signed-in player: "Enter as <name>" resumes that account; "Log out" clears the
-    // local session and reveals the normal guest/login menu (no reload needed). ──
     document.getElementById("enterBtn")?.addEventListener("click", ()=>launch("characterSelect"));
     document.getElementById("logoutBtn")?.addEventListener("click", ()=>{
       const doSignOut=()=>{ if(window.tqSignOut){ window.tqSignOut(); } else { setTimeout(doSignOut,80); return; } };
@@ -612,26 +545,15 @@
       showToast("Signed out.");
     });
 
-    // Toast (login errors / status).
     let toastT; function showToast(msg){ const t=document.getElementById("toast"); if(!t) return;
       t.textContent=msg; t.classList.add("show"); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove("show"),2600); }
 
-    // ── Login (AUTH-T2/T3): OAuth providers redirect to the server's /auth/<p> (302 →
-    // consent → /?token=…); "Tamer's Account" opens a native email/password form
-    // posting to /auth/{login,signup}. All three backends are live. On success we
-    // store the returned session token and route to character select (same as guest). ──
-    // Provider availability: the server only enables an OAuth provider when its client
-    // id + secret are set in env. Probe /auth/providers so an unconfigured provider's
-    // button is marked unavailable UP FRONT (a clear state) instead of only finding out
-    // after a redirect round-trip. Native "Tamer's Account" needs no external creds, so
-    // it's always available. Fail-open: if the probe fails we leave the buttons active
-    // (the server still redirects to /?login=unavailable as the backstop).
     const providerOf = { Google:"google", Discord:"discord" };
     const providerAvail = { google:true, discord:true };
     function applyProviderAvail(){
       document.querySelectorAll("#title [data-login]").forEach(b=>{
         const key=providerOf[b.dataset.login];
-        if(!key) return; // native account — always on
+        if(!key) return;
         const ok = providerAvail[key] !== false;
         b.classList.toggle("unavailable", !ok);
         b.setAttribute("aria-disabled", ok ? "false" : "true");
@@ -643,7 +565,7 @@
     fetch("/auth/providers",{headers:{Accept:"application/json"}})
       .then(r=>r.ok?r.json():null)
       .then(d=>{ if(d&&Array.isArray(d.providers)){ providerAvail.google=d.providers.includes("google"); providerAvail.discord=d.providers.includes("discord"); applyProviderAvail(); } })
-      .catch(()=>{}); // fail-open: keep buttons active if the probe can't be reached
+      .catch(()=>{});
 
     document.querySelectorAll("#title [data-login]").forEach(b=>b.addEventListener("click",()=>{
       const which=b.dataset.login;
@@ -651,7 +573,7 @@
       if(key && providerAvail[key]===false){ showToast("That sign-in option isn't available yet."); return; }
       if(which==="Google") location.href="/auth/google";
       else if(which==="Discord") location.href="/auth/discord";
-      else openAccount(); // "Tamer's Account" → native email/password
+      else openAccount();
     }));
 
     const acctModal=document.getElementById("acct-modal");
@@ -659,14 +581,14 @@
     const acctEmail=document.getElementById("acct-email");
     const acctPass=document.getElementById("acct-pass");
     const acctErr=document.getElementById("acct-err");
-    let acctMode="login"; // "login" | "signup"
+    let acctMode="login";
     function setAcctMode(m){ acctMode=m; acctErr.textContent="";
       document.getElementById("acct-title").textContent = m==="login" ? "Tamer's Account" : "Create your account";
       document.getElementById("acct-go").textContent = m==="login" ? "Sign in" : "Create account";
       document.getElementById("acct-toggle").textContent = m==="login" ? "Create an account" : "Have an account? Sign in";
       acctPass.setAttribute("autocomplete", m==="login" ? "current-password" : "new-password");
-      if(acctUsername) acctUsername.style.display = m==="signup" ? "" : "none"; // username only when creating
-      const af=document.getElementById("acct-forgot"); if(af) af.style.display = m==="login" ? "" : "none"; // forgot only when signing in (TQ-59)
+      if(acctUsername) acctUsername.style.display = m==="signup" ? "" : "none";
+      const af=document.getElementById("acct-forgot"); if(af) af.style.display = m==="login" ? "" : "none";
     }
     function openAccount(){ if(!acctModal) return; if(acctUsername) acctUsername.value=""; acctEmail.value=""; acctPass.value=""; setAcctMode("login"); acctModal.classList.add("show"); try{acctEmail.focus();}catch{} }
     function closeAccount(){ if(acctModal) acctModal.classList.remove("show"); }
@@ -680,8 +602,6 @@
         const r=await fetch("/auth/"+(acctMode==="signup"?"signup":"login"),{
           method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)});
         const data=await r.json().catch(()=>({}));
-        // Success returns an account session; a fresh account has NO token yet (no characters —
-        // the player creates one in character-select), so accept an accountSession with no token.
         if(r.ok && (data.token || data.accountSession)){
           if(window.tqAuthed) window.tqAuthed(data.token||undefined, username||email.split("@")[0], data.accountSession, stayPref());
           closeAccount(); launch("characterSelect");
@@ -698,17 +618,15 @@
     acctModal?.addEventListener("click",(e)=>{ if(e.target===acctModal) closeAccount(); });
     [acctUsername,acctEmail,acctPass].forEach(el=>el?.addEventListener("keydown",(e)=>{
       if(e.key==="Enter"){ e.preventDefault(); acctSubmit(); } else if(e.key==="Escape"){ e.preventDefault(); closeAccount(); } }));
-    // Forgot password (TQ-59): email a single-use reset link. Neutral reply — never reveals whether
-    // the email has an account (no enumeration; the server always 200s and no-ops unknown emails).
     document.getElementById("acct-forgot")?.addEventListener("click", async ()=>{
       const email=(acctEmail.value||"").trim();
       if(!email){ acctErr.textContent="Enter your email above, then tap Forgot password."; try{acctEmail.focus();}catch{} return; }
       acctErr.textContent="Sending…";
       try{ await fetch("/auth/forgot-password",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({email}) }); }catch{}
+      // Neutral reply: never reveal whether the email has an account.
       acctErr.textContent="If that email has an account, we've sent a reset link. Check your inbox.";
     });
 
-    // ── First-login username prompt (OAuth ?new=1) ──
     const unameModal=document.getElementById("uname-modal");
     const unameInput=document.getElementById("uname-input");
     const unameErr=document.getElementById("uname-err");
@@ -726,7 +644,6 @@
             headers:{ "Content-Type":"application/json", "x-account-session":session },
             body:JSON.stringify({ name }) });
           if(r.ok){
-            // Persist the chosen name on the local profile so the indicator shows it immediately.
             try{ if(window.tqSetNickname) window.tqSetNickname(name); }catch{}
             unameModal.classList.remove("show"); launch("characterSelect");
           } else {
@@ -740,28 +657,20 @@
       unameInput.onkeydown=(e)=>{ if(e.key==="Enter"){ e.preventDefault(); submit(); } };
     }
 
-    // Server redirect after an OAuth round-trip: /?token=… (success) or
-    // /?login=failed|unavailable. Scrub the query, then store the token + route.
     (function handleAuthReturn(){
       const q=new URLSearchParams(location.search);
       const token=q.get("token"), acct=q.get("acct"), li=q.get("login"), isNew=q.get("new")==="1";
       if(!token && !acct && !li) return;
-      history.replaceState(null,"",location.pathname); // never leave the token in the URL/history
-      // A successful sign-in returns an account session (acct) and, for a returning account, a
-      // character token. A BRAND-NEW account comes back with acct but NO token (it has no
-      // characters yet — the player creates one in character-select); accept that too. `new=1`
-      // (first OAuth login) → prompt for a username before character-select.
+      history.replaceState(null,"",location.pathname);
       if(token || acct){ window.__tqAuthPending=true; const t0=document.getElementById("title"); if(t0) t0.classList.add("resuming"); const keep=stayPref(); const apply=()=>{ if(window.tqAuthed){ window.tqAuthed(token||undefined, undefined, acct, keep); if(isNew && acct) openUsername(acct); else launch("characterSelect"); } else setTimeout(apply,80); }; apply(); }
       else showToast(li==="unavailable" ? "That sign-in option isn't available yet." : "Sign-in failed — please try again.");
     })();
 
-    // Password reset landing (TQ-59): the emailed /?reset=<token> link → "set a new password" form,
-    // which POSTs {token,password} to /auth/reset-password (server consumes the single-use token).
     (function handleResetReturn(){
       const resetModal=document.getElementById("reset-modal");
       const token=new URLSearchParams(location.search).get("reset");
       if(!token || !resetModal) return;
-      history.replaceState(null,"",location.pathname); // never leave the token in the URL/history
+      history.replaceState(null,"",location.pathname);
       const rPass=document.getElementById("reset-pass"), rErr=document.getElementById("reset-err"), rGo=document.getElementById("reset-go");
       resetModal.classList.add("show"); try{ rPass.focus(); }catch{}
       async function submit(){
@@ -785,15 +694,13 @@
 
     addEventListener("keydown",(e)=>{
       const t=document.getElementById("title"); if(!t || t.classList.contains("hidden")) return;
-      if(guestModal && guestModal.classList.contains("show")) return; // modal input handles keys
-      if(e.key==="Enter") openGuest(); // Enter on the title starts the guest flow
+      if(guestModal && guestModal.classList.contains("show")) return;
+      if(e.key==="Enter") openGuest();
     });
     window.addEventListener("tq:title", ()=>{
-      if(window.__tqLaunching) return; // a launch is mid-flight (clicked during boot) — don't re-show the title over it
-      const t=document.getElementById("title"); if(!t) return; t.style.display=""; t.classList.remove("hidden"); // clear the stay-logged-in display:none on Back
-      // Restore the login UI when genuinely back on the title (Back / Sign out), but keep the
-      // "Signing you in…" resume state while a sign-in round-trip is still completing.
-      if(!window.__tqAuthPending){ t.classList.remove("resuming"); try{ syncSignedIn(); }catch{} } // re-show "Enter as …" if still signed in, else the login menu
+      if(window.__tqLaunching) return;
+      const t=document.getElementById("title"); if(!t) return; t.style.display=""; t.classList.remove("hidden");
+      if(!window.__tqAuthPending){ t.classList.remove("resuming"); try{ syncSignedIn(); }catch{} }
       const old=t.querySelector(".intro"); if(old){ const n=old.cloneNode(false); old.replaceWith(n); }
       if(window.__fitStage) window.__fitStage();
     });

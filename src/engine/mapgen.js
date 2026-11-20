@@ -11,15 +11,6 @@ const NUM_BIOMES = 10;
 const SMOOTHING_PASSES = 3;
 const MONSTER_DENSITY = 0.005;
 
-// Biomes are PURELY VISUAL/region markers now. Movement is the SAME speed
-// everywhere — the old per-biome `speedMult` (terrain that sped you up / dragged
-// you down) was removed 2026-06-09 (user: "remove movement speed modifiers from
-// tiles and biomes"). Biome assignment stays seeded + deterministic.
-//
-// `tint` (PT1-T07) is a representative RGB per biome so the minimap reads as
-// REAL, distinguishable biome regions (forest=green, desert=sand, water=blue, …)
-// instead of the muddy per-tile averages that all looked "green". Static +
-// deterministic, so SP and MP minimaps can blend it in identically.
 export const BIOME_DEFS = [
   { name: "Forest", rarity: 30, size: 80, tint: [60, 120, 64] },
   { name: "Plains", rarity: 40, size: 60, tint: [150, 168, 82] },
@@ -35,15 +26,6 @@ export const BIOME_DEFS = [
   { name: "Crystal", rarity: 60, size: 50, tint: [104, 206, 210] },
 ];
 
-// TQ-441: never-empty TILE safety net (parity with the zero-biome net added in TQ-438). AI-content-only
-// prod loads no seed tiles (groundTiles = []), so a DB with ZERO generated tiles would otherwise leave
-// every map cell null → an all-void, unplayable round. When getGroundTiles() is empty, generateMap falls
-// back to this tiny default set so the floor is always playable until generated tiles exist. It is a
-// shared module const (server + every client import the same values), and only kicks in when BOTH sides
-// have zero tiles — so the server and client regenerate the IDENTICAL map for a seed (MP-determinism is
-// preserved). Plain procedural tiles (no `html`) → tiles.js paints the base colour + grain. Negative ids
-// can't collide with real (positive) DB tile ids. biome:"" means they're used via the global allTiles
-// fallback path in fillMapWithTiles (no per-biome match needed).
 export const DEFAULT_TILES = [
   { id: -901, name: "default-floor-a", biome: "", collidable: 0, rarity: 10, colorProfile_full_r: 78, colorProfile_full_g: 74, colorProfile_full_b: 90 },
   { id: -902, name: "default-floor-b", biome: "", collidable: 0, rarity: 10, colorProfile_full_r: 68, colorProfile_full_g: 66, colorProfile_full_b: 82 },
@@ -51,32 +33,10 @@ export const DEFAULT_TILES = [
   { id: -904, name: "default-wall", biome: "", collidable: 1, rarity: 10, colorProfile_full_r: 46, colorProfile_full_g: 42, colorProfile_full_b: 56 },
 ];
 
-/**
- * Representative minimap RGB for the biome under a tile coord, or null. The
- * biomeMap cell IS one of the BIOME_DEFS objects (see generateBiomesVoronoi), so
- * the tint rides along — pure lookup, shared by the SP + MP minimaps.
- * @param {{biomeMap?:Array}} map  a generateMap() result
- * @param {number} tx @param {number} ty  tile coords
- * @returns {?number[]} [r,g,b] or null
- */
 export function biomeTintAt(map, tx, ty) {
   return map?.biomeMap?.[tx]?.[ty]?.tint ?? null;
 }
 
-/**
- * Is the world-space point (x, y) walkable? TQ-360: walkability is driven by the
- * tile's `collidable` flag ALONE — every cell now carries a tile (collidable=1 =
- * impassable boundary, the former "void"; collidable=0 = walkable floor), so a
- * present non-collidable tile is walkable and everything else (collidable tile, or
- * off-grid where there is no tile) is a wall. Equivalent to the old voidMap+!collidable
- * rule (former-void cells are collidable=1), but expressed purely via the tile.
- * Shared collision rule: the server (tickRound), the SP client, and the MP client's
- * movement prediction all consume this so they agree on where walls are (no
- * "invisible wall" / "walk on water" drift). Null map → walkable (map still loading).
- * @param {{tileMap?:Array}} map  a generateMap() result
- * @param {number} x @param {number} y  world px
- * @returns {boolean}
- */
 export function isWalkable(map, x, y) {
   if (!map?.tileMap) return true;
   const E = GAME.EFFECTIVE_TILE;
@@ -85,21 +45,6 @@ export function isWalkable(map, x, y) {
   return !!tile && !tile.collidable;
 }
 
-/**
- * TQ-499: per-axis "can the body's leading EDGE move to this point" test — the slide-safe corner guard.
- * The bare per-axis collision (isWalkable at the leading-edge MIDPOINT only) modelled the body as a 1-px
- * probe, so when moving alongside a wall the body's perpendicular CORNERS could poke into an adjacent
- * wall cell the midpoint missed (the "glitching into walls" report) — and the local prediction + the
- * server both did it, so it wasn't a desync, it was a real geometry gap on BOTH sides. These sample the
- * leading edge across the body's perpendicular extent (midpoint + both ±R ends), so a corner can't enter
- * a wall. Slide-safe: the leading coordinate is kept inside the walkable column by the move clamp, so a
- * flat wall never false-blocks — only a real protrusion into the body's width (or a true corner) stops
- * you. Shared so the MP client prediction (onlineGame), the server player tick, and the server monster
- * chaser all use ONE identical rule and stay in lockstep. R = GAME.PLAYER_RADIUS.
- *
- *   edgeClearX — an X move: the VERTICAL leading edge at world-x `ex` must be clear across y±R.
- *   edgeClearY — a Y move: the HORIZONTAL leading edge at world-y `ey` must be clear across x±R.
- */
 export function edgeClearX(map, ex, y, R) {
   return isWalkable(map, ex, y) && isWalkable(map, ex, y - R) && isWalkable(map, ex, y + R);
 }
@@ -107,21 +52,8 @@ export function edgeClearY(map, x, ey, R) {
   return isWalkable(map, x, ey) && isWalkable(map, x - R, ey) && isWalkable(map, x + R, ey);
 }
 
-/**
- * Corner forgiveness: how far (px) a straight move may be nudged sideways to slip past a wall CORNER that
- * catches the edge of the body. Without it, walking along a corridor a few px off-centre stopped dead on
- * every protruding tile corner (80px tiles, 26px body) — the full-edge guard (TQ-499) is correct but harsh.
- */
 export const CORNER_SLIP = 10;
 
-/**
- * ONE body movement step — shared by the server player tick and the MP client prediction so they stay in
- * lockstep. (dx, dy) is the direction (already diagonal-normalised), `dist` the distance this step, R the
- * body radius, maxXY the play-area bound (0 = unknown → lower bound only). Per-axis (slide along walls) with
- * the leading-edge guard; a SINGLE-axis move blocked only by a corner within CORNER_SLIP px is nudged
- * sideways (at most `dist` per step) toward the clear side instead of stopping. Returns
- * { x, y, blocked } — blocked = the input made no progress at all (a flat wall, not a slip).
- */
 export function stepBody(map, x, y, dx, dy, dist, R, maxXY = 0) {
   const clamp = (v) => (maxXY ? Math.min(maxXY, Math.max(0, v)) : Math.max(0, v));
   const nx = clamp(x + dx * dist), ny = clamp(y + dy * dist);
@@ -130,29 +62,21 @@ export function stepBody(map, x, y, dx, dy, dist, R, maxXY = 0) {
   const clearY = edgeClearY(map, x, ny + Math.sign(dy) * R, R);
   if (clearY) y = ny;
   let slipped = false;
-  if (dx && !dy && !clearX) { // horizontal move blocked → try a small vertical nudge
+  if (dx && !dy && !clearX) {
     const s = slipShift((o) => edgeClearX(map, nx + Math.sign(dx) * R, y + o, R) && edgeClearY(map, x, y + o + Math.sign(o) * R, R));
     if (s) { y = clamp(y + Math.sign(s) * Math.min(dist, Math.abs(s))); slipped = true; }
-  } else if (dy && !dx && !clearY) { // vertical move blocked → try a small horizontal nudge
+  } else if (dy && !dx && !clearY) {
     const s = slipShift((o) => edgeClearY(map, x + o, ny + Math.sign(dy) * R, R) && edgeClearX(map, x + o + Math.sign(o) * R, y, R));
     if (s) { x = clamp(x + Math.sign(s) * Math.min(dist, Math.abs(s))); slipped = true; }
   }
   const blocked = !slipped && ((dx && !clearX) || (dy && !clearY)) && !((dx && clearX) || (dy && clearY));
   return { x, y, blocked };
 }
-// Smallest perpendicular offset (1..CORNER_SLIP, nearer side first, + before − on a tie) that passes `test`, or 0.
 function slipShift(test) {
   for (let o = 1; o <= CORNER_SLIP; o++) { if (test(o)) return o; if (test(-o)) return -o; }
   return 0;
 }
 
-/**
- * Name of the biome under a WORLD-space point, or null (PT1-T18 HUD indicator).
- * Nearest-tile lookup (a label doesn't need the speed field's interpolation).
- * @param {{biomeMap?:Array}} map  a generateMap() result
- * @param {number} worldX @param {number} worldY  world px
- * @returns {?string}
- */
 export function biomeNameAt(map, worldX, worldY) {
   const bm = map?.biomeMap;
   if (!bm) return null;
@@ -163,18 +87,9 @@ export function biomeNameAt(map, worldX, worldY) {
   return bm[tx]?.[ty]?.name ?? null;
 }
 
-// (biomeSpeedMultAt removed 2026-06-09 — biomes no longer modify movement speed.)
-
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
-// Generate a map. Pass a `seed` (number or string) to reproduce a map exactly —
-// required for multiplayer (server picks the seed, clients regenerate it). When
-// omitted, a fresh random seed is used and returned in the result.
-// TQ-365: `biomeSet` (optional) is the EXPLICIT, ordered set of biome defs the round is composed of
-// — one Voronoi centre per biome, so ALL of them appear in the map. The server picks the set
-// (stable, 11 reused + 1 new per round) and delivers the SAME defs to every client in roundStart, so
-// the seeded map matches everywhere. Omitted (hub preview / legacy / tests) → the historic
-// NUM_BIOMES rarity-weighted pick from the full pool (byte-identical to before).
+// Must stay deterministic: server and clients rebuild the same map from seed.
 export async function generateMap(onProgress, seed, biomeSet = null, comp = null) {
   const actualSeed = seed ?? randomSeed();
   const rng = makeRng(actualSeed);
@@ -196,23 +111,14 @@ export async function generateMap(onProgress, seed, biomeSet = null, comp = null
   generateBiomesVoronoi(biomeMap, rng, biomeSet);
 
   onProgress?.(0.60, "Selecting tiles...");
-  // TQ-441: never-empty safety net — AI-content-only prod with 0 generated tiles must not yield an
-  // all-void map. Fall back to the deterministic DEFAULT_TILES const (shared server+client → same map).
   const allTiles = getGroundTiles();
   const tiles = allTiles.length ? allTiles : DEFAULT_TILES;
-  const tilesByBiome = buildBiomePools(tiles, comp); // TQ-367: 4 collidable + 8 non-collidable per biome when comp given
+  const tilesByBiome = buildBiomePools(tiles, comp);
   await fillMapWithTiles(voidMap, biomeMap, tileMap, tiles, tilesByBiome, onProgress, rng);
-  // TQ-360: the former "void" (off-map area NOT carved by DLA) becomes real tiles — every still-empty
-  // in-grid cell gets a collidable=1 boundary tile from its biome, so the world reads as solid terrain
-  // with explicit impassable edges instead of an abyss. Deterministic + rng-free (position-hashed), so
-  // the server + every client agree AND the monster-spawn rng stream below is left byte-identical.
   fillVoidWithBoundaryTiles(biomeMap, tileMap, tiles);
 
   onProgress?.(0.95, "Spawning monsters...");
-  // TQ-83: confine spawns to the largest EFFECTIVELY-walkable component so every player + monster
-  // is mutually reachable (collidable water can split the playable graph even though voidMap isn't).
   const reachMap = largestWalkableComponent(voidMap, tileMap);
-  // TQ-366: when the round set its composition, spawn from per-biome diversity-maximized 16-pools.
   let monstersByBiome = null;
   if (comp && comp.monstersPerBiome) {
     const names = (biomeSet && biomeSet.length) ? biomeSet.map((b) => b.name) : distinctBiomeNames(biomeMap);
@@ -232,7 +138,6 @@ function yieldFrame() {
 async function generateDLA(voidMap, onProgress, rng) {
   const requiredTiles = Math.floor(MAP_SIZE * MAP_SIZE * WALKABLE_PERCENTAGE);
 
-  // Initial random walk near center
   const startX = Math.floor(MAP_SIZE / 4 + rng.next() * (MAP_SIZE / 4));
   const startY = Math.floor(MAP_SIZE / 4 + rng.next() * (MAP_SIZE / 4));
   let x = startX;
@@ -250,7 +155,6 @@ async function generateDLA(voidMap, onProgress, rng) {
   let walkableCount = countWalkable(voidMap);
   let yieldCounter = 0;
 
-  // DLA loop: each walk marks the entire path back to start
   while (walkableCount < requiredTiles) {
     const sx = rng.range(MAP_SIZE);
     const sy = rng.range(MAP_SIZE);
@@ -263,18 +167,12 @@ async function generateDLA(voidMap, onProgress, rng) {
     }
   }
 
-  // Smooth 3 times (matching Java)
   for (let pass = 0; pass < SMOOTHING_PASSES; pass++) {
     smoothMap(voidMap);
     widenNarrowTunnels(voidMap);
   }
 }
 
-// Reused across dlaWalk calls. The DLA loop invokes dlaWalk thousands of times per map (until
-// WALKABLE_PERCENTAGE of the 160k cells is carved), and each call built a fresh `path` array and grew it
-// via push() — thousands of allocations + their internal growth-reallocations per generation. dlaWalk is
-// fully synchronous (it never yields mid-walk) and consumes the buffer entirely before returning, so a
-// single shared buffer reset to empty at each call is safe and byte-identical.
 const _dlaPath = [];
 function dlaWalk(voidMap, startX, startY, rng) {
   const path = _dlaPath; path.length = 0;
@@ -283,7 +181,6 @@ function dlaWalk(voidMap, startX, startY, rng) {
   for (let step = 0; step < MAX_DLA_STEPS; step++) {
     path.push(x, y);
 
-    // Check all 4 neighbors (with clamping, matching Java's MathUtils.clamp)
     let foundNeighbor = false;
     for (let d = 0; d < 4; d++) {
       const nx = Math.max(0, Math.min(MAP_SIZE - 1, x + DIRS[d][0]));
@@ -295,7 +192,6 @@ function dlaWalk(voidMap, startX, startY, rng) {
     }
 
     if (foundNeighbor) {
-      // Mark ALL positions along the walk path
       let count = 0;
       for (let i = 0; i < path.length; i += 2) {
         const px = path[i], py = path[i + 1];
@@ -307,7 +203,6 @@ function dlaWalk(voidMap, startX, startY, rng) {
       return count;
     }
 
-    // Random walk with clamping
     const dir = DIRS[rng.range(4)];
     x = Math.max(0, Math.min(MAP_SIZE - 1, x + dir[0]));
     y = Math.max(0, Math.min(MAP_SIZE - 1, y + dir[1]));
@@ -324,7 +219,6 @@ function countWalkable(voidMap) {
   return count;
 }
 
-// Apply in-place to match Java (modifications during iteration affect subsequent checks)
 function smoothMap(voidMap) {
   for (let x = 0; x < MAP_SIZE; x++) {
     for (let y = 0; y < MAP_SIZE; y++) {
@@ -344,17 +238,14 @@ function smoothMap(voidMap) {
   }
 }
 
-// Apply in-place to match Java
 function widenNarrowTunnels(voidMap) {
   for (let x = 1; x < MAP_SIZE - 1; x++) {
     for (let y = 1; y < MAP_SIZE - 1; y++) {
       if (!voidMap[x][y]) continue;
-      // Vertical passage (walkable up/down, void left/right) → widen horizontal
       if (!voidMap[x - 1][y] && !voidMap[x + 1][y] && voidMap[x][y - 1] && voidMap[x][y + 1]) {
         voidMap[x - 1][y] = true;
         voidMap[x + 1][y] = true;
       }
-      // Horizontal passage (walkable left/right, void up/down) → widen vertical
       if (!voidMap[x][y - 1] && !voidMap[x][y + 1] && voidMap[x - 1][y] && voidMap[x + 1][y]) {
         voidMap[x][y - 1] = true;
         voidMap[x][y + 1] = true;
@@ -363,38 +254,22 @@ function widenNarrowTunnels(voidMap) {
   }
 }
 
-// AI-CONTENT-ONLY toggle (server sets this in prod, mirroring AI_MONSTERS_ONLY): when on, the
-// built-in BIOME_DEFS baseline is DROPPED and the world is composed purely from AI-generated biomes.
-// A safety net keeps a non-empty pool — if there are no generated biomes yet, BIOME_DEFS is still used
-// so map gen never gets zero biomes (a dead round). Server-only; the client keeps BIOME_DEFS as its
-// offline fallback (online/SP rounds use the server-provided biomeSet, so this never diverges).
 let aiOnlyBiomes = false;
 export function setAiOnlyBiomes(v) { aiOnlyBiomes = !!v; }
-// Base built-in set, honouring the AI-only toggle (with the never-empty safety net applied by callers).
 function builtinBiomes() { return aiOnlyBiomes ? [] : BIOME_DEFS; }
 
-// The biomes the Voronoi region picker draws from: the built-in baseline (unless AI-only) plus any
-// AI-GENERATED biomes (engine/gamedata `getBiomes`). Both the server and every client compute the
-// SAME list for a given pool — the generated pool is delivered to the client verbatim (server's order)
-// via /api/biomes — so the seeded map stays deterministic across them.
 function biomeList() {
   const gen = getBiomes();
   const out = gen && gen.length ? [...builtinBiomes(), ...gen] : [...builtinBiomes()];
-  return out.length ? out : [...BIOME_DEFS]; // safety net: never zero biomes
+  return out.length ? out : [...BIOME_DEFS];
 }
 
-// TQ-365: the full biome pool (built-ins unless AI-only + generated) as a fresh array — the round-
-// formation code (server/world.js) draws its stable, rotating round set from this.
 export function allBiomes() {
   const gen = getBiomes();
   const out = gen && gen.length ? [...builtinBiomes(), ...gen] : [...builtinBiomes()];
-  return out.length ? out : [...BIOME_DEFS]; // safety net: never zero biomes
+  return out.length ? out : [...BIOME_DEFS];
 }
 
-// TQ-84: pick a biome for a region centre WEIGHTED by rarity so common biomes (low `rarity`)
-// dominate and rare ones (Astral/Water at 90) are genuinely uncommon — instead of the old uniform
-// rng.pick. Weight = (101 - rarity): rarity 30 → 71, rarity 90 → 11 (≈6.5× likelier). One rng draw
-// (same per-centre rng consumption as the old rng.pick, so the downstream stream stays stable).
 function pickBiomeByRarity(pool, rng) {
   let total = 0;
   for (const b of pool) total += Math.max(1, 101 - (Number(b.rarity) || 50));
@@ -406,14 +281,12 @@ function pickBiomeByRarity(pool, rng) {
 function generateBiomesVoronoi(biomeMap, rng, biomeSet = null) {
   const centers = [];
   if (biomeSet && biomeSet.length) {
-    // TQ-365: one centre per biome in the round's set, so every biome in the set appears. Each centre
-    // draws the SAME two rng values (x,y) on server + client (identical set order), so placement matches.
     for (const biome of biomeSet) {
       centers.push({ x: rng.range(MAP_SIZE), y: rng.range(MAP_SIZE), biome });
     }
   } else {
     const pool = biomeList();
-    const n = Math.min(NUM_BIOMES, pool.length); // clamp: a small generated-only pool must not over-pick
+    const n = Math.min(NUM_BIOMES, pool.length);
     for (let i = 0; i < n; i++) {
       centers.push({
         x: rng.range(MAP_SIZE),
@@ -423,12 +296,6 @@ function generateBiomesVoronoi(biomeMap, rng, biomeSet = null) {
     }
   }
 
-  // TQ-84: size-weighted Voronoi — divide the squared distance by the biome's `size` so a larger-size
-  // biome claims a proportionally bigger basin (the `size` field was dead before). The weight is invariant
-  // across cells, so resolve it ONCE per centre: the nearest-centre loop below runs MAP_SIZE² × centres
-  // (160000 × ~10) times, and computing Number(biome.size) inside it repeated the same coercion ~2M times
-  // per map. The cached value is byte-identical, so the /sz score — and thus the server/client biome
-  // assignment (MP-determinism, TQ-365) — is unchanged.
   for (const c of centers) c.sz = (c.biome && Number(c.biome.size)) || 60;
 
   for (let x = 0; x < MAP_SIZE; x++) {
@@ -449,12 +316,7 @@ function generateBiomesVoronoi(biomeMap, rng, biomeSet = null) {
   }
 }
 
-// Group tiles by biome name. TQ-367: when `comp` is given, COMPOSE each biome to exactly
-// comp.tilesCollidablePerBiome collidable + comp.tilesNonCollidablePerBiome non-collidable tiles.
-// Selection is rng-free + sorted by a CONTENT key (rarity, then name) so the server and every client
-// pick the IDENTICAL tiles regardless of pool-delivery order — the same MP-determinism contract the
-// biome set (TQ-365) relies on. A biome short of either kind keeps what it has (generation backfill =
-// TQ-368). Omitted comp → the full per-biome pool (byte-identical to before).
+// Pick by content key (rarity, name), never pool order: server/client must match.
 export function buildBiomePools(allTiles, comp = null) {
   const pools = {};
   for (const tile of allTiles) {
@@ -465,18 +327,13 @@ export function buildBiomePools(allTiles, comp = null) {
   if (!comp) return pools;
   const nC = Math.max(0, comp.tilesCollidablePerBiome | 0);
   const nW = Math.max(0, comp.tilesNonCollidablePerBiome | 0);
-  // The AI-GENERATED (html-textured) tiles are a biome's authored look and are used EXCLUSIVELY in any
-  // biome that has them; the simple built-in/procedural tiles are only a FALLBACK, for biomes that have
-  // no generated tiles yet. (Without this, a biome's built-in flat tiles — typically lower rarity — were
-  // mixed in and dominated the composed pool, so the map rendered mostly flat.) Deterministic sort
-  // (rarity, then name) so the server and client compose the identical pool for the same seed.
   const hasHtmlTex = (t) => !!(t && t.html && typeof t.html.base === "string" && t.html.base.trim());
   const byContent = (a, b) => (Number(a.rarity || 0) - Number(b.rarity || 0)) || ((a.name || "") < (b.name || "") ? -1 : (a.name || "") > (b.name || "") ? 1 : 0);
   const out = {};
   for (const biome of Object.keys(pools)) {
     const tiles = pools[biome];
     const ai = tiles.filter(hasHtmlTex);
-    const source = ai.length ? ai : tiles; // AI tiles exclusive when present, else fall back to the simple pool
+    const source = ai.length ? ai : tiles;
     const collide = source.filter((t) => t.collidable).sort(byContent).slice(0, nC);
     const walk = source.filter((t) => !t.collidable).sort(byContent).slice(0, nW);
     out[biome] = [...walk, ...collide];
@@ -500,9 +357,6 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
       const biomeMatched = biomePool && biomePool.length > 0;
       const candidates = biomeMatched ? biomePool : allTiles;
 
-      // Already-placed neighbours. Their OVERALL colour is what we match against (TQ-407: the per-side
-      // edge-colour concept was removed, so there is no rotation-by-seam step any more — full colour is
-      // rotation-invariant). Raster order fills left + above first; right/below are read too for symmetry.
       const leftN = x > 0 ? tileMap[x - 1][y] : null;
       const rightN = x < MAP_SIZE - 1 ? tileMap[x + 1][y] : null;
       const aboveN = y > 0 ? tileMap[x][y - 1] : null;
@@ -513,9 +367,6 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
 
       for (const tile of candidates) {
         const fR = tile.colorProfile_full_r, fG = tile.colorProfile_full_g, fB = tile.colorProfile_full_b;
-        // Biome bonus + a per-candidate jitter (one rng.next() per candidate, as before — so the
-        // later monster-spawn rng stream is consumed identically), then prefer neighbours whose
-        // overall colour is close so the floor reads as a smooth, coherent ground.
         let score = (biomeMatched ? 50 : 0) + rng.next() * 16;
         if (leftN) score += compareFullFast(fR, fG, fB, leftN.colorProfile_full_r, leftN.colorProfile_full_g, leftN.colorProfile_full_b);
         if (rightN) score += compareFullFast(fR, fG, fB, rightN.colorProfile_full_r, rightN.colorProfile_full_g, rightN.colorProfile_full_b);
@@ -529,10 +380,6 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
       }
 
       if (bestTile) {
-        // Deterministic position-hash rotation (TQ-407): keeps the per-type grain/texture from reading
-        // as a uniform repeating stamp now that rotation is no longer chosen by edge seam-matching.
-        // rng-free (position-hashed), so it's identical on server + every client and leaves the
-        // monster-spawn rng stream untouched.
         tileMap[x][y] = {
           ...bestTile,
           rotation: (hashXY(x, y) % 4) * 90,
@@ -549,23 +396,17 @@ async function fillMapWithTiles(voidMap, biomeMap, tileMap, allTiles, tilesByBio
   }
 }
 
-// TQ-360: assign every still-empty (former-void) cell a collidable=1 boundary tile from its biome, so
-// the whole map is tiles — collidable=1 = impassable boundary, collidable=0 = walkable. PURE +
-// DETERMINISTIC: picks by a position hash from the biome's collidable tiles (NO rng → identical on the
-// server + every client, and the later monster-spawn rng stream is untouched). A biome with no
-// collidable tile falls back to any collidable tile, then to a synthesized dark boundary tile. Walkable
-// cells (already filled by fillMapWithTiles) and in-map collidable tiles (e.g. water) are left as-is.
-const hashXY = (x, y) => (((x * 374761393) ^ (y * 668265263)) >>> 0); // matches the void-mote hash family
+const hashXY = (x, y) => (((x * 374761393) ^ (y * 668265263)) >>> 0);
 const VOID_FALLBACK_TILE = { name: "Boundary", biome: "", collidable: 1, rarity: 0,
   colorProfile_full_r: 17, colorProfile_full_g: 15, colorProfile_full_b: 24 };
 function fillVoidWithBoundaryTiles(biomeMap, tileMap, allTiles) {
-  const sortByName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0); // stable, content-keyed
+  const sortByName = (a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   const anyCollidable = allTiles.filter((t) => t.collidable).sort(sortByName);
   const byBiome = {};
   for (const t of anyCollidable) (byBiome[t.biome || ""] ||= []).push(t);
   for (let x = 0; x < MAP_SIZE; x++) {
     for (let y = 0; y < MAP_SIZE; y++) {
-      if (tileMap[x][y] != null) continue; // already a walkable or in-map collidable tile
+      if (tileMap[x][y] != null) continue;
       const biomeName = biomeMap[x]?.[y]?.name || "";
       const pool = (byBiome[biomeName] && byBiome[biomeName].length) ? byBiome[biomeName]
         : (anyCollidable.length ? anyCollidable : [VOID_FALLBACK_TILE]);
@@ -575,23 +416,17 @@ function fillVoidWithBoundaryTiles(biomeMap, tileMap, allTiles) {
   }
 }
 
-// Squared distance / 195075 — matches Java's compareFullProfilesFast
 function compareFullFast(r1, g1, b1, r2, g2, b2) {
   const dr = r1 - r2, dg = g1 - g2, db = b1 - b2;
   return 30 - (dr * dr + dg * dg + db * db) / 195075 * 30;
 }
 
-// GP-1/GP-2 (rarity wall fix): pick a monster type weighted by *location*. New players
-// spawn toward the map edges and the storm shrinks the safe zone toward the center, so we
-// bias low-rarity (catchable with a starter chain) monsters to the edges and the rare,
-// powerful ones to the contested center/endgame. Pure + seeded (uses rng.next) → spawns
-// stay deterministic for multiplayer. The curve constants are balance knobs (tune freely).
 const MON_CENTER = (MAP_SIZE - 1) / 2;
 const MON_MAX_D = Math.hypot(MON_CENTER, MON_CENTER);
 function pickMonsterByLocation(types, x, y, rng) {
-  if (!types || !types.length) return null; // empty pool → caller skips this spawn (no types[-1] crash)
-  const edgeness = Math.min(1, Math.hypot(x - MON_CENTER, y - MON_CENTER) / MON_MAX_D); // 0 center … 1 edge
-  const target = 5 - 3 * edgeness; // edge → ~2 (catchable), center → 5 (rare)
+  if (!types || !types.length) return null;
+  const edgeness = Math.min(1, Math.hypot(x - MON_CENTER, y - MON_CENTER) / MON_MAX_D);
+  const target = 5 - 3 * edgeness;
   let total = 0;
   const weights = types.map((t) => {
     const w = 1 / (1 + Math.pow(Math.abs((t.rarity ?? 3) - target), 1.6));
@@ -606,18 +441,12 @@ function pickMonsterByLocation(types, x, y, rng) {
   return types[types.length - 1];
 }
 
-// The distinct biome names present on a biomeMap (used when a round didn't pass an explicit set).
 function distinctBiomeNames(biomeMap) {
   const names = new Set();
   for (let x = 0; x < MAP_SIZE; x++) for (let y = 0; y < MAP_SIZE; y++) { const b = biomeMap[x]?.[y]; if (b?.name) names.add(b.name); }
   return [...names];
 }
 
-// TQ-366: pick `n` monsters from priority-ordered `candidates` to MAXIMIZE diversity — bucket by
-// rarity and round-robin across the buckets, so the pool spreads across rarity tiers instead of
-// clumping. Within a bucket the candidates' incoming order is preserved (biome-matched first, then
-// name-sorted backfill), so the result is deterministic + order-independent → server and every
-// client build the IDENTICAL per-biome pool (the monster spawns stay reproducible for MP).
 export function diverseMonsterPool(candidates, n) {
   const buckets = new Map();
   for (const m of candidates) {
@@ -644,10 +473,6 @@ export function diverseMonsterPool(candidates, n) {
   return picked;
 }
 
-// TQ-366: build each biome's diversity-maximized monster pool of `comp.monstersPerBiome` (16) types.
-// Biome-matched monsters (monster.biome === biome) are prioritized, then ALL types backfill so a
-// biome always reaches the target even before its content is biome-tagged. Pure + sorted by name →
-// identical on server + every client (the spawn pool is part of the deterministic map).
 export function buildBiomeMonsterPools(allMonsters, comp, biomeNames) {
   const n = Math.max(1, (comp && comp.monstersPerBiome) | 0) || 1;
   const byName = (a, b) => (a.typeName < b.typeName ? -1 : a.typeName > b.typeName ? 1 : 0);
@@ -664,9 +489,6 @@ function spawnMonsters(voidMap, tileMap, rng, reachMap = null, biomeMap = null, 
   const maxMonsters = Math.floor(MAP_SIZE * MAP_SIZE * MONSTER_DENSITY);
   const allMonsterTypes = getMonsterTypes();
   const monsters = [];
-  // No monster types yet (e.g. prod's seed is suppressed and the DB pool is empty/unreachable,
-  // or a map is generated before initContent merges the pool) → spawn a monster-less but valid
-  // map instead of crashing on an undefined type. Self-heals once the pool is populated.
   if (!allMonsterTypes.length) return monsters;
 
   let attempts = 0;
@@ -675,22 +497,19 @@ function spawnMonsters(voidMap, tileMap, rng, reachMap = null, biomeMap = null, 
     const x = rng.range(MAP_SIZE);
     const y = rng.range(MAP_SIZE);
     if (!voidMap[x][y] || !tileMap[x][y]) continue;
-    if (tileMap[x][y].collidable) continue; // TQ-82: don't spawn on a collidable tile (e.g. water) — unreachable/unfightable
-    if (reachMap && !reachMap[x][y]) continue; // TQ-83: only the largest reachable component (mutually reachable)
+    if (tileMap[x][y].collidable) continue;
+    if (reachMap && !reachMap[x][y]) continue;
     if (tileMap[x][y].activeMonster) continue;
 
-    // TQ-366: draw from the cell's biome-specific 16-pool when the round composed them; otherwise the
-    // global pool (back-compat). pickMonsterByLocation consumes ONE rng draw regardless of pool size,
-    // so the seeded stream is unchanged — only WHICH type is picked narrows to the biome's pool.
+    // Exactly one rng draw per cell regardless of pool: the seeded stream must stay in sync.
     const pool = (monstersByBiome && biomeMap)
       ? (monstersByBiome[biomeMap[x]?.[y]?.name] || allMonsterTypes)
       : allMonsterTypes;
     const monType = pickMonsterByLocation(pool.length ? pool : allMonsterTypes, x, y, rng);
-    if (!monType) break; // defensive: empty pool (guarded above) — stop spawning rather than deref null
-    const level = rng.int(GAME.SPAWN_LEVEL_MIN, GAME.SPAWN_LEVEL_MAX); // GP-10: was hardcoded 1-5; honor the config (admin/env-tunable)
+    if (!monType) break;
+    const level = rng.int(GAME.SPAWN_LEVEL_MIN, GAME.SPAWN_LEVEL_MAX);
     const stats = getMonsterStats(monType, level);
     const monster = {
-      // Deterministic, map-unique id (no Date.now — keeps gen reproducible).
       id: `m_${x}_${y}`,
       typeName: monType.typeName,
       name: monType.typeName,
@@ -710,12 +529,6 @@ function spawnMonsters(voidMap, tileMap, rng, reachMap = null, biomeMap = null, 
   return monsters;
 }
 
-// TQ-83: the largest EFFECTIVELY-walkable connected component. voidMap is always a single
-// connected component, but isWalkable also excludes collidable tiles (water), so the *playable*
-// graph can split into isolated pockets. Flood-fill effective walkability (carved cell + present,
-// non-collidable tile) over 4-connectivity and return a 2D boolean `reach` marking the biggest
-// component — spawns are confined to it so every player + monster is mutually reachable. tileMap
-// omitted → all carved cells count (no collidable info) → reach == voidMap's single component.
 export function largestWalkableComponent(voidMap, tileMap = null) {
   const N = voidMap.length;
   const eff = (x, y) => !!voidMap[x]?.[y] && (!tileMap || (!!tileMap[x]?.[y] && !tileMap[x][y].collidable));
@@ -746,20 +559,11 @@ export function largestWalkableComponent(voidMap, tileMap = null) {
   return reach;
 }
 
-// `rng` optional: pass a seeded RNG for deterministic spawns (server), or omit
-// for a random spawn (single-player client).
 export function findSpawnPoint(voidMap, rng, tileMap = null, reachMap = null) {
   const rand = rng ? rng.next : Math.random;
-  // A spawn must be EFFECTIVELY walkable — a carved cell whose placed tile isn't collidable
-  // (TQ-82), else the player lands stuck; and, when a reachMap is supplied, in the largest
-  // reachable component (TQ-83). tileMap/reachMap omitted (older callers / tests) → fall back to
-  // the voidMap-only test so behaviour is unchanged.
   const okTile = (x, y) =>
     (!tileMap || (!!tileMap[x]?.[y] && !tileMap[x][y].collidable)) &&
     (!reachMap || !!reachMap[x]?.[y]);
-  // TQ-557: a cell is "open" only when it is carved AND its placed tile isn't collidable. The old
-  // check required the 3×3 to be CARVED but only the centre to be non-collidable, so a spawn could
-  // land in a one-cell pocket walled in by collidable tiles — the player appeared boxed in and stuck.
   const open = (x, y) => !!voidMap[x]?.[y] && (!tileMap || (!!tileMap[x]?.[y] && !tileMap[x][y].collidable));
   const clearance = (x, y, r) => {
     for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) if (!open(x + dx, y + dy)) return false;
@@ -768,11 +572,8 @@ export function findSpawnPoint(voidMap, rng, tileMap = null, reachMap = null) {
   for (let attempt = 0; attempt < 1000; attempt++) {
     const x = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
     const y = Math.floor(rand() * (MAP_SIZE - 2)) + 1;
-    // 3×3 effectively-walkable clearance (room to move in every direction) in the reachable component.
     if (clearance(x, y, 1) && okTile(x, y)) return { x, y };
   }
-  // Relaxed sweeps: first any reachable cell with at least one open 4-neighbour (never boxed in),
-  // then any reachable open cell at all.
   for (let x = 1; x < MAP_SIZE - 1; x++)
     for (let y = 1; y < MAP_SIZE - 1; y++)
       if (open(x, y) && okTile(x, y) && (open(x + 1, y) || open(x - 1, y) || open(x, y + 1) || open(x, y - 1))) return { x, y };
@@ -782,12 +583,6 @@ export function findSpawnPoint(voidMap, rng, tileMap = null, reachMap = null) {
   return { x: MAP_SIZE / 2, y: MAP_SIZE / 2 };
 }
 
-// GP-5: place `count` player spawns spread apart so 16 players don't all start on the
-// same monster cluster (and, with PvP on, immediately on top of each other). Rejection-
-// samples findSpawnPoint, re-rolling a bounded number of times to keep each spawn
-// ≥ minSepTiles from the ones already placed — accepts a closer spot if separation
-// can't be met (small/sparse cave), so it never loops forever. Deterministic with a
-// seeded `rng`.
 export function findSpreadSpawns(voidMap, rng, count, minSepTiles = 24, tileMap = null, reachMap = null) {
   const spawns = [];
   const minSq = minSepTiles * minSepTiles;

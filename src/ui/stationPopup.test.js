@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { stationPopupRect, stationContentRect, stationCloseRect, stationPopupInside } from "./stationPopup.js";
 import { bestiaryPanelState, bestiaryPanelScroll } from "./bestiaryPanel.js";
 
-// TQ-118: the shell geometry is pure (only reads k.width()/height()), so it's unit-testable.
 const mk = (w, h) => ({ width: () => w, height: () => h });
 
 test("stationPopupRect: centred + responsive; content + close-button inside the panel; hit-test", () => {

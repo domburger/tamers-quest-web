@@ -1,4 +1,4 @@
-// Enter a solo run from the hub portal popup and screenshot the in-round HUD (overworld), desktop or phone.
+// Solo-run HUD screenshots (MOBILE=1 for phone). Needs: npx vite + node server/index.js.
 import { chromium, devices } from "playwright";
 import { mkdirSync } from "node:fs";
 const URL = process.env.GAME_URL || "http://localhost:5173";
@@ -26,7 +26,6 @@ await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {});
 await p.keyboard.press("Enter"); await sleep(3000);
 await p.evaluate(() => window.__openStation && window.__openStation("portal")); await sleep(1200);
 await shot("0-portal");
-// "Singleplayer" button: centred in the popup, first button
 const btn = await p.evaluate(() => (window.__portalButtons ? window.__portalButtons() : null));
 if (btn) await tap(btn[0].x, btn[0].y); else if (MOBILE) await tap(vp.width / 2, 140); else await tap(640, 208);
 for (const t of [3, 6, 9]) { await sleep(3000); await shot(`1-world-${t}s`); }

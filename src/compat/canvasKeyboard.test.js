@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { normalizeKeyName, domKeyToken, makeKeyboard } from "./canvasKeyboard.js";
 
-// A minimal EventTarget mock: records listeners so tests can fire synthetic key events.
 function mockTarget() {
   const ls = {};
   return {
@@ -42,15 +41,14 @@ test("clearHandlers drops scene-scoped key/char handlers (no accumulation across
   kb.onKeyPress("escape", () => presses++);
   kb.onKeyDown("down", () => downs++);
   kb.onCharInput(() => charsN++);
-  t.fire("keydown", kd("Escape")); // press edge
-  t.fire("keydown", kd("ArrowDown")); kb.update(); // held → continuous down fires
-  t.fire("keydown", kd("a")); // char
+  t.fire("keydown", kd("Escape"));
+  t.fire("keydown", kd("ArrowDown")); kb.update();
+  t.fire("keydown", kd("a"));
   assert.equal(presses, 1); assert.equal(downs, 1); assert.equal(charsN, 1);
-  // Simulate a scene switch: the shim clears handlers before the next scene re-registers its own.
   kb.clearHandlers();
   assert.ok(kb.isKeyDown("down"), "held physical state is preserved (DOM tracks it), not cleared");
   t.fire("keydown", kd("Escape")); kb.update(); t.fire("keydown", kd("a"));
-  assert.equal(presses, 1, "old escape handler no longer fires"); // unchanged
+  assert.equal(presses, 1, "old escape handler no longer fires");
   assert.equal(downs, 1, "old continuous down handler no longer fires on update()");
   assert.equal(charsN, 1, "old char handler no longer fires");
   assert.equal(t.count("keydown"), 1, "DOM listener NOT detached (still exactly one)");
@@ -60,7 +58,7 @@ test("TQ-280 isKeyDown tracks the held set; matches names<->DOM keys; keyup rele
   const t = mockTarget();
   const kb = makeKeyboard(t);
   assert.equal(kb.isKeyDown("space"), false);
-  t.fire("keydown", kd(" "));          // Space pressed
+  t.fire("keydown", kd(" "));
   t.fire("keydown", kd("ArrowRight"));
   assert.equal(kb.isKeyDown("space"), true, "kaboom name 'space' matches DOM ' '");
   assert.equal(kb.isKeyDown("right"), true);
@@ -78,12 +76,12 @@ test("TQ-280 onKeyPress fires on the down EDGE only (auto-repeat ignored); cance
   const kb = makeKeyboard(t);
   let presses = 0;
   const sub = kb.onKeyPress("enter", () => presses++);
-  t.fire("keydown", kd("Enter"));               // edge → fire
-  t.fire("keydown", kd("Enter", { repeat: true })); // auto-repeat → ignored
-  t.fire("keydown", kd("Enter"));               // still held (no keyup) → ignored
+  t.fire("keydown", kd("Enter"));
+  t.fire("keydown", kd("Enter", { repeat: true }));
+  t.fire("keydown", kd("Enter"));
   assert.equal(presses, 1, "one press per physical down edge");
   t.fire("keyup", kd("Enter"));
-  t.fire("keydown", kd("Enter"));               // new edge → fire
+  t.fire("keydown", kd("Enter"));
   assert.equal(presses, 2);
   sub.cancel();
   t.fire("keyup", kd("Enter")); t.fire("keydown", kd("Enter"));
@@ -95,15 +93,14 @@ test("TQ-280 onKeyDown is continuous (fired from update() per held key); onCharI
   const kb = makeKeyboard(t);
   let ticks = 0; kb.onKeyDown("w", () => ticks++);
   t.fire("keydown", kd("w"));
-  kb.update(); kb.update();        // two frames held → two ticks
+  kb.update(); kb.update();
   assert.equal(ticks, 2);
   t.fire("keyup", kd("w"));
-  kb.update();                     // released → no tick
+  kb.update();
   assert.equal(ticks, 2);
-  // char input: printable single chars, modifiers suppress it
   const typed = []; kb.onCharInput((c) => typed.push(c));
   t.fire("keydown", kd("h")); t.fire("keydown", kd("i"));
-  t.fire("keydown", kd("a", { ctrlKey: true }));  // Ctrl+A → not text
-  t.fire("keydown", kd("Enter"));                  // not a single char
+  t.fire("keydown", kd("a", { ctrlKey: true }));
+  t.fire("keydown", kd("Enter"));
   assert.deepEqual(typed, ["h", "i"]);
 });

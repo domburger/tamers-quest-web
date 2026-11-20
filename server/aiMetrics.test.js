@@ -28,8 +28,8 @@ test("records calls, v1/v2 split, and average + max latency", () => {
 
 test("fallbacks + timeouts feed the rates", () => {
   recordTurn({ ok: true, latencyMs: 50 });
-  recordTurn({ ok: false, timeout: true, latencyMs: 10000 }); // a timeout fallback
-  recordTurn({ ok: false, latencyMs: 20 }); // a non-timeout fallback (e.g. bad JSON)
+  recordTurn({ ok: false, timeout: true, latencyMs: 10000 });
+  recordTurn({ ok: false, latencyMs: 20 });
   const s = aiMetricsSnapshot();
   assert.equal(s.calls, 3);
   assert.equal(s.fallbacks, 2);
@@ -39,12 +39,10 @@ test("fallbacks + timeouts feed the rates", () => {
 });
 
 test("alert needs BOTH a meaningful sample and a high fallback rate", () => {
-  // 100% fallback but only 3 calls → below the min sample, no alert yet
   for (let i = 0; i < 3; i++) recordTurn({ ok: false, latencyMs: 5 });
   assert.equal(aiMetricsSnapshot().alert, false, "small sample doesn't trip the alert");
 
   resetAiMetrics();
-  // 10 calls, 3 fallbacks = 30% > 20% threshold → alert
   for (let i = 0; i < 7; i++) recordTurn({ ok: true, latencyMs: 5 });
   for (let i = 0; i < 3; i++) recordTurn({ ok: false, latencyMs: 5 });
   const s = aiMetricsSnapshot();
@@ -52,7 +50,6 @@ test("alert needs BOTH a meaningful sample and a high fallback rate", () => {
   assert.equal(s.alert, true, "30% fallback over 10 calls trips the alert");
 
   resetAiMetrics();
-  // 10 calls, 1 fallback = 10% < 20% → no alert
   for (let i = 0; i < 9; i++) recordTurn({ ok: true, latencyMs: 5 });
   recordTurn({ ok: false, latencyMs: 5 });
   assert.equal(aiMetricsSnapshot().alert, false, "10% fallback stays under the threshold");

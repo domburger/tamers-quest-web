@@ -1,4 +1,3 @@
-// P8-T3 round-end gains summary (@visual). Server delta math + client wiring.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { computeRunGains } from "./world.js";
@@ -10,9 +9,9 @@ test("computeRunGains: per-run caught/XP/level/survival deltas", () => {
     profile: { stats: { caught: 5 }, activeMonsters: [{ xp: 80, level: 6 }, { xp: 60, level: 5 }] },
   };
   const g = computeRunGains(s);
-  assert.equal(g.caught, 3);    // 5 - 2
-  assert.equal(g.xpGained, 40); // (80+60) - 100
-  assert.equal(g.levelUps, 3);  // (6+5) - 8
+  assert.equal(g.caught, 3);
+  assert.equal(g.xpGained, 40);
+  assert.equal(g.levelUps, 3);
   assert.ok(g.survivedS >= 4 && g.survivedS <= 7);
 });
 
@@ -37,5 +36,5 @@ test("extracted/died carry per-run gains to roundResult (null when absent)", () 
 
   const s2 = { roundResult: null };
   applyMessage(s2, { t: "died", reason: "zone" });
-  assert.equal(s2.roundResult.gains, null); // missing gains → null, no crash
+  assert.equal(s2.roundResult.gains, null);
 });

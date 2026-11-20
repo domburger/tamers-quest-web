@@ -3,10 +3,6 @@ import assert from "node:assert/strict";
 import { itemHtmlBrief } from "./itemModel.js";
 import { HTML_ALLOWED_TAGS, HTML_FORBIDDEN, HTML_CANVAS } from "./htmlModel.js";
 
-// TQ-393: the item builder authors a free-form HTML/CSS icon (parity with monsters). The legacy
-// shape-layer `visual` builder (coerceItemVisual + the disc/ring/… schema) was removed with the
-// back-compat path, so the contract is now just the render-target brief the model targets.
-
 test("itemHtmlBrief: targets a transparent, centered HTML/CSS icon on the canonical canvas", () => {
   const b = itemHtmlBrief();
   assert.ok(b.includes(String(HTML_CANVAS)), "brief states the canonical render-box size");

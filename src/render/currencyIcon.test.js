@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { drawCurrencyIcon } from "./currencyIcon.js";
 
-// Immediate-mode render — smoke-test with a mock k that counts draw calls per primitive.
 function mockK() {
   const calls = { circle: 0, ellipse: 0, line: 0 };
   return {

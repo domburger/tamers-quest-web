@@ -12,13 +12,13 @@ test("shake: addShake raises trauma and caps at 1", () => {
   clearShake();
   addShake(0.4);
   assert.ok(Math.abs(shakeTrauma() - 0.4) < 1e-9);
-  addShake(1); // would exceed 1 → capped
+  addShake(1);
   assert.equal(shakeTrauma(), 1);
 });
 
 test("shake: offset magnitude is bounded by trauma²·MAX", () => {
   clearShake();
-  addShake(0.5); // trauma 0.5 → max offset 0.25·MAX
+  addShake(0.5);
   const bound = 0.25 * SHAKE_MAX + 1e-6;
   for (let i = 0; i < 50; i++) {
     const o = shakeOffset();
@@ -29,7 +29,7 @@ test("shake: offset magnitude is bounded by trauma²·MAX", () => {
 test("shake: updateShake decays trauma to zero over time", () => {
   clearShake();
   addShake(1);
-  for (let i = 0; i < 120; i++) updateShake(1 / 60); // ~2s of frames
+  for (let i = 0; i < 120; i++) updateShake(1 / 60);
   assert.equal(shakeTrauma(), 0);
   assert.deepEqual(shakeOffset(), { x: 0, y: 0 });
 });

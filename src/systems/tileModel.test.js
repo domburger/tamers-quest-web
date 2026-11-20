@@ -3,10 +3,6 @@ import assert from "node:assert/strict";
 import { tileHtmlBrief } from "./tileModel.js";
 import { HTML_ALLOWED_TAGS, HTML_FORBIDDEN, HTML_CANVAS } from "./htmlModel.js";
 
-// TQ-393: the tile builder authors a free-form HTML/CSS ground texture (parity with monsters + items).
-// The legacy shape-layer `visual` builder (coerceTileVisual + the gradient/speckle/… schema) was removed
-// with the back-compat path; generated tiles render only from `html`, seed tiles keep procedural grain.
-
 test("tileHtmlBrief: targets a FULL-BLEED HTML/CSS ground texture on the canonical canvas", () => {
   const b = tileHtmlBrief();
   assert.ok(b.includes(String(HTML_CANVAS)), "brief states the canonical render-box size");

@@ -1,5 +1,3 @@
-// TQ-405: multi-provider LLM router — routing, key gating / re-routing, and the OpenAI-compatible
-// wire path (schema mode, json_object fallback, locked-sampling retry) with a mocked fetch.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -163,12 +161,10 @@ test("chatJson failover: a provider that reports no credits / a rejected key is 
       assert.deepEqual(resolveModel("gpt-5.5"), { provider: "groq", model: "llama-3.3-70b-versatile", requested: "gpt-5.5", substituted: true }, "later resolutions route straight to the healthy provider");
       await chatJson({ model: "gpt-5.5", system: "s", user: "u" });
       assert.equal(calls.length, 3); assert.ok(calls[2].startsWith("https://api.groq.com/"), "no further OpenAI attempts while degraded");
-      // A plain rate limit on the ONLY provider still surfaces as before (no failover target, no degrade).
       _resetLlmState(); delete process.env.GROQ_API_KEY;
       global.fetch = async () => bad(429, "rate limited");
       await assert.rejects(() => chatJson({ model: "gpt-5.5", system: "s", user: "u" }), /OpenAI 429: rate limited/);
       assert.equal(providerStatus().find((p) => p.id === "openai").degraded, false, "rate limiting is not a degrade");
-      // A rejected key with no alternative: the error surfaces AND the provider is degraded (admin shows it).
       global.fetch = async () => bad(401, "invalid api key");
       await assert.rejects(() => chatJson({ model: "gpt-5.5", system: "s", user: "u" }), /OpenAI 401/);
       assert.equal(providerStatus().find((p) => p.id === "openai").degraded, true);

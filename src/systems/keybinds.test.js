@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_BINDINGS, ACTIONS, ACTION_META, getBindings, keysFor, setBinding, resetBinding, resetAllBindings, loadOverrides, actionsForKey, normalizeKey } from "./keybinds.js";
 
-// A minimal localStorage stand-in (TQ-458 — the module takes an injectable store).
 function memStore(initial = {}) {
   const m = new Map(Object.entries(initial));
   return {
@@ -20,7 +19,6 @@ test("defaults reproduce the pre-TQ-458 keys (movement + core actions)", () => {
   assert.deepEqual(DEFAULT_BINDINGS.catch, ["c"]);
   assert.deepEqual(DEFAULT_BINDINGS.attack1, ["1"]);
   assert.deepEqual(DEFAULT_BINDINGS.pause, ["escape"]);
-  // Every labelled action exists and every action is labelled (UI ↔ bindings stay in sync).
   for (const m of ACTION_META) assert.ok(ACTIONS.includes(m.action), `${m.action} is a real action`);
   assert.equal(ACTION_META.length, ACTIONS.length, "every action has a label");
 });
@@ -34,12 +32,10 @@ test("getBindings returns defaults with no overrides; keysFor reads per-action",
 
 test("setBinding persists an override, normalizes + dedupes, and survives a reload", () => {
   const s = memStore();
-  const out = setBinding("catch", ["K", "k", "B"], s); // upper-case + dup → normalized + deduped
+  const out = setBinding("catch", ["K", "k", "B"], s);
   assert.deepEqual(out, ["k", "b"]);
-  // A fresh read from the SAME store reflects the override (persistence round-trip).
   assert.deepEqual(keysFor("catch", s), ["k", "b"]);
   assert.deepEqual(loadOverrides(s).catch, ["k", "b"]);
-  // Other actions are untouched.
   assert.deepEqual(keysFor("flee", s), ["f"]);
 });
 
@@ -69,7 +65,6 @@ test("actionsForKey reverse-looks-up bindings (conflict detection)", () => {
   const s = memStore();
   assert.deepEqual(actionsForKey("c", s), ["catch"]);
   assert.deepEqual(actionsForKey("up", s), ["moveUp"]);
-  // Bind 'c' to flee too → the key now reports both (a conflict the UI can warn on).
   setBinding("flee", ["c"], s);
   assert.deepEqual(actionsForKey("c", s).sort(), ["catch", "flee"]);
   assert.deepEqual(actionsForKey("", s), []);

@@ -18,23 +18,19 @@ test("takeAcked: exact match trims the history to start at the acked entry", () 
   assert.deepEqual(hist.map((e) => e.seq), [3, 4]);
 });
 
-// Simulate a walk with a TURN under lag: the client predicts instantly, the server applies each input LAG
-// seconds later. With the history-based comparison, a turn must not produce any correction.
 test("a 90-degree turn under 250ms lag produces no correction (the old heading's lead is in the history)", () => {
   const LAG = 0.25, SEND = 0.05;
-  const inputs = []; // [time, dx, dy, seq]
+  const inputs = [];
   let seq = 0;
-  for (let t = 0; t < 1; t += SEND) inputs.push([t, 1, 0, ++seq]);   // walk right for 1 s
-  for (let t = 1; t < 2; t += SEND) inputs.push([t, 0, 1, ++seq]);   // then turn and walk down
+  for (let t = 0; t < 1; t += SEND) inputs.push([t, 1, 0, ++seq]);
+  for (let t = 1; t < 2; t += SEND) inputs.push([t, 0, 1, ++seq]);
   const pos = { x: 0, y: 0 }, server = { x: 0, y: 0 }, hist = [];
   let corrections = 0, maxCorr = 0, matched = 0;
   let iClient = 0, iServer = 0, srvDir = [0, 0], ack = 0;
   for (let t = 0; t < 2.2; t += DT) {
-    // client: send inputs whose time has come, recording the predicted position at send time
     while (iClient < inputs.length && inputs[iClient][0] <= t) { const [, dx, dy, s] = inputs[iClient]; hist.push({ seq: s, x: pos.x, y: pos.y, dx, dy }); iClient++; }
     const cur = inputs[Math.max(0, iClient - 1)];
     if (t < 2) { pos.x += cur[1] * SPEED * DT; pos.y += cur[2] * SPEED * DT; }
-    // server: apply inputs LAG later; it moves with the last applied input until the next one arrives
     while (iServer < inputs.length && inputs[iServer][0] + LAG <= t) { srvDir = [inputs[iServer][1], inputs[iServer][2]]; ack = inputs[iServer][3]; iServer++; }
     if (t < 2 + LAG) { server.x += srvDir[0] * SPEED * DT; server.y += srvDir[1] * SPEED * DT; }
     const h = takeAcked(hist, ack);
@@ -52,8 +48,6 @@ test("a 90-degree turn under 250ms lag produces no correction (the old heading's
 
 test("a real divergence (server stopped by a wall the client missed) is corrected smoothly, without overshoot", () => {
   const pos = { x: 100, y: 0 }, server = { x: 60, y: 0 };
-  // We sent a STOP at x=100, but the server's body was held at x=60 by a wall our prediction missed:
-  // the acked entry says 100, the server says 60, so 40px of real disagreement remains.
   const hist = [{ seq: 5, x: 100, y: 0, dx: 0, dy: 0 }];
   let prevErr = Infinity;
   for (let i = 0; i < 120; i++) {
@@ -76,7 +70,7 @@ test("a teleport (respawn / region travel) snaps and clears the history", () => 
 });
 
 test("the server one input interval ahead along the acked direction is legitimate (no correction)", () => {
-  const pos = { x: 200, y: 0 }, server = { x: 30, y: 0 }; // we sent at x=20 heading right; server is 10px further
+  const pos = { x: 200, y: 0 }, server = { x: 30, y: 0 };
   const hist = [{ seq: 7, x: 20, y: 0, dx: 1, dy: 0 }];
   assert.equal(reconcileStep(pos, server, hist[0], hist, DT, SPRINT), "none");
   assert.equal(pos.x, 200);

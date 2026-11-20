@@ -1,13 +1,3 @@
-// TQ-287 (engine-removal TQ-227/233 — COMPLETE as of TQ-298): assemble the canvas modules into a single
-// k.* object — the SOLE renderer. makeCanvasShim() composes the standalone modules (immediate draws,
-// retained layer, scene manager, input, textures, refit) into one runtime that exposes the full
-// kaboom-compat k.* surface the scenes call. main.js boots it directly; Phaser + its old compat shim
-// were removed in TQ-298, so there is no other render path.
-//
-// COVERS: immediate draws (rect/circle/ellipse/line/text/polygon/sprite + pushClip/popClip), retained
-//   add/destroyAll + the k.add comp pipeline (compsToRecord), scene mgmt (scene/go/onUpdate/onDraw/
-//   onSceneLeave), input (keyboard + mouse + touch), textures (loadSprite), camera (camPos/worldToScreen),
-//   timers (k.wait), loadFont, and the rgb/vec2/width/height/center/time/dt helpers + responsive refit.
 import { makeCanvasRuntime } from "./canvasBackend.js";
 import { makeCanvasRenderer } from "./canvasRenderer.js";
 import { makeLabelCache } from "./canvasTextCache.js";
@@ -20,14 +10,9 @@ import { makeRefitter, relayoutScenes } from "./canvasRefit.js";
 
 const DESIGN_W = 1280, DESIGN_H = 720;
 const NOOP_SUB = { cancel() {} };
-// Phaser parity (kaboomShim.js IMMEDIATE_DEPTH): immediate-mode onDraw content sits at depth 0.5 —
-// ABOVE default-z (0) retained objects (k.add backgrounds/cards/buttons) but BELOW z>=1 retained
-// overlays. Scenes rely on this (e.g. character-select composites tamer portraits in onDraw OVER the
-// retained menu background + cards). So retained must render in two bands AROUND the onDraw layer, not
-// all-on-top — else the menu background covers every onDraw figure (the canvas char-select breakage).
+// onDraw renders between retained z<0.5 and z>=0.5; scenes rely on it.
 const IMMEDIATE_DEPTH = 0.5;
 
-// Normalize a color from any of: (r,g,b) | [r,g,b] | a {r,g,b}/KColor object → {r,g,b}. Default white.
 function normColor(...a) {
   if (a.length >= 3) return { r: a[0] || 0, g: a[1] || 0, b: a[2] || 0 };
   const v = a[0];
@@ -36,10 +21,8 @@ function normColor(...a) {
   return { r: 255, g: 255, b: 255 };
 }
 
-// TQ-288: a comp descriptor (mirrors the shim's comp()). k.add() reads these to build a CanvasObj.
 const comp = (id, data) => ({ __kcomp: id, ...data });
 
-// Translate a k.add comp list (descriptors + string tags) into the flat CanvasObj record.
 function compsToRecord(comps) {
   const arr = Array.isArray(comps) ? comps : [comps];
   const by = {};
@@ -47,12 +30,12 @@ function compsToRecord(comps) {
   const rec = { tags: arr.filter((c) => typeof c === "string") };
   if (by.pos) { rec.x = by.pos.x || 0; rec.y = by.pos.y || 0; }
   if (by.anchor) rec.anchor = by.anchor.anchor;
-  if (by.color) rec.color = by.color.color;                 // {r,g,b}; CanvasObj.toRGB normalizes
+  if (by.color) rec.color = by.color.color;
   if (by.opacity) rec.opacity = by.opacity.opacity;
   if (by.scale) rec.scale = by.scale.scale;
   if (by.z) rec.z = by.z.z;
   if (by.outline) rec.outline = { width: by.outline.width, color: by.outline.color };
-  if (by.fixed) rec.fixed = true;                           // TQ-290: screen-anchored (skips camera)
+  if (by.fixed) rec.fixed = true;
   if (by.rect) { rec.kind = "rect"; rec.w = by.rect.w; rec.h = by.rect.h; rec.radius = by.rect.radius || 0; rec.gradient = by.rect.gradient || null; rec.shadow = by.rect.shadow || null; if (by.rect.fill === false) rec.fill = false; }
   else if (by.circle) { rec.kind = "circle"; rec.radius = by.circle.r; if (by.circle.fill === false) rec.fill = false; }
   else if (by.text) { rec.kind = "text"; rec.text = by.text.text; if (by.text.size) rec.size = by.text.size; if (by.text.font) rec.font = by.text.font; if (by.text.width) rec.wrap = by.text.width; }
@@ -60,41 +43,23 @@ function compsToRecord(comps) {
   return rec;
 }
 
-/**
- * Compose the canvas backend into a k.* object. Pure construction (no DOM) until start() is called.
- * @returns {object} the k shim
- */
 export function makeCanvasShim() {
   const textures = makeTextureRegistry();
   const scenes = makeSceneManager();
   const retained = makeRetainedLayer();
-  // TQ-443 (opt 2): persists ACROSS frames (the renderer is rebuilt each frame, so it can't live there).
   const labelCache = makeLabelCache();
-  // Keyboard is created EAGERLY (it only needs window, available now) so onKeyPress/onKeyDown registered
-  // during scene setup — which runs on go(), before start() — aren't dropped. (Harness finding, TQ-287.)
+  // Create eagerly: scene setup registers key handlers before start().
   const keyboard = makeKeyboard();
   let mouse = null, runtime = null, refitter = null, renderer = null;
   let _t = 0, _dt = 0;
-  // TQ-555: scene transition. k.go() switches scenes immediately (no hold) and arms a short fade-in from
-  // black over the new scene's first frames — every navigation (title → select → hub → run → …) reads as a
-  // deliberate cut instead of a hard swap. Drawn last in the frame loop; -1 = no fade pending.
-  let sceneFadeP = -1; // -1 idle · 0..1 fade progress (advances per FRAME, dt-capped, so a slow setup frame can't skip it)
+  let sceneFadeP = -1;
   const SCENE_FADE_S = 0.3;
-  // TQ-262 perf: per-frame cache of the canvas bounding rect for worldToScreen. The HTML monster
-  // overlay calls worldToScreen once per visible monster per frame, AFTER writing mount.style.clipPath
-  // (which dirties layout) — so each getBoundingClientRect would force a fresh layout recalc (thrash).
-  // The rect is constant within a rendered frame, so memoize it keyed on the frame time _t.
   let _w2sRect = null, _w2sRectT = -1;
 
-  // TQ-294: the live aspect-matched design width (k.width), read from the runtime; DESIGN_W before start.
   const liveWidth = () => (runtime && runtime.canvas && runtime.canvas._tq && runtime.canvas._tq.vp ? runtime.canvas._tq.vp.W : DESIGN_W);
 
-  // TQ-290/294: camera. camTarget is the world point centred on screen; null = NEUTRAL (no scroll, offset 0)
-  // regardless of the live width. camPos(x,y) sets it. The offset centres on the LIVE width (W/2), not a
-  // fixed 1280/2, so scrolling is correct on any aspect; fixed draws skip the offset.
   let camTarget = null;
   const camOffset = () => (camTarget ? { dx: liveWidth() / 2 - camTarget.x, dy: DESIGN_H / 2 - camTarget.y } : { dx: 0, dy: 0 });
-  // Shallow-copy a draw opts object with its positional fields shifted by (dx,dy) — unless o.fixed.
   const applyCam = (o = {}) => {
     if (o.fixed) return o;
     const { dx, dy } = camOffset();
@@ -107,8 +72,6 @@ export function makeCanvasShim() {
     return c;
   };
 
-  // TQ-289: frame-driven, scene-scoped timers (k.wait). Game-time (ticked by the loop with dt), so they
-  // pause with the loop like Phaser's delayedCall. Cleared on go() so a wait can't outlive its scene.
   let timers = [];
   const tickTimers = (dt) => {
     let anyDead = false;
@@ -121,12 +84,10 @@ export function makeCanvasShim() {
   };
 
   const k = {
-    // ── helpers ──
     rgb: (...c) => normColor(...c),
     vec2: (x = 0, y = 0) => ({ x, y }),
-    // ── TQ-288: component constructors (k.add reads these descriptors) ──
-    rect: (w, h, o = {}) => comp("rect", { w, h, radius: o.radius || 0, gradient: o.gradient || null, shadow: o.shadow || null, fill: o.fill }), // gradient/shadow: UI-polish passthrough (see canvasBackend cDrawRect)
-    circle: (r, o = {}) => comp("circle", { r, fill: o.fill }), // o.fill === false → outline-only ring (with k.outline), like rect
+    rect: (w, h, o = {}) => comp("rect", { w, h, radius: o.radius || 0, gradient: o.gradient || null, shadow: o.shadow || null, fill: o.fill }),
+    circle: (r, o = {}) => comp("circle", { r, fill: o.fill }),
     text: (t, o = {}) => comp("text", { text: t, size: o.size, font: o.font, width: o.width, align: o.align }),
     sprite: (name) => comp("sprite", { name }),
     pos: (x, y) => comp("pos", { x, y }),
@@ -138,44 +99,31 @@ export function makeCanvasShim() {
     z: (z) => comp("z", { z }),
     fixed: () => comp("fixed", {}),
     area: () => comp("area", {}),
-    width: () => liveWidth(),         // TQ-294: dynamic, aspect-matched
+    width: () => liveWidth(),
     height: () => DESIGN_H,
     center: () => ({ x: liveWidth() / 2, y: DESIGN_H / 2 }),
     time: () => _t,
     dt: () => _dt,
-    // TQ-289: k.wait(sec, cb) — fires cb after `sec` game-seconds; cancelable; scene-scoped (cleared on go).
     wait: (sec, cb) => { const t = { remaining: Math.max(0, sec || 0), cb, dead: false }; timers.push(t); return { cancel() { t.dead = true; } }; },
-    // ── assets ──
     loadSprite: (name, src) => textures.loadSprite(name, src),
-    // TQ-289: k.loadFont(name, url) — DOM FontFace (port of kaboomShim.js:450). No-op without a DOM.
     loadFont: (name, url) => {
       if (typeof FontFace === "undefined" || typeof document === "undefined" || !document.fonts) return Promise.resolve();
       try { return new FontFace(name, `url(${url})`).load().then((f) => { document.fonts.add(f); return f; }).catch(() => {}); }
       catch (e) { void e; return Promise.resolve(); }
     },
-    textures, // expose for asset baking (bakeCoreTextures/bakeTile/bakeMonster)
-    // ── scene management ──
+    textures,
     scene: (name, fn) => scenes.scene(name, fn),
-    // TQ-289: drop the old scene's pending waits. TQ-233: also CLEAR all retained objects + RESET the camera
-    // — k.add objects are scene-scoped (Phaser destroys the scene's display list on switch) AND each Phaser
-    // scene starts with a fresh camera at scroll 0. Without the clear, every scene's background/cards/buttons
-    // leak into the next (settings drew ON TOP of a still-present character-select); without the camera reset,
-    // a stale scroll from a world scene (e.g. the hub follows the player via camPos) shifts the next scene's
-    // world-space UI off-screen (settings rendered BLANK after the hub). Both run BEFORE scenes.go executes
-    // the next scene's setup (which re-adds that scene's retained objects + re-establishes any camera).
-    go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); sceneFadeP = 0; return scenes.go(name, data); }, // clear scene-scoped key handlers so they don't accumulate across navigations (the next scene's setup re-registers its own); TQ-555: arm the scene fade-in
+    // Clear scene-scoped state before scenes.go runs the next setup.
+    go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); sceneFadeP = 0; return scenes.go(name, data); },
     onSceneLeave: (cb) => scenes.onSceneLeave(cb),
     onUpdate: (cb) => scenes.onUpdate(cb),
     onDraw: (cb) => scenes.onDraw(cb),
-    // ── retained objects: k.add(comp list) — real scene usage — or a plain flat record (harness) ──
     add: (comps) => retained.add(Array.isArray(comps) ? compsToRecord(comps) : comps),
     destroyAll: (tag) => retained.destroyAll(tag),
-    // ── input: keyboard ──
     isKeyDown: (n) => (keyboard ? keyboard.isKeyDown(n) : false),
     onKeyPress: (n, cb) => (keyboard ? keyboard.onKeyPress(n, cb) : NOOP_SUB),
     onKeyDown: (n, cb) => (keyboard ? keyboard.onKeyDown(n, cb) : NOOP_SUB),
     onCharInput: (cb) => (keyboard ? keyboard.onCharInput(cb) : NOOP_SUB),
-    // ── input: mouse / touch ──
     mousePos: () => (mouse ? mouse.mousePos() : { x: 0, y: 0 }),
     onMousePress: (cb) => (mouse ? mouse.onMousePress(cb) : NOOP_SUB),
     onMouseMove: (cb) => (mouse ? mouse.onMouseMove(cb) : NOOP_SUB),
@@ -186,14 +134,10 @@ export function makeCanvasShim() {
     onTouchEnd: (cb) => (mouse ? mouse.onTouchEnd(cb) : NOOP_SUB),
     isTouchscreen,
     setCursor: (s) => { if (mouse) mouse.setCursor(s); },
-    // ── TQ-290/294: camera ──
     camPos: (x, y) => { camTarget = { x: typeof x === "number" ? x : (camTarget ? camTarget.x : liveWidth() / 2), y: typeof y === "number" ? y : (camTarget ? camTarget.y : DESIGN_H / 2) }; },
     getCamPos: () => (camTarget ? { x: camTarget.x, y: camTarget.y } : { x: liveWidth() / 2, y: DESIGN_H / 2 }),
-    // Map a design point to PAGE CSS px (camera offset for world + aspect-match scale + canvas page offset)
-    // for the DOM monster overlay (TQ-262). Aspect-match fill → no letterbox offset. Null before start().
     worldToScreen: (x, y, { fixed = false } = {}) => {
       if (!runtime || !runtime.canvas || !runtime.canvas.getBoundingClientRect) return null;
-      // Reuse the rect within a frame (see _w2sRect note) — avoids a forced reflow per overlay monster.
       let rect = _w2sRect;
       if (_w2sRectT !== _t || !rect) { rect = runtime.canvas.getBoundingClientRect(); _w2sRect = rect; _w2sRectT = _t; }
       const scale = (rect.height || DESIGN_H) / DESIGN_H;
@@ -202,50 +146,35 @@ export function makeCanvasShim() {
     },
   };
 
-  // Immediate-mode draws: WORLD draws shift by the camera (applyCam); o.fixed skips it. No-op before start().
   for (const m of ["drawRect", "drawCircle", "drawEllipse", "drawLine", "drawText", "drawPolygon", "drawSprite"]) {
     k[m] = (o) => { if (renderer) renderer[m](applyCam(o)); };
   }
-  // Clip is screen-space (UI: station popups / scrolling grids) — no camera shift.
   k.pushClip = (x, y, w, h) => { if (renderer) renderer.pushClip(x, y, w, h); };
   k.popClip = () => { if (renderer) renderer.popClip(); };
-  // UI v3 frosted glass: a sheet calls k.requestFrost() when it opens; the runtime snapshots + blurs the
-  // frame it opened on (end of that frame), and k.drawFrost({pos,width,height,radius,opacity}) paints that
-  // snapshot (screen-space) from then on. k.frostReady() lets a sheet fall back to a plain scrim before the
-  // first capture lands. k.measureText(text,size,font) → real design-px width (0 before start()).
-  // The snapshot belongs to the sheet that is OPEN: a frame that draws no frost (every sheet closed, or a scene
-  // change) marks it stale, so the next sheet captures its own background. It used to stay "ready" forever, so a
-  // run's result card showed the blurred VILLAGE captured when the portal popup opened (the plaza as a grey disc).
   let frostWanted = false, frostUsed = false;
   k.requestFrost = () => { frostWanted = true; };
   k.frostReady = () => !!(runtime && runtime.frost && runtime.frost.ready);
   k.drawFrost = (o) => { const ok = renderer && renderer.drawFrost ? renderer.drawFrost({ ...o, fixed: true }) : false; if (ok) frostUsed = true; return ok; };
   k.measureText = (text, size, font) => (renderer && renderer.measureText ? renderer.measureText(text, size, font) : String(text || "").length * (size || 16) * 0.56);
 
-  /** Boot the runtime: drives the per-frame loop + wires input. Browser only. Returns the runtime. */
   k.start = ({ mount, hideTitle, zIndex } = {}) => {
     runtime = makeCanvasRuntime((ctx, t, dt) => {
       _t = t; _dt = dt;
       renderer = makeCanvasRenderer(ctx, { textures, labelCache, frost: runtime ? runtime.frost : null, designW: k.width(), designH: k.height() });
-      keyboard.update();                 // continuous onKeyDown handlers
-      tickTimers(dt);                    // TQ-289: k.wait timers (game-time)
-      scenes.update(dt);                 // active scene onUpdate
-      // Z-banded compositing to match the Phaser shim: retained z<0.5 (backgrounds/cards/buttons at the
-      // default z=0) UNDER the onDraw layer, then onDraw (immediate world/UI at depth 0.5), then retained
-      // z>=0.5 (explicit-z overlays/popups) ON TOP. World draws camera-shifted via applyCam/camOffset.
+      keyboard.update();
+      tickTimers(dt);
+      scenes.update(dt);
       const cam = camOffset();
-      retained.render(renderer, cam, { below: IMMEDIATE_DEPTH }); // backdrop + default-z UI, behind onDraw
-      scenes.draw(renderer, dt);                                  // active scene onDraw (immediate, depth 0.5)
-      retained.render(renderer, cam, { from: IMMEDIATE_DEPTH });  // z>=1 overlays/popups, above onDraw
-      // TQ-555: scene fade-in (ease-out) over everything, for SCENE_FADE_S after a k.go.
+      retained.render(renderer, cam, { below: IMMEDIATE_DEPTH });
+      scenes.draw(renderer, dt);
+      retained.render(renderer, cam, { from: IMMEDIATE_DEPTH });
       if (sceneFadeP >= 0) {
-        const f = Math.min(1, sceneFadeP), op = (1 - f) * (1 - f); // ease-out: fully black on the first frame, fading fast
+        const f = Math.min(1, sceneFadeP), op = (1 - f) * (1 - f);
         if (op > 0.01) renderer.drawRect({ pos: { x: 0, y: 0 }, width: k.width(), height: k.height(), color: { r: 0, g: 0, b: 0 }, opacity: op, fixed: true });
-        sceneFadeP += Math.min(dt || 0.016, 1 / 30) / SCENE_FADE_S; // per-frame advance (capped) → ≥9 frames even when a frame stalls
+        sceneFadeP += Math.min(dt || 0.016, 1 / 30) / SCENE_FADE_S;
         if (sceneFadeP >= 1) sceneFadeP = -1;
       }
-      // UI v3: snapshot the finished frame for frosted sheets (one-shot per request; see k.requestFrost).
-      if (!frostUsed && runtime && runtime.frost) runtime.frost.ready = false; // no sheet used it this frame: stale
+      if (!frostUsed && runtime && runtime.frost) runtime.frost.ready = false;
       frostUsed = false;
       if (frostWanted) { frostWanted = false; if (runtime && runtime.captureFrost) runtime.captureFrost(); }
     }, {
@@ -254,27 +183,19 @@ export function makeCanvasShim() {
       hideTitle, zIndex,
     });
     mouse = makeMouse(runtime.canvas);
-    // TQ-371: on a resize/orientation refit, the menu scene is re-run so its retained UI reflows to the
-    // new size — but that MUST clear the old retained objects first (exactly like k.go does, line ~158),
-    // or the resized header/buttons/panels draw ON TOP of the pre-resize copy. Without it, every
-    // resolution swap ghosted/duplicated the whole scene (title tripled, panels/buttons stacked). Pass a
-    // sceneManager whose go() runs the same clear (retained + timers + camera) before scenes.go.
+    // Must clear like k.go does, or the re-run scene draws over the old one.
     refitter = makeRefitter({ onRefit: () => {
-      // TQ-524: recompute the canvas backing-store size FIRST (with the now-settled post-rotation dims), so the
-      // scene relayout below reads the correct k.width()/k.height(). The refitter fires after the debounce
-      // settle, which on iOS standalone is when clientWidth/Height have finally reflowed (the raw resize event
-      // fired earlier with stale dims). Without this the menu scene relaid out to the pre-rotation size.
+      // Resize first so the relayout reads the settled post-rotation size.
       try { runtime.resize(); } catch (e) { void e; }
       return relayoutScenes({
         current: () => scenes.current(),
         lastGo: () => scenes.lastGo(),
-        go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); return scenes.go(name, data); }, // a refit re-runs the scene's setup → clear its key handlers first so a resize can't accumulate them
+        go: (name, data) => { timers = []; retained.destroyAll(); camTarget = null; if (keyboard) keyboard.clearHandlers(); return scenes.go(name, data); },
       });
     } });
     return runtime;
   };
 
-  /** Tear down: dispose input + refit + runtime + active scene. */
   k.stop = () => {
     try { refitter && refitter.dispose(); } catch (e) { void e; }
     try { mouse && mouse.dispose(); } catch (e) { void e; }
@@ -283,7 +204,6 @@ export function makeCanvasShim() {
     scenes.stop();
   };
 
-  // expose the sub-managers + the timer tick for the cutover wiring + harness inspection / tests
   k._scenes = scenes; k._retained = retained; k._tickTimers = tickTimers;
   return k;
 }

@@ -1,38 +1,25 @@
-// In-memory game-data store + accessors — pure, no fetch/DOM.
-import { getMonsterStats } from "./stats.js"; // generated-attack costs scale to the monster's own energy
-// A loader populates it once at startup via setGameData(): the client loader
-// (src/data.js) fetches JSON; a server would read files/DB and call the same fn.
+import { getMonsterStats } from "./stats.js";
 
 let monsterTypes = [];
 let attacks = [];
 let groundTiles = [];
 let items = [];
 let spiritChains = [];
-let biomes = []; // GENERATED biomes only; the built-in BIOME_DEFS baseline lives in engine/mapgen.js
+let biomes = [];
 
-// typeName -> monsterType index, kept in lockstep with monsterTypes so getMonsterType
-// is an O(1) Map lookup instead of an O(N) linear scan. getMonsterType runs per combat
-// turn (server) AND per team monster per frame in the lobby/roster scenes, over a pool of
-// ~hundreds of types. Built keeping the FIRST occurrence of each name (matches the old
-// Array.find), and refreshed by every monsterTypes mutation below — never goes stale.
+// Reindex on every monsterTypes mutation; first name occurrence wins.
 let monsterIndex = new Map();
 function reindexMonsters() {
   monsterIndex = new Map();
   for (const m of monsterTypes) if (m && m.typeName != null && !monsterIndex.has(m.typeName)) monsterIndex.set(m.typeName, m);
 }
 
-// name -> attack index (same rationale as monsterIndex). getAttack runs up to 4x per
-// getAttacksForMonster — i.e. per combat turn — over the large attacks pool (~hundreds).
-// `attacks` is only ever replaced via setGameData (no add/remove), so this is rebuilt
-// there. FIRST occurrence wins: attack names are intentionally non-unique (two moves can
-// share a base name — see cleanAttackName), and Array.find returns the first, so must we.
 let attackIndex = new Map();
 function reindexAttacks() {
   attackIndex = new Map();
   for (const a of attacks) if (a && a.name != null && !attackIndex.has(a.name)) attackIndex.set(a.name, a);
 }
 
-/** @param {{monsterTypes?:Array, attacks?:Array, groundTiles?:Array, items?:Array, spiritChains?:Array, biomes?:Array}} data */
 export function setGameData(data) {
   if (data.monsterTypes) { monsterTypes = data.monsterTypes; reindexMonsters(); }
   if (data.attacks) { attacks = data.attacks; reindexAttacks(); }
@@ -46,53 +33,40 @@ export function getMonsterTypes() {
   return monsterTypes;
 }
 
-// Append a (e.g. AI-generated) monster type to the live pool. Returns false if a
-// type with the same name already exists. Used by the P5 generation pipeline.
 export function addMonsterType(mt) {
-  if (!mt || !mt.typeName || monsterIndex.has(mt.typeName)) return false; // O(1) dup check (was .some)
+  if (!mt || !mt.typeName || monsterIndex.has(mt.typeName)) return false;
   monsterTypes.push(mt);
   monsterIndex.set(mt.typeName, mt);
   return true;
 }
 
-// Remove a monster type from the live pool by name (admin curation, P7-T3).
 export function removeMonsterType(name) {
   const i = monsterTypes.findIndex((m) => m.typeName === name);
   if (i < 0) return false;
   monsterTypes.splice(i, 1);
-  reindexMonsters(); // rare (admin) — rebuild keeps the index correct even if dupes ever existed
+  reindexMonsters();
   return true;
 }
 
-// TQ-551 design B: EVOLVED monster types live in a SEPARATE registry from the spawnable pool. An evolution
-// mints a derived type (unique typeName) and repoints the player's instance to it; because everything
-// (getMonsterStats, the html render path + its typeName-keyed cache) resolves a monster via getMonsterType,
-// evolved forms "just work" with no changes to those paths. They are kept OUT of getMonsterTypes() so they
-// never spawn as wild monsters and never appear in the bestiary — an evolved form is personal to one
-// caught monster. Persisted separately (server/db.js) and reloaded at boot via setEvolvedTypes.
+// Keep evolved types out of monsterTypes: they must never spawn or reach the bestiary.
 let evolvedTypes = new Map();
-/** Register a derived evolved type (resolvable by getMonsterType, excluded from the spawnable pool). */
 export function addEvolvedType(mt) {
   if (!mt || !mt.typeName) return false;
   evolvedTypes.set(mt.typeName, mt);
   return true;
 }
-/** All evolved types, for persistence. */
 export function getEvolvedTypes() {
   return Array.from(evolvedTypes.values());
 }
-/** Load persisted evolved types at boot. */
 export function setEvolvedTypes(list) {
   evolvedTypes = new Map();
   for (const mt of (Array.isArray(list) ? list : [])) if (mt && mt.typeName) evolvedTypes.set(mt.typeName, mt);
 }
 
 export function getMonsterType(name) {
-  return monsterIndex.get(name) || evolvedTypes.get(name); // spawnable pool first, then evolved forms
+  return monsterIndex.get(name) || evolvedTypes.get(name);
 }
 
-// Empty the live monster pool (admin "clean wipe" — pairs with the DB wipe so the reset is
-// live without a restart). Followed by AI generation to repopulate.
 export function clearMonsterTypes() {
   monsterTypes = [];
   monsterIndex = new Map();
@@ -106,18 +80,6 @@ export function getAttacks() {
   return attacks;
 }
 
-// AI-authored attacks (genAttacks: {title, description}, from the v2 monster generator)
-// are a monster's REAL moves under the descriptive (v2) combat judge, which resolves a
-// turn from the chosen move's `description`. Map each to the engine's attack shape,
-// synthesizing a NEUTRAL numeric profile (keyed off the monster's element) so the
-// deterministic crash-net — used only if the AI judge is briefly unavailable — can still
-// resolve the move. The live judge path reads only `name`/`description`, never the numbers.
-// Energy cost of generated attack slot i (0..3) for a monster type. The slot curve used to be FIXED (14, 20, 26,
-// 32), but AI-generated monsters have ~8-16 max energy that barely grows with level: at level 1, 53 of the 101 live
-// types could not afford even their cheapest move, so their attack buttons were greyed out and fights became
-// "out of energy" struggles (2026-11-08). The cost is now a share of the monster's level-1 max energy (the
-// cheapest move is always affordable, the strongest takes most of the bar), capped at the old curve so
-// high-energy monsters are unchanged.
 const GEN_COST_SHARE = [0.25, 0.4, 0.55, 0.75];
 export function genAttackCost(mt, i = 0) {
   const fixed = 14 + i * 6;
@@ -126,16 +88,12 @@ export function genAttackCost(mt, i = 0) {
 }
 
 function genAttackMove(ga, mt, i = 0) {
-  // The 4 AI attacks carry no numeric data, so give them a light cost/power CURVE by slot
-  // (cheaper+weaker → costlier+stronger). This makes the energy economy meaningful and the
-  // four moves feel distinct in the UI (the cost shown per button) + the deterministic
-  // crash-net, while the live descriptive judge resolves from `description`, not these numbers.
   return {
     name: ga.title,
     description: ga.description || "",
-    damage: 34 + i * 6,        // 34, 40, 46, 52
+    damage: 34 + i * 6,
     accuracy: 0.9,
-    energyCost: genAttackCost(mt, i), // a share of the monster's own energy (see genAttackCost)
+    energyCost: genAttackCost(mt, i),
     critChance: 0.1,
     critMultiplier: 1.5,
     elementalDiffusion: 0.5,
@@ -147,11 +105,7 @@ function genAttackMove(ga, mt, i = 0) {
 }
 
 export function getAttacksForMonster(monsterType) {
-  if (!monsterType) return []; // unknown/deleted type (e.g. an owned monster whose
-  // generated type an admin removed) → no attacks instead of throwing on .attack_1,
-  // which would crash combat resolution. Callers treat [] as "no usable move".
-  // Prefer the monster's own AI-authored attacks when present (v2-generated monsters);
-  // fall back to the legacy shared-pool refs (attack_1..4) for seed / v1-generated ones.
+  if (!monsterType) return [];
   const gen = monsterType.genAttacks;
   if (Array.isArray(gen) && gen.length) {
     const moves = gen.filter((a) => a && a.title).map((a, i) => genAttackMove(a, monsterType, i));
@@ -168,13 +122,7 @@ export function getAttacksForMonster(monsterType) {
     .filter(Boolean);
 }
 
-// CN-7: some attack names embed their own description ("Burrow Strike - Digs…",
-// "Healing Light - Restores health…") — the AI generator appended it. Strip the
-// " - <description>" suffix for DISPLAY + AI prompts (the text already lives in the
-// `description` field). This is display-ONLY: the full name stays the lookup key,
-// because monsters/`getAttack` reference it and two distinct attacks can share a
-// base name (e.g. two different "Healing Light"), so stripping the key would
-// collide. No `" - "` in a name → returned unchanged.
+// Display-only: keep the full name as the lookup key (base names collide).
 export function cleanAttackName(name) {
   return String(name || "").split(" - ")[0].trim();
 }
@@ -183,16 +131,13 @@ export function getGroundTiles() {
   return groundTiles;
 }
 
-// Append a (AI-generated) ground tile to the live pool (dedupe by name). Returns false on a dupe.
-// Mirrors addMonsterType/addItem so tile generation + admin curation share the pattern. The seed
-// tiles (groundtiles.json) load first, generated ones append — so server + client agree on order.
+// Append only, seed tiles first: server and client pool order must match.
 export function addGroundTile(tile) {
   if (!tile || !tile.name || groundTiles.some((t) => t.name === tile.name)) return false;
   groundTiles.push(tile);
   return true;
 }
 
-// Remove a ground tile from the live pool by name (admin curation).
 export function removeGroundTile(name) {
   const i = groundTiles.findIndex((t) => t.name === name);
   if (i < 0) return false;
@@ -200,9 +145,6 @@ export function removeGroundTile(name) {
   return true;
 }
 
-// Drop only GENERATED tiles (admin "clean wipe") — the hand-authored seed (groundtiles.json) is
-// kept, since maps still need it (unlike monsters, tiles are not pure-AI). Generated tiles carry
-// `generated:true` (set by genTiles.js).
 export function clearGeneratedTiles() {
   groundTiles = groundTiles.filter((t) => !t.generated);
 }
@@ -211,8 +153,6 @@ export function getItems() {
   return items;
 }
 
-// Add a generated item to the live pool (dedupe by name); returns false if a dupe. Mirrors
-// addMonsterType so AI item generation + admin curation share the monster pattern.
 export function addItem(item) {
   if (!item || !item.name || items.some((it) => it.name === item.name)) return false;
   items.push(item);
@@ -230,13 +170,10 @@ export function getItem(name) {
   return items.find((it) => it.name === name);
 }
 
-// Empty the live item pool (admin "clean wipe").
 export function clearItems() {
   items = [];
 }
 
-// GENERATED biomes (the built-in BIOME_DEFS baseline is a const in engine/mapgen.js; these are
-// appended to it for the Voronoi region pick). Mirrors getItems/getGroundTiles.
 export function getBiomes() {
   return biomes;
 }
@@ -254,7 +191,6 @@ export function removeBiome(name) {
   return true;
 }
 
-// Empty the GENERATED biome pool (admin "clean wipe"); the built-in BIOME_DEFS baseline remains.
 export function clearBiomes() {
   biomes = [];
 }

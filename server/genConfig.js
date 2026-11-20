@@ -1,28 +1,17 @@
-// Round-composition + generation config (TQ-364, foundation for Epic TQ-363). Admin-editable,
-// DB-persisted (settings id=5), applied live — mirrors aiconfig.js / prompts.js exactly. These knobs
-// describe the STRUCTURE of a round (how many biomes, monsters-per-biome, tile split per biome, how
-// many biomes are reused vs freshly generated each round) and the per-round generation budget. The
-// round-formation + map-gen + generation tasks (TQ-365..369) READ these via getGenConfig() /
-// roundComposition() so the operator can retune composition from /admin without a redeploy.
-//
-// Defaults encode Dominik's 2026-06-15 spec: 12 biomes/round, 16 monsters/biome, 4 collidable + 8
-// non-collidable tiles/biome, 11 reused + 1 new biome per round, <=30 new monsters generated/round.
-
 import { loadGenConfig, saveGenConfig } from "./db.js";
 
 export const DEFAULT_GEN_CONFIG = {
-  biomesPerRound: 12,             // total distinct biomes a round is composed of
-  newBiomesPerRound: 1,           // of those, how many are freshly generated each round (rest reused)
-  monstersPerBiome: 16,           // size of each biome's (diversity-maximized) monster pool
-  tilesCollidablePerBiome: 4,     // impassable tile types per biome (water/lava/rock…)
-  tilesNonCollidablePerBiome: 8,  // walkable tile types per biome
-  maxNewMonstersPerRound: 30,     // hard cap on AI monsters generated to backfill one round
-  roundGenBackfill: true,         // TQ-368: round start triggers AI gen to fill shortfalls vs the above
-  biomeRarity: true,              // generate a per-biome rarity (off → fixed default, field dropped from the prompt)
-  biomeSize: true,                // generate a per-biome size  (off → fixed default, field dropped from the prompt)
+  biomesPerRound: 12,
+  newBiomesPerRound: 1,
+  monstersPerBiome: 16,
+  tilesCollidablePerBiome: 4,
+  tilesNonCollidablePerBiome: 8,
+  maxNewMonstersPerRound: 30,
+  roundGenBackfill: true,
+  biomeRarity: true,
+  biomeSize: true,
 };
 
-// Per-field validation/coercion. Returns a clean value, or undefined to reject (keeps the default).
 const int = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : undefined; };
 const bool = (v) => (v === true || v === "true" || v === "1" || v === 1) ? true : (v === false || v === "false" || v === "0" || v === 0) ? false : undefined;
 const SPEC = {
@@ -44,7 +33,6 @@ export async function initGenConfig() {
   catch { overrides = {}; }
 }
 
-// Active value for one key: a valid override if present, else the default.
 export function getGenConfig(key) {
   if (key in overrides && SPEC[key]) {
     const clean = SPEC[key](overrides[key]);
@@ -53,9 +41,6 @@ export function getGenConfig(key) {
   return DEFAULT_GEN_CONFIG[key];
 }
 
-// The coherent round-composition plan the consumers (TQ-365..369) act on. `reusedBiomesPerRound` is
-// DERIVED (total - fresh, floored at 0, fresh clamped to total) rather than stored, so reused + new
-// can never disagree with the total — the operator sets the total and the new-count, reused follows.
 export function roundComposition() {
   const total = getGenConfig("biomesPerRound");
   const fresh = Math.min(getGenConfig("newBiomesPerRound"), total);
@@ -73,7 +58,6 @@ export function roundComposition() {
   };
 }
 
-// For the admin editor: per-field current/default/overridden, plus the derived round plan for display.
 export function allGenConfig() {
   const fields = {};
   for (const k of Object.keys(DEFAULT_GEN_CONFIG)) {
@@ -82,7 +66,6 @@ export function allGenConfig() {
   return { fields, composition: roundComposition() };
 }
 
-// Apply a validated/clamped patch. A null/empty value resets that key to its default.
 export async function setGenConfig(patch) {
   if (patch && typeof patch === "object") {
     for (const k of Object.keys(DEFAULT_GEN_CONFIG)) {

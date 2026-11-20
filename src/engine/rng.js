@@ -1,8 +1,3 @@
-// Seeded pseudo-random number generator — shared by client and server.
-// Deterministic from a seed so the same seed reproduces the same map/result.
-// Framework-agnostic (no Kaboom/DOM): safe to import on the server too.
-
-// FNV-1a string hash → 32-bit unsigned int. Lets us seed from names/strings.
 export function hashString(str) {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
@@ -12,7 +7,6 @@ export function hashString(str) {
   return h >>> 0;
 }
 
-// mulberry32 PRNG: tiny, fast, good distribution. Returns a () => [0,1) fn.
 export function mulberry32(seed) {
   let s = seed >>> 0;
   return function () {
@@ -23,22 +17,20 @@ export function mulberry32(seed) {
   };
 }
 
-// Ergonomic RNG wrapper. `seed` may be a number or a string.
 export function makeRng(seed) {
   const numeric = typeof seed === "string" ? hashString(seed) : seed >>> 0;
   const next = mulberry32(numeric);
   return {
     seed: numeric,
-    next, // () => [0, 1)
+    next,
     float: (a = 0, b = 1) => a + next() * (b - a),
     int: (a, b) => Math.floor(a + next() * (b - a + 1)), // inclusive [a, b]
-    range: (n) => Math.floor(next() * n), // [0, n)
+    range: (n) => Math.floor(next() * n),
     pick: (arr) => arr[Math.floor(next() * arr.length)],
     chance: (p) => next() < p,
   };
 }
 
-// A fresh non-deterministic seed (single-player runs, matchmaking).
 export function randomSeed() {
   return (Math.random() * 0xffffffff) >>> 0;
 }

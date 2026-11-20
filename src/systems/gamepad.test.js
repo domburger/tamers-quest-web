@@ -1,5 +1,3 @@
-// Controller input (user-requested). The polling needs a browser Gamepad API, but
-// the deadzone math and the node-safe no-pad path are testable here.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { gamepadMove, gamepadPressed, gamepadConnected, applyDeadzone, BTN } from "./gamepad.js";

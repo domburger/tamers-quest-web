@@ -1,5 +1,3 @@
-// P8-T6 procedural audio (@visual). The synth itself needs a browser AudioContext,
-// but the mute state + the no-op-when-unavailable guards are testable in node.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { isMuted, setMuted, toggleMuted, sfx, getVolume, setVolume } from "./audio.js";
@@ -25,7 +23,7 @@ test("master volume clamps to [0,1], coerces junk, and persists in-process", () 
 test("sfx is a no-op at zero volume even when unmuted", () => {
   setMuted(false);
   setVolume(0);
-  assert.doesNotThrow(() => sfx("hit")); // volume 0 → returns early like mute
+  assert.doesNotThrow(() => sfx("hit"));
   setVolume(1);
 });
 
@@ -34,6 +32,6 @@ test("sfx is a safe no-op with no AudioContext (node) and on unknown names", () 
   assert.doesNotThrow(() => sfx("hit"));
   assert.doesNotThrow(() => sfx("nope-not-a-sound"));
   setMuted(true);
-  assert.doesNotThrow(() => sfx("extract")); // muted → returns early
+  assert.doesNotThrow(() => sfx("extract"));
   setMuted(false);
 });

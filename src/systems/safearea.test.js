@@ -12,7 +12,7 @@ test("readSafeAreaInsets: reads the probe element's resolved padding", () => {
   global.getComputedStyle = () => ({ paddingTop: "44px", paddingRight: "0px", paddingBottom: "34px", paddingLeft: "0px" });
   try {
     assert.deepEqual(readSafeAreaInsets(), { top: 44, right: 0, bottom: 34, left: 0 });
-    assert.equal(appended.length, 1); // probe was attached then read
+    assert.equal(appended.length, 1);
   } finally {
     delete global.document;
     delete global.getComputedStyle;
@@ -46,8 +46,6 @@ test("safeInsetsDesign: zeros off-browser and never throws on bad k", () => {
 });
 
 test("safeInsetsDesign: converts CSS-px insets to design units by the canvas scale", () => {
-  // Canvas is 1440 CSS px tall for a 720 design height → 2 CSS px per design unit, so a
-  // 44px CSS top inset = 22 design units.
   global.document = {
     body: { appendChild() {} },
     createElement: () => ({ style: {}, remove() {} }),

@@ -1,18 +1,12 @@
-// TQ-118: compact Bestiary CONTENT for the in-lobby station popup (the pilot station). A scrollable
-// grid of monster-type cards drawn INTO a given rect (the shell clips it), tapping one opens the
-// SHARED monster-detail popup (ui/monsterDetail.js). Reuses the gamedata + theme helpers; the full
-// bestiary scene (filters / NEW badges) stays the out-of-lobby fallback route. All draws are fixed
-// (screen-space) so the shell's k.pushClip masks them.
 import { getMonsterTypes } from "../engine/gamedata.js";
 import { THEME, accentColor, drawCard, drawCardPlate, drawChip, inRect } from "./theme.js";
 import { drawIcon } from "./icons.js";
-import { drawMonsterIcon } from "../render/monster.js"; // TQ-351: shrink tall sprites so they don't bleed above the bestiary card
+import { drawMonsterIcon } from "../render/monster.js";
 import { sheetEntrance } from "./stationPopup.js";
 
 const CW = 150, CH = 124, G = 14;
 const slug = (n) => String(n || "").toLowerCase().replace(/\s+/g, "_");
 
-// `caught` (optional) = a Set of lowercased typeNames the player owns → uncaught cards dim.
 export function bestiaryPanelState(caught = null) {
   return { scrollY: 0, selected: null, caught, _cols: 1, _maxScroll: 0 };
 }
@@ -33,18 +27,15 @@ export function drawBestiaryPanel(k, rect, state) {
   const { cols, x0, top } = layout(k, rect, state);
   for (let i = 0; i < types.length; i++) {
     const cx = x0 + (i % cols) * (CW + G), cy0 = top + Math.floor(i / cols) * (CH + G);
-    if (cy0 + CH < ry || cy0 > ry + rh) continue; // cull off-rect rows
-    const cy = cy0 + (i < 30 ? sheetEntrance(k, i, { step: 0.02 }) : 0); // UI v4: the first screen of cards slides in
+    if (cy0 + CH < ry || cy0 > ry + rh) continue;
+    const cy = cy0 + (i < 30 ? sheetEntrance(k, i, { step: 0.02 }) : 0);
     const mt = types[i];
     const col = accentColor();
     const hover = inRect(k.mousePos(), [cx, cy0, CW, CH]) && k.mousePos().y >= ry;
-    drawCard(k, { rect: [cx, cy, CW, CH], accent: col, hover, radius: 12, glowY: 0.4, fixed: true }); // design upgrade: lit stage card
-    drawMonsterIcon(k, { sprite: slug(mt.typeName), typeName: mt.typeName, cx: cx + CW / 2, cy: cy + 46, scale: 0.62, topY: cy + 2, fixed: true }); // TQ-351 fit tall sprites; TQ-373 typeName → authored html-model raster
-    // TQ-352: legibility plate behind the name — it sits over the monster's lower body, so a
-    // same-hued monster (e.g. green name over a green golem) washed out. Shared card plate.
+    drawCard(k, { rect: [cx, cy, CW, CH], accent: col, hover, radius: 12, glowY: 0.4, fixed: true });
+    drawMonsterIcon(k, { sprite: slug(mt.typeName), typeName: mt.typeName, cx: cx + CW / 2, cy: cy + 46, scale: 0.62, topY: cy + 2, fixed: true });
     drawCardPlate(k, { rect: [cx, cy, CW, CH], h: 30, inset: 6, radius: 8, fixed: true });
     k.drawText({ text: mt.typeName, pos: k.vec2(cx + CW / 2, cy + CH - 22), size: 13, font: "gameFontBold", anchor: "center", width: CW - 12, color: T("text"), fixed: true });
-    // UI v4: caught monsters wear a green check badge; unseen ones dim with an "Unseen" chip (instead of a flat wash).
     const known = !state.caught || state.caught.has(String(mt.typeName).toLowerCase());
     if (known && state.caught) {
       k.drawCircle({ pos: k.vec2(cx + CW - 15, cy + 15), radius: 10, color: T("success"), fixed: true });
@@ -56,11 +47,8 @@ export function drawBestiaryPanel(k, rect, state) {
   }
   const rows = Math.ceil(types.length / cols);
   state._maxScroll = Math.max(0, rows * (CH + G) + 16 - rh);
-  // NOTE: the selected monster's detail is drawn by the HOST after the popup (OUTSIDE the clip), so the
-  // shared full-screen monster-detail modal isn't masked to the content rect.
 }
 
-// Tap handling inside the content rect. Returns true if consumed. Closes an open detail first.
 export function bestiaryPanelTap(k, rect, state, p) {
   if (state.selected) { state.selected = null; return true; }
   const [rx, ry, rw, rh] = rect;
@@ -78,9 +66,6 @@ export function bestiaryPanelScroll(state, dy) {
   state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy));
 }
 
-// TQ-527: focus targets for controller nav — every monster card (A opens its detail, exactly like a tap;
-// the hub's B then closes that detail). Reuses the same grid layout as draw/tap so the focus rects match
-// the hitboxes. (layout() ignores its k arg, so null is fine here.)
 export function bestiaryPanelFocusables(rect, state) {
   const types = getMonsterTypes(), { cols, x0, top } = layout(null, rect, state), out = [];
   for (let i = 0; i < types.length; i++) {

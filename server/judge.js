@@ -1,35 +1,10 @@
-// Structured Fight-Judgement judge (plan: "Implement combat as per description below").
-//
-// A richer combat-judge contract than the v1 absolute-value resolver (ai.js mapAiResult):
-//   INPUT  - the action being executed + FULL descriptions of both monsters (incl. passive/
-//            active effects) + a running fight TRANSCRIPT, so passives and history are considered.
-//   OUTPUT - per-field EDITS to each monster: integer fields as DELTAS (added then clamped),
-//            string fields as full REWRITES; a short DISPLAY string (was the action a hit?);
-//            and a SPECIAL-ACTIONS section (end the battle / insta-win / flee / arbitrary trigger).
-//
-// This module is the pure, framework-agnostic core (schema + appliers), unit-tested without a
-// live API. It is opt-in behind the admin flag `combatJudgeV2` (default off) so the live default
-// judge is unchanged until this is validated. ai.js wires it in when the flag is set.
+import { normalizeStatus } from "../src/engine/combat.js";
 
-import { normalizeStatus } from "../src/engine/combat.js"; // same status canonicalization as v1
-
-// Integer combat fields the judge may nudge by a DELTA. Value = the matching max-field to clamp
-// against (null = clamp to >= 0 only). currentHealth/energy are the common ones; the stats allow
-// transient buffs/debuffs ("any field", per the spec) but stay clamped so they cannot go negative.
+// Judge sends DELTAS for these; value = max field to clamp to (null = >= 0).
 const INT_FIELDS = { currentHealth: "maxHealth", currentEnergy: "maxEnergy", strength: null, defense: null, speed: null, power: null, luck: null };
-// String fields the judge may REWRITE. status is the live one; kept to a whitelist so a rewrite
-// cannot clobber identity fields (e.g. name) mid-fight.
+// Allowlist: judge output is untrusted; never let it rewrite identity fields.
 const STR_FIELDS = new Set(["status"]);
 
-/**
- * Apply the judge's per-field edits to a combat monster snapshot. Integer fields are DELTAS
- * (added to the current value, then clamped to [0, max]); whitelisted string fields are full
- * rewrites (status is canonicalized + length-capped). Unknown fields are ignored (defensive -
- * the edits are untrusted model output). Pure: returns a new object, never mutates `mon`.
- * @param {object} mon  combat monster ({currentHealth,maxHealth,currentEnergy,maxEnergy,...,status})
- * @param {object} edits  { field: delta-or-rewrite }
- * @param {object} [opts]  { maxTurnDamageFrac } — per-turn HP-loss cap (Task 78); 1 / unset = off.
- */
 export function applyJudgeEdits(mon, edits = {}, opts = {}) {
   const out = { ...mon };
   if (!edits || typeof edits !== "object") return out;
@@ -41,12 +16,7 @@ export function applyJudgeEdits(mon, edits = {}, opts = {}) {
     } else if (STR_FIELDS.has(k)) {
       out[k] = (v == null || v === "") ? null : (normalizeStatus(String(v)).slice(0, 24) || null);
     }
-    // any other field: ignored
   }
-  // Task 78 — per-turn damage cap (parity with the v1 ai.js mapAiResult path, which the DEFAULT
-  // v2 judge had silently dropped): a single turn can't drain more than `maxTurnDamageFrac` of MAX
-  // HP, so the judge can't swing a near-full monster to 0 in one shot. Applies ONLY to a net HP
-  // LOSS this turn; heals and a monster already below the cap are untouched. 1 / unset = off.
   const frac = Number.isFinite(opts.maxTurnDamageFrac) ? Math.max(0.1, Math.min(1, opts.maxTurnDamageFrac)) : 1;
   if (frac < 1 && Number.isFinite(mon.currentHealth) && Number.isFinite(mon.maxHealth) && out.currentHealth < mon.currentHealth) {
     out.currentHealth = Math.max(out.currentHealth, Math.max(0, mon.currentHealth - Math.ceil(mon.maxHealth * frac)));
@@ -54,8 +24,6 @@ export function applyJudgeEdits(mon, edits = {}, opts = {}) {
   return out;
 }
 
-// Strip control chars (newlines included) and cap length, so an untrusted reason string cannot
-// inject into logs/UI. ASCII-printable kept as-is.
 function cleanReason(s) {
   let out = "";
   for (const ch of String(s)) {
@@ -65,12 +33,6 @@ function cleanReason(s) {
   return out.slice(0, 80);
 }
 
-/**
- * Normalize the judge's optional "special actions" into a safe, bounded result the combat loop
- * can act on: whether the battle ends, who won, whether it was a flee, and a short reason. Pure.
- * @param {object} special  the model's special-actions object (untrusted)
- * @returns {{end:boolean, winner:("player"|"enemy"|null), flee:boolean, reason:string}}
- */
 export function resolveSpecial(special = {}) {
   const out = { end: false, winner: null, flee: false, reason: "" };
   if (!special || typeof special !== "object") return out;

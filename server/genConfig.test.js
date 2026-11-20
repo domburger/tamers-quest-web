@@ -1,5 +1,3 @@
-// TQ-364: round-composition + generation config registry. No DB in tests, so loadGenConfig/
-// saveGenConfig are no-ops ({} / undefined) and we exercise the pure defaults/override/derive logic.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { initGenConfig, getGenConfig, allGenConfig, setGenConfig, roundComposition, DEFAULT_GEN_CONFIG } from "./genConfig.js";
@@ -17,8 +15,8 @@ test("TQ-364: defaults match Dominik's spec (12 biomes, 16/biome, 4+8 tiles, 30 
 test("TQ-364: roundComposition derives reused = total - new and tiles/biome = collidable + walkable", async () => {
   await initGenConfig();
   const c = roundComposition();
-  assert.equal(c.reusedBiomesPerRound, 11); // 12 - 1
-  assert.equal(c.tilesPerBiome, 12);        // 4 + 8
+  assert.equal(c.reusedBiomesPerRound, 11);
+  assert.equal(c.tilesPerBiome, 12);
   assert.equal(c.biomesPerRound, 12);
 });
 
@@ -27,18 +25,18 @@ test("TQ-364: setGenConfig validates + clamps; derived reused stays coherent", a
   await setGenConfig({ biomesPerRound: 8, newBiomesPerRound: 3, monstersPerBiome: 999, tilesCollidablePerBiome: -5 });
   assert.equal(getGenConfig("biomesPerRound"), 8);
   assert.equal(getGenConfig("newBiomesPerRound"), 3);
-  assert.equal(getGenConfig("monstersPerBiome"), 64);       // clamped to max
-  assert.equal(getGenConfig("tilesCollidablePerBiome"), 0); // clamped to min
+  assert.equal(getGenConfig("monstersPerBiome"), 64);
+  assert.equal(getGenConfig("tilesCollidablePerBiome"), 0);
   const c = roundComposition();
-  assert.equal(c.reusedBiomesPerRound, 5); // 8 - 3
+  assert.equal(c.reusedBiomesPerRound, 5);
 });
 
 test("TQ-364: new biomes never exceed the total (fresh clamped to total in the plan)", async () => {
   await initGenConfig();
   await setGenConfig({ biomesPerRound: 4, newBiomesPerRound: 10 });
   const c = roundComposition();
-  assert.equal(c.newBiomesPerRound, 4);     // clamped to total
-  assert.equal(c.reusedBiomesPerRound, 0);  // 4 - 4, floored at 0
+  assert.equal(c.newBiomesPerRound, 4);
+  assert.equal(c.reusedBiomesPerRound, 0);
 });
 
 test("TQ-364: empty/null value resets a key to its default", async () => {

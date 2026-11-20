@@ -1,5 +1,4 @@
-// Production smoke test: load tamersquest.com, play as a guest, create a character, reach the village, open the
-// remaining full-screen scenes via tqGo, and report any page errors. No DEV hooks (prod bundle).
+// Prod smoke test (guest -> hub -> scenes, reports page errors). Needs: nothing local (GAME_URL overrides).
 import { chromium } from "playwright";
 import { mkdirSync } from "node:fs";
 const URL = process.env.GAME_URL || "https://tamersquest.com";

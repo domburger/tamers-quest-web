@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { encodeSnapshot, decodeSnapshot } from "./snapshotCodec.js";
 
-// A full keyframe with every category populated + youMeta + circle/portals → round-trips exactly.
 test("TQ-477 codec: full snapshot round-trips (entities, youMeta, gone, circle, portals)", () => {
   const msg = {
     t: "snapshot", tick: 12345, roundId: "round_abc", full: true,
@@ -31,8 +30,6 @@ test("TQ-477 codec: full snapshot round-trips (entities, youMeta, gone, circle, 
   assert.deepEqual(dec.prGone, msg.prGone); assert.deepEqual(dec.chGone, msg.chGone);
 });
 
-// A lean delta (no entities, no youMeta) — the common steady-state frame — omits empty categories,
-// matching the server's omit-empty JSON shape so the client delta-merge is identical either way.
 test("TQ-477 codec: lean delta omits empty categories + null fields", () => {
   const msg = { t: "snapshot", tick: 7, roundId: "r", full: false, you: { id: "p1", x: 1, y: 2, ack: 3, stamina: 100, danger: 0 }, time: 60, circle: null, portals: [] };
   const dec = decodeSnapshot(encodeSnapshot(msg));
@@ -59,6 +56,6 @@ test("TQ-477 codec: chainTier/level null sentinel + empty optional strings round
 
 test("TQ-477 codec: rejects an unknown version byte", () => {
   const bad = encodeSnapshot({ t: "snapshot", tick: 0, roundId: "r", full: true, you: { id: "p", x: 0, y: 0, ack: 0, stamina: 0, danger: 0 }, time: 0, circle: null, portals: [] });
-  bad[0] = 9; // corrupt the version
+  bad[0] = 9;
   assert.throws(() => decodeSnapshot(bad), /codec version/);
 });

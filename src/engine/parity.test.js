@@ -1,10 +1,3 @@
-// PARITY-6 (PT2-T11 proof obligation): script a full run through the SHARED engine
-// helpers that BOTH single-player (`fight.js`/`game.js`) and the authoritative
-// server (`world.js`) route through. The whole parity contract is "SP and MP can't
-// diverge because they call THESE" — so this integration test locks the composed
-// behaviour in. Asserts each step against GAME constants (not brittle magic numbers),
-// so it catches a formula/rule drift in any helper without breaking on a balance tune.
-
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -28,22 +21,19 @@ test("PARITY-6: a scripted run resolves identically through the shared engine (S
   const mon = (id, hp) => ({ id, typeName: name, level: 3, xp: 0, currentHealth: hp, currentEnergy: 0, status: null });
   const profile = {
     gold: 100, essence: 5,
-    activeMonsters: [mon("a", 40), mon("b", 40), mon("c", 40), mon("d", 40)], // full team
+    activeMonsters: [mon("a", 40), mon("b", 40), mon("c", 40), mon("d", 40)],
     vaultMonsters: [],
     chains: [{ chainId: "t1" }, { chainId: "t2" }],
     equippedChainId: "t1",
-    upgrades: {}, // no Prospector/Attunement/Deep-Vault → base multipliers
+    upgrades: {},
   };
 
-  // 1) Defeat a Lv-5 wild monster → GOLD by the shared reward formula (TQ-132: essence is not earned).
   profile.gold += defeatGold(profile, 5);
   assert.equal(profile.gold, 100 + goldForDefeat(5), "defeat gold (no Prospector) = the base formula");
 
-  // 2) A catch with a full team overflows to the vault.
   assert.equal(addCaughtMonster(profile, mon("caught", 1)), "vault", "full team → vault");
   assert.equal(profile.vaultMonsters.length, 1);
 
-  // 3) Cycle the equipped chain ([ / ]) and equip it via the shared rules.
   const nxt = nextChainId(profile.chains, profile.equippedChainId, 1);
   assert.equal(nxt, "t2");
   assert.equal(equipChain(profile, nxt), true);
@@ -52,14 +42,11 @@ test("PARITY-6: a scripted run resolves identically through the shared engine (S
 
   profile.activeMonsters[0].currentHealth = 0;
 
-  // 5) Extract → the extract bonus banks; survivors are NOT auto-healed
-  //    (TQ-203/TQ-207: heal between runs at the free lobby Healer instead).
   const goldBefore = profile.gold;
   grantExtractRewards(profile);
   assert.equal(profile.gold, goldBefore + GAME.GOLD.PER_EXTRACT, "extract bonus");
   assert.equal(profile.activeMonsters[0].currentHealth, 0, "the fainted lead is NOT auto-healed on extract");
 
-  // 6) Re-roster: keep only "b" active; the rest fall to the (capped) vault.
   assert.equal(applyRoster(profile, ["b"]), true);
   assert.equal(profile.activeMonsters.length, 1);
   assert.equal(profile.activeMonsters[0].id, "b");

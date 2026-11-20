@@ -1,4 +1,3 @@
-// Admin-steerable AI model + params (no DB needed — saveAiConfig no-ops without a pool).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { initAiConfig, getAiConfig, setAiConfig, allAiConfig, DEFAULT_AI_CONFIG } from "./aiconfig.js";
@@ -45,16 +44,12 @@ test("allAiConfig exposes current/default/overridden + model options", async () 
 
 test("per-phase generation config: each phase has its own model + temperature dial", async () => {
   await initAiConfig();
-  // Generation is structured BY PHASE (Idea / Attributes / Builder for monsters; Inspiration /
-  // Designer for items). The Builder defaults to a capable model; the rest to the cheap one.
   assert.equal(getAiConfig("genBuilderModel"), "gpt-5.4", "Builder defaults to the reliable model");
   assert.equal(getAiConfig("genIdeaModel"), "gpt-5.4-mini");
   assert.equal(getAiConfig("itemDesignerModel"), "gpt-5.4-mini");
   assert.equal(getAiConfig("genIdeaTemperature"), 0.9);
-  // the old global genModelName / genTemperature were replaced by the per-phase dials
   assert.equal(getAiConfig("genModelName"), undefined, "global gen model replaced by per-phase");
   assert.equal(getAiConfig("genTemperature"), undefined, "global gen temperature replaced by per-phase");
-  // a phase model + temp set independently
   await setAiConfig({ genAttributesModel: "gpt-5.5", genAttributesTemperature: 0.4 });
   assert.equal(getAiConfig("genAttributesModel"), "gpt-5.5");
   assert.equal(getAiConfig("genAttributesTemperature"), 0.4);

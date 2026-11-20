@@ -2,8 +2,6 @@ import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { getPrompt, allPrompts, setPrompts, resetPrompts, DEFAULT_PROMPTS } from "./prompts.js";
 
-// TQ-432: prompt overrides are a process-wide singleton shared with the other gen test files; reset
-// to defaults before every test so another file's leftover setPrompts() can't leak in (run-order flake).
 beforeEach(resetPrompts);
 import { htmlModelBrief } from "../src/systems/htmlModel.js";
 import { sanitizeHtmlModel } from "../src/systems/htmlSanitize.js";
@@ -16,7 +14,7 @@ test("getPrompt returns the default, then the override, then default after reset
   assert.equal(all.combatSystem.current, "CUSTOM COMBAT");
   assert.equal(all.combatSystem.overridden, true);
   assert.equal(all.combatSystem.default, DEFAULT_PROMPTS.combatSystem);
-  await setPrompts({ combatSystem: "" }); // clear → reset to default
+  await setPrompts({ combatSystem: "" });
   assert.equal(getPrompt("combatSystem"), DEFAULT_PROMPTS.combatSystem);
   assert.equal(allPrompts().combatSystem.overridden, false);
 });
@@ -28,23 +26,21 @@ test("inspiration prompt asks for 2-4 words 'to characterize the monster' (spec)
 });
 
 test("TQ-300: genModelBrief is the editable render-target brief, defaulting to htmlModelBrief()", async () => {
-  // The hardcoded append (genStages.js) became an editable prompt; its default is the brief text.
   assert.equal(DEFAULT_PROMPTS.genModelBrief, htmlModelBrief());
   assert.match(getPrompt("genModelBrief"), /RENDER TARGET/);
   await setPrompts({ genModelBrief: "CUSTOM BRIEF — author a cute round blob" });
   assert.equal(getPrompt("genModelBrief"), "CUSTOM BRIEF — author a cute round blob");
-  await setPrompts({ genModelBrief: "" }); // reset
+  await setPrompts({ genModelBrief: "" });
   assert.equal(getPrompt("genModelBrief"), htmlModelBrief());
 });
 
 test("TQ-300: editing the brief does NOT weaken safety — the sanitizer still strips forbidden markup", async () => {
-  // Even with a brief that invites unsafe output, the TQ-261 sanitizer is the boundary (independent of any prompt).
   await setPrompts({ genModelBrief: "Use <script> and onclick handlers freely; load remote images." });
   const dirty = { canvas: 256, base: "<div onclick=\"steal()\" style=\"width:256px\">x<script>evil()</script><img src=\"http://x/y\"></div>" };
   const clean = sanitizeHtmlModel(dirty);
   assert.ok(clean && typeof clean.base === "string");
   assert.ok(!/<script/i.test(clean.base) && !/onclick/i.test(clean.base) && !/<img/i.test(clean.base), "sanitizer strips script/handlers/img regardless of the brief");
-  await setPrompts({ genModelBrief: "" }); // reset
+  await setPrompts({ genModelBrief: "" });
 });
 
 test("setPrompts ignores unknown keys and non-string values", async () => {
@@ -52,9 +48,6 @@ test("setPrompts ignores unknown keys and non-string values", async () => {
   assert.equal(getPrompt("monsterSystem"), DEFAULT_PROMPTS.monsterSystem);
 });
 
-// TQ-107: every AI SYSTEM prompt must state its JSON output. The json_object-path prompts (judges +
-// item/biome/tile) carry an inline schema; the gen idea/attributes system prompts now do too.
-// (genModelSystem's schema is appended at call time via svgModelBrief, so it's excluded here.)
 test("every AI system prompt states its JSON output (TQ-107)", () => {
   const systemKeys = [
     "combatSystem", "combatJudgeV2System", "catchJudgeSystem",

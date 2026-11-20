@@ -1,26 +1,7 @@
-// Shared inventory/collection rules — the start of the INV-T1 inventory engine
-// (PT2-T11 PARITY-3). Pure, framework-agnostic, so single-player (`fight.js`) and
-// the authoritative server (`world.js`) place caught monsters by ONE rule and the
-// vault cap can't drift between the two modes.
-
 import { GAME, ensureChainSlots } from "./schemas.js";
 import { vaultCapacity } from "./upgrades.js";
 import { defeatGold } from "./progression.js";
 
-/**
- * Place a freshly-caught monster into a player's collection:
- *   - into the **active team** if there's room (< TEAM_SIZE), else
- *   - into the **vault** if it's under the player's capacity (base VAULT_SIZE +
- *     Deep Vault upgrade), else
- *   - **released** — a full vault drops the catch (same outcome as a capture
- *     failing), so repeated catches with a full team can't grow the profile without
- *     bound (the catch-path twin of the NC-5 PvP-loot cap).
- * Mutates `profile` (creates the arrays if missing). Returns where it landed so the
- * caller can show the right message: `"team" | "vault" | "released"`.
- * @param {{activeMonsters?:Array, vaultMonsters?:Array, upgrades?:object}} profile
- * @param {object} mon  the caught monster instance
- * @returns {"team"|"vault"|"released"}
- */
 export function addCaughtMonster(profile, mon) {
   profile.activeMonsters = profile.activeMonsters || [];
   if (profile.activeMonsters.length < GAME.TEAM_SIZE) {
@@ -35,17 +16,6 @@ export function addCaughtMonster(profile, mon) {
   return "released";
 }
 
-/**
- * Rearrange a profile's roster from a desired active-team id list. The monsters
- * named in `activeIds` (order preserved, deduped, capped at TEAM_SIZE) become the
- * active team; every other owned monster falls to the vault (capped at the player's
- * capacity — base VAULT_SIZE + Deep Vault). Unknown ids are ignored. Mutates
- * `profile` only on success. Single source for SP roster management + the MP
- * `setRoster` handler (PT2-T11 PARITY-3). _(Distinct from `schemas.js clampRoster`,
- * which clamps an already-built roster rather than rebuilding from an id list.)_
- * @returns {boolean} true if a valid roster (≥1 active) was applied; false (no
- *   mutation) otherwise — the active team must never be emptied.
- */
 export function applyRoster(profile, activeIds) {
   if (!profile) return false;
   const pool = [...(profile.activeMonsters || []), ...(profile.vaultMonsters || [])];
@@ -63,19 +33,6 @@ export function applyRoster(profile, activeIds) {
   return true;
 }
 
-/**
- * Release an owned monster (INV-T7): remove it from the active team or vault and
- * grant a modest refund — Spirit Essence + level-scaled gold, through the SAME
- * meta-upgrade-scaled helpers a wild defeat uses, so a released monster is worth a
- * consistent (not free) amount. Mutates `profile` (gold/essence + roster arrays).
- * Enforces the keep-≥1-active invariant: if the release empties the active team a
- * vault monster is promoted; releasing the player's *last* monster is refused (no
- * mutation). Pure/shared so SP `inventory.js` and an MP release handler grant the
- * same reward and obey the same guard.
- * @param {{activeMonsters?:Array, vaultMonsters?:Array, gold?:number, upgrades?:object}} profile
- * @param {string} monsterId
- * @returns {{ok:boolean, reason?:string, reward?:{gold:number}, from?:"active"|"vault", monster?:object}}
- */
 export function releaseMonster(profile, monsterId) {
   if (!profile) return { ok: false, reason: "no-profile" };
   const id = String(monsterId ?? "");
@@ -91,28 +48,14 @@ export function releaseMonster(profile, monsterId) {
     if (idx < 0) return { ok: false, reason: "not-found" };
     from = "vault"; mon = vault.splice(idx, 1)[0];
   }
-  // Keep ≥1 active: a release that emptied the team promotes a vault monster.
   if (active.length === 0 && vault.length > 0) active.push(vault.shift());
 
   const level = Math.max(1, mon.level || 1);
-  // TQ-132: release refunds GOLD only (essence is premium/paid, never earned).
   const reward = { gold: defeatGold(profile, level) };
   profile.gold = (profile.gold || 0) + reward.gold;
   return { ok: true, reward, from, monster: mon };
 }
 
-/**
- * Apply the death stake to the active team (Q10, confirmed 2026-06-07): a run that
- * ends in defeat (combat wipe / storm / timeout / disconnect) **loses the active run
- * team**. Refill it from the vault (up to TEAM_SIZE), or fresh starters if the vault
- * is empty, so the player is never left with nothing. Mutates `profile`. Shared so SP
- * (`game.js`/`fight.js` death paths) and MP (`world.js endRunForPlayer`) lose the team
- * by ONE rule — `rollStarters` is injected (server + SP supply their own) to keep this
- * engine-pure. Returns the new active team.
- * @param {{activeMonsters?:Array, vaultMonsters?:Array}} profile
- * @param {() => Array} [rollStarters]  fresh-starter roller, used only if the vault is empty
- * @returns {Array} the new active team
- */
 export function loseRunTeam(profile, rollStarters) {
   profile.vaultMonsters = profile.vaultMonsters || [];
   profile.activeMonsters = profile.vaultMonsters.splice(0, GAME.TEAM_SIZE);
@@ -122,22 +65,10 @@ export function loseRunTeam(profile, rollStarters) {
   return profile.activeMonsters;
 }
 
-/**
- * Equip a spirit chain the player owns. Validates the id is in the player's chain
- * inventory before setting `equippedChainId` — the same ownership gate the MP
- * `setEquippedChain` handler needs against an untrusted client, and a harmless
- * no-op guard in the (UI-gated) SP path. Mutates `profile`. (PT2-T11 PARITY-3.)
- * @param {{chains?:Array, equippedChainId?:string}} profile
- * @param {string} chainId
- * @returns {boolean} true if equipped (owned), false if the id isn't owned.
- */
+// Ownership check guards untrusted MP clients; do not drop it.
 export function equipChain(profile, chainId) {
   const id = String(chainId || "");
   if (!(profile.chains || []).some((c) => c.chainId === id)) return false;
-  // CHAIN_SLOTS: the ACTIVE chain must occupy one of the loadout slots. If the id is
-  // already slotted this is just a hot-swap of the active pointer (the in-run case);
-  // otherwise drop it into a free slot, or replace the last slot when the loadout is
-  // full (a lobby "tap to equip" still lands the chain in the loadout).
   if (!Array.isArray(profile.equippedChainIds)) profile.equippedChainIds = [];
   if (!profile.equippedChainIds.includes(id)) {
     if (profile.equippedChainIds.length < GAME.SPIRIT_CHAIN.CHAIN_SLOTS) profile.equippedChainIds.push(id);
@@ -147,18 +78,6 @@ export function equipChain(profile, chainId) {
   return true;
 }
 
-/**
- * Set a profile's chain-slot loadout from a desired id list (the inventory's 3 chain
- * slots). Ids are validated against ownership, deduped, and capped at
- * GAME.SPIRIT_CHAIN.CHAIN_SLOTS (order = slot order); unknown/unowned ids are dropped.
- * The ACTIVE chain (`equippedChainId`) is pinned to a slot (kept if still present,
- * else the first slot). Mutates `profile`; the single rule for the SP inventory and
- * the MP `setChainSlots` handler so the two can't drift. Always succeeds (an empty/
- * all-invalid list yields an empty loadout — the chainless-safety paths backfill it).
- * @param {{chains?:Array, equippedChainId?:?string, equippedChainIds?:string[]}} profile
- * @param {string[]} ids
- * @returns {boolean} true (a loadout was applied)
- */
 export function setChainSlots(profile, ids) {
   if (!profile) return false;
   const owned = new Set((profile.chains || []).map((c) => c.chainId));
@@ -171,23 +90,10 @@ export function setChainSlots(profile, ids) {
   }
   profile.equippedChainIds = slots;
   if (!slots.includes(profile.equippedChainId)) profile.equippedChainId = slots[0] || null;
-  // Respect an intentional 1- or 2-chain loadout, but never leave the player with an
-  // EMPTY loadout while they still own chains (that would be un-throwable) — backfill then.
   if (slots.length === 0 && (profile.chains || []).length) ensureChainSlots(profile);
   return true;
 }
 
-/**
- * The next equipped-chain id when cycling owned chains by `dir` (+1 / -1) from
- * `currentId` (the `[` / `]` keys). Wraps around; returns `null` when there's ≤1
- * chain (nothing to cycle). Pure — callers apply it their own way (SP saves to the
- * character; MP sets optimistically + tells the server). PT2-T11 PARITY-3 — was
- * duplicated in SP `game.js` and MP `onlineGame.js`.
- * @param {Array<{chainId:string}>} chains
- * @param {string} currentId
- * @param {number} dir  +1 (next) or -1 (previous)
- * @returns {string|null}
- */
 export function nextChainId(chains, currentId, dir) {
   const list = chains || [];
   if (list.length <= 1) return null;

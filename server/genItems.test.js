@@ -3,8 +3,6 @@ import assert from "node:assert/strict";
 import { normalizeGeneratedItem, aiGenerateItem, buildItemDesignerPrompt } from "./genItems.js";
 import { DEFAULT_PROMPTS, setPrompts, resetPrompts } from "./prompts.js";
 
-// TQ-432: prompt overrides are a process-wide singleton shared with the other gen test files; reset
-// to defaults before every test so another file's leftover setPrompts() can't leak in (run-order flake).
 beforeEach(resetPrompts);
 
 test("normalizeGeneratedItem: a simple {id,name,description}, defaulted + clamped", () => {
@@ -12,7 +10,6 @@ test("normalizeGeneratedItem: a simple {id,name,description}, defaulted + clampe
   assert.equal(it.id, 3);
   assert.equal(it.name, "Ember Vial");
   assert.ok(it.description.includes("Fire"));
-  // accepts alt field names; defaults a missing name; caps long text
   assert.equal(normalizeGeneratedItem({ action: "Heals your monster a little." }).name, "Curio");
   assert.equal(normalizeGeneratedItem({ name: "X", effect: "does a thing" }).description, "does a thing");
   assert.ok(normalizeGeneratedItem({ name: "L", description: "x".repeat(500) }).description.length <= 250, "long description is capped (~240 + ellipsis)");
@@ -25,13 +22,13 @@ test("normalizeGeneratedItem: name is made unique vs existingNames", () => {
 
 test("aiGenerateItem: inspiration -> designer -> normalized item (mocked chat)", async () => {
   const origKey = process.env.OPENAI_API_KEY;
-  process.env.OPENAI_API_KEY = "test-key"; // aiEnabled()
+  process.env.OPENAI_API_KEY = "test-key";
   const calls = [];
   const chat = async (system, user) => {
     calls.push({ system, user });
-    if (calls.length === 1) return { inspiration: "smoking tar bomb" };                                                     // stage 1: inspiration
-    if (calls.length === 2) return { name: "Tar Bomb", description: "Throw to coat the enemy in burning tar — Fire damage that lingers." }; // stage 2: designer
-    return { html: `<div style="position:relative;width:256px;height:256px"><div style="position:absolute;left:64px;top:48px;width:128px;height:160px;background:#28201a;border-radius:18px"></div></div>` }; // stage 3: builder authors free HTML/CSS (TQ-393)
+    if (calls.length === 1) return { inspiration: "smoking tar bomb" };
+    if (calls.length === 2) return { name: "Tar Bomb", description: "Throw to coat the enemy in burning tar — Fire damage that lingers." };
+    return { html: `<div style="position:relative;width:256px;height:256px"><div style="position:absolute;left:64px;top:48px;width:128px;height:160px;background:#28201a;border-radius:18px"></div></div>` };
   };
   try {
     const it = await aiGenerateItem({ id: 9 }, { chat });
@@ -59,23 +56,18 @@ test("item prompts: inspiration asks for 2-4 words + spans the full toolkit (hea
   const idea = (DEFAULT_PROMPTS.itemIdeaSystem + " " + DEFAULT_PROMPTS.itemIdeaUser).toLowerCase();
   assert.ok(idea.includes("to characterize"), "characterize-the-item framing present");
   assert.ok(idea.includes("2-4 words"));
-  // items must NOT be all enemy-debuffs — the inspiration spans self-help + offence.
   assert.ok(idea.includes("heal") && idea.includes("enemy"), "covers helping your own monster AND harming the enemy");
-  // the inspiration user prompt carries the role hint via {kind} (filled by buildItemInspirationPrompt)
   assert.ok(DEFAULT_PROMPTS.itemIdeaUser.includes("{kind}"), "user prompt has a {kind} slot for the role hint");
-  // the designer prompt is filled with the inspiration verbatim (function replacement, $-safe)
   assert.ok(buildItemDesignerPrompt("a$b inspiration").user.includes("a$b inspiration"));
 });
 
 test("item designer: a dropped {inspiration} slot is respected (no append-if-missing)", async () => {
-  // The prompt is literal: an override that removes the placeholder omits the inspiration (the operator
-  // dropped it for a reason). Default keeps {inspiration} → it fills (covered above).
   await setPrompts({ itemDesignerUser: "Design a combat item as JSON {name,description}." });
   try {
     const out = buildItemDesignerPrompt("smoking tar bomb").user;
     assert.ok(out.includes("Design a combat item"), "override text used verbatim");
     assert.ok(!out.includes("smoking tar bomb"), "dropped {inspiration} is NOT re-appended");
   } finally {
-    await setPrompts({ itemDesignerUser: "" }); // reset to default
+    await setPrompts({ itemDesignerUser: "" });
   }
 });

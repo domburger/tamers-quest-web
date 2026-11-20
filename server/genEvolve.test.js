@@ -7,7 +7,6 @@ import { resetPrompts } from "./prompts.js";
 
 beforeEach(resetPrompts);
 
-// Same fake LangChain chat shape as genStages.test.js: records the prompts, returns canned output by name.
 function mockChat(canned, calls) {
   return {
     withStructuredOutput(schema, cfg) {
@@ -42,7 +41,6 @@ test("TQ-551 evolveMonster: calls the agent, normalizes its edits, and evolves t
     assert.match(m.html.base, /huge blazing/, "base markup edited via the replace tool");
     assert.equal(m.baseHealth, 70); assert.equal(m.baseStrength, 20);
     assert.deepEqual(m.evolvedLevels, [30]);
-    // the agent was prompted with the current model markup (so it can copy oldStrings verbatim) + the level
     const call = calls.find((c) => c.name === "MonsterEvolution");
     assert.ok(call, "evolution agent invoked");
     assert.match(call.user, /small/, "prompt includes the current markup to edit");
@@ -66,7 +64,6 @@ test("TQ-551 buildEvolutionSchema: survives strict-mode coercion (required keys,
   const strict = toStrictSchema(buildEvolutionSchema());
   assert.deepEqual(strict.required.sort(), ["attrEdits", "modelEdits", "name"]);
   assert.equal(strict.additionalProperties, false);
-  // every nested object is locked down for strict structured output
   const editItem = strict.properties.modelEdits.items.properties.edits.items;
   assert.deepEqual(editItem.required.sort(), ["newString", "oldString"]);
   assert.equal(editItem.additionalProperties, false);
@@ -78,12 +75,11 @@ test("TQ-551 processEvolutions: evolves DUE survivors (lvl≥30), repoints insta
   const registered = [];
   const register = (t) => registered.push(t);
   let n = 0; const newId = () => `id${++n}`;
-  // mock evolve that applies like evolveMonster would (mutates the type copy)
   const evolve = async (t, level) => { t.name = "Dire Wolf"; t.html.base = "<div>beast</div>"; t.baseHealth = 90; t.evolvedLevels = [level]; return { ok: true, monster: t }; };
   const team = [
-    { id: "a", typeName: "Wolf", level: 31 },                       // due
-    { id: "b", typeName: "Wolf", level: 12 },                       // not due
-    { id: "c", typeName: "Wolf", level: 30, evolvedLevels: [30] },  // already evolved
+    { id: "a", typeName: "Wolf", level: 31 },
+    { id: "b", typeName: "Wolf", level: 12 },
+    { id: "c", typeName: "Wolf", level: 30, evolvedLevels: [30] },
   ];
   const events = await processEvolutions(team, { evolve, getType, register, newId });
   assert.equal(events.length, 1, "only the due monster evolves");
@@ -111,7 +107,7 @@ test("TQ-556 processEvolutions: never re-evolves an already-evolved type (defens
   let called = 0;
   const getType = () => ({ typeName: "Wolf#evo30#x", name: "Dire Wolf", evolved: true, html: { base: "<div>beast</div>" } });
   const events = await processEvolutions(
-    [{ id: "a", typeName: "Wolf#evo30#x", level: 45 }], // 45 ≥ 30 + evolvedLevels missing → would retry, but base is evolved
+    [{ id: "a", typeName: "Wolf#evo30#x", level: 45 }],
     { getType, evolve: async () => { called++; return { ok: true }; }, register: () => {}, newId: () => "y" },
   );
   assert.equal(events.length, 0, "an evolved type is not evolved again");

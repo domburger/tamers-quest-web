@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { EVOLUTION_LEVELS, EVOLUTION_MAX_GROWTH, pendingEvolution, applyReplaceEdits, applyAttrEdits, applyEvolution } from "./evolution.js";
 
-// A monster TYPE shape: stats are top-level base* fields (src/engine/stats.js), html is the per-state model.
 const baseMon = () => ({
   typeName: "Emberling", name: "Emberling",
   baseHealth: 40, baseStrength: 12, baseDefense: 8, healthScaling1: 2, healthScaling2: 1,
@@ -10,7 +9,7 @@ const baseMon = () => ({
 });
 
 test("TQ-551 pendingEvolution: fires when crossing the fixed level (30), once, and respects idempotency", () => {
-  const L = EVOLUTION_LEVELS[0]; // 30
+  const L = EVOLUTION_LEVELS[0];
   const m = baseMon();
   assert.equal(pendingEvolution(m, L - 1, L - 2), null, "not at the fixed level yet");
   assert.equal(pendingEvolution(m, L, L - 1), L, "crossing 30 evolves");
@@ -26,7 +25,6 @@ test("TQ-551 applyReplaceEdits: exactly-once find/replace; rejects missing, ambi
   assert.equal(applyReplaceEdits("abc", [{ oldString: "", newString: "y" }]).error, "empty_old");
   assert.equal(applyReplaceEdits("abc", [{ newString: "y" }]).error, "bad_edit");
   assert.equal(applyReplaceEdits("abc", []).error, "no_edits");
-  // sequential edits chain on the running text
   assert.deepEqual(applyReplaceEdits("one two", [{ oldString: "one", newString: "1" }, { oldString: "two", newString: "2" }]), { ok: true, text: "1 2" });
 });
 
@@ -67,8 +65,8 @@ test("TQ-551 applyEvolution: ATOMIC — a bad state edit rejects the whole evolu
   const before = JSON.parse(JSON.stringify(m));
   const res = applyEvolution(m, 15, {
     modelEdits: {
-      base: [{ oldString: "small", newString: "huge" }],          // valid
-      idle: [{ oldString: "NOT-PRESENT", newString: "x" }],        // invalid → whole thing must roll back
+      base: [{ oldString: "small", newString: "huge" }],
+      idle: [{ oldString: "NOT-PRESENT", newString: "x" }],
     },
   });
   assert.equal(res.ok, false);
@@ -86,7 +84,6 @@ test("TQ-551 applyEvolution: requires a base edit (no no-op evolutions) and a mo
 
 test("TQ-551 applyEvolution: rejects an edit that breaks renderability", () => {
   const m = baseMon();
-  // Replace the entire base markup with plain text → not renderable HTML → rejected.
   const res = applyEvolution(m, 30, { modelEdits: { base: [{ oldString: m.html.base, newString: "just words" }] } });
   assert.equal(res.ok, false);
   assert.equal(res.error, "model_base_unrenderable");

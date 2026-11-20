@@ -11,7 +11,7 @@ test("addDiscovered marks a brand-new species as new and appends it", () => {
 test("addDiscovered is idempotent — a known species is not new", () => {
   const { list, isNew } = addDiscovered(["cinder wolf"], "Cinder Wolf");
   assert.equal(isNew, false);
-  assert.deepEqual(list, ["cinder wolf"]); // no duplicate
+  assert.deepEqual(list, ["cinder wolf"]);
 });
 
 test("addDiscovered is case- and whitespace-insensitive", () => {
@@ -38,7 +38,6 @@ test("addDiscovered tolerates a non-array list", () => {
 });
 
 test("markDiscovered/isDiscovered/getDiscovered: persistent, case-insensitive milestone set", () => {
-  // Mock localStorage so the persistence path runs (node has none → load/persist no-op).
   const store = {};
   const prev = globalThis.localStorage;
   globalThis.localStorage = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
@@ -64,7 +63,6 @@ test("markSpeciesSeen/getSeenSpecies: bestiary NEW-badge state, independent of d
     assert.equal(markSpeciesSeen("Cinder Wolf"), true, "first inspection marks it seen");
     assert.equal(markSpeciesSeen(" cinder wolf "), false, "inspecting again is a no-op (case/space-insensitive)");
     assert.deepEqual([...getSeenSpecies()], ["cinder wolf"]);
-    // Seen-state is a SEPARATE key from discovered → marking seen doesn't discover, and vice-versa.
     assert.equal(isDiscovered("Cinder Wolf"), false, "seen ≠ discovered (different localStorage keys)");
   } finally {
     if (prev === undefined) delete globalThis.localStorage; else globalThis.localStorage = prev;
@@ -80,7 +78,6 @@ test("markEncountered/getEncountered: wild-sighting set, independent of discover
     assert.equal(markEncountered("Cinder Wolf"), true, "first sighting records it");
     assert.equal(markEncountered(" cinder WOLF "), false, "same species again is a no-op (case/space-insensitive)");
     assert.deepEqual([...getEncountered()], ["cinder wolf"]);
-    // Separate key from discovered(=caught) + bestiary-seen → a fought-but-fled monster reads as seen, not caught.
     assert.equal(isDiscovered("Cinder Wolf"), false, "encountered != caught");
     assert.deepEqual([...getSeenSpecies()], [], "encountered != bestiary-inspected");
   } finally {

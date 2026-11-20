@@ -1,21 +1,9 @@
-// TQ-199 (epic TQ-99 / sub-task of the lobby station-popup work): Profile CONTENT for the in-lobby
-// station popup. Re-implements profile.js's read view — avatar, identity (name + account level/XP),
-// lifetime stats (with the multi-tamer selector), the active team, and recent match history — in the
-// shell's immediate-mode draw(k,rect,state)+tap contract (profile.js itself is a retained-mode scene
-// that can't mount in the clipped popup). Coordinated with 00002 (profile.js / TQ-13 lane): this is a
-// SEPARATE content module reading the SAME storage helpers, mirroring the settingsPanel.js /
-// cosmeticsPanel.js precedent — profile.js stays the standalone out-of-lobby fallback route.
-//
-// Username editing reuses profile.js's approach: a fixed-position DOM <input> (so the mobile keyboard
-// opens) over an immediate-mode backdrop drawn inside this panel. The DOM node is torn down via the
-// state.dispose() hook the host calls on close. All canvas draws are fixed (screen-space) so the
-// shell's k.pushClip masks them.
 import { getProfile, getCharacters, getAccountSession, getAccountNickname, setProfileNickname } from "../storage.js";
 import { THEME, PAL, FONT, FONT_BOLD, FONT_BODY, drawGlass, drawButton, drawEyebrow, drawChip, inRect } from "./theme.js";
 import { drawGlassSheet } from "./stationPopup.js";
 import { drawCharacter } from "../render/character.js";
 import { getEquippedCharacterSkin } from "../render/characterCosmetics.js";
-import { slugOf, drawMonsterIcon } from "../render/monster.js"; // TQ-351: drawMonsterIcon shrinks tall sprites to the team icon box
+import { slugOf, drawMonsterIcon } from "../render/monster.js";
 import { xpForLevel } from "../engine/progression.js";
 import { prefersReducedMotion } from "../systems/a11y.js";
 
@@ -57,9 +45,6 @@ function serverData(account) {
   return { name: account.nickname || "Tamer", isGuest: false, providers: account.providers || null, characters: chars, totals: sumStats(chars), history: mergeHistory(chars) };
 }
 
-// state carries the loaded data (refreshed from the server for logged-in accounts), the per-tamer
-// stats view, scroll, and the rename modal's DOM node + status. `activeCharId` selects which tamer's
-// team/level to show (the one you entered the lobby as).
 export function profilePanelState(activeCharId) {
   const profile = getProfile();
   const authed = !!(profile && !profile.isGuest);
@@ -74,7 +59,7 @@ export function profilePanelState(activeCharId) {
     fetch("/account/me", { headers: { "x-account-session": session } })
       .then((r) => (r.status === 401 ? null : r.ok ? r.json() : null))
       .then((d) => { if (d && d.account) state.data = serverData(d.account); })
-      .catch(() => { /* offline — keep the local render */ });
+      .catch(() => {});
   }
   return state;
 }
@@ -88,10 +73,7 @@ export function drawProfilePanel(k, rect, state) {
   let y = ry + 8 - state.scrollY;
   const rects = { chips: [], edit: null };
 
-  // ── Identity: avatar (immediate-mode vector tamer) + name + account level/XP ──
   const sk = state.skin || {};
-  // fixed:true → screen-space (the popup composites over the hub, whose camera tracks the player; a
-  // world-space figure would draw off-popup). drawCharacter wraps k into a fixed overlay internally.
   drawCharacter(k, { x: cx, y: y + 78, t: prefersReducedMotion() ? 0 : k.time(), dir: { x: 0, y: 1 }, scale: 1.5, color: sk.accent || [90, 170, 255], cloak: sk.cloak, model: sk.model || "cloak", fixed: true });
   y += 104;
   k.drawText({ text: data.name || "Tamer", pos: k.vec2(cx, y), size: 26, font: FONT_BOLD, anchor: "center", color: T("text"), fixed: true });
@@ -105,7 +87,6 @@ export function drawProfilePanel(k, rect, state) {
     rects.edit = er; y += 34;
   }
 
-  // ── Stats selector (multi-tamer accounts) + lifetime stat cells ──
   let viewChar = null;
   if (state.statsView !== "all") { viewChar = chars.find((c) => c.id === state.statsView) || null; if (!viewChar) state.statsView = "all"; }
   if (chars.length > 1) {
@@ -144,7 +125,6 @@ export function drawProfilePanel(k, rect, state) {
   });
   y += 108;
 
-  // ── Active team portraits ──
   const activeChar = chars.find((c) => c.id === state.activeCharId) || chars[0] || null;
   const team = (activeChar && activeChar.activeMonsters) || [];
   drawGlass(k, { rect: [rx + 2, y, rw - 4, 104], radius: 16, fixed: true });
@@ -152,8 +132,6 @@ export function drawProfilePanel(k, rect, state) {
   if (!team.length) {
     k.drawText({ text: activeChar ? "No monsters yet." : "No tamer selected.", pos: k.vec2(cx, y + 52), size: 13, font: FONT_BODY, anchor: "center", color: T("textMut"), fixed: true });
   } else {
-    // UI v4: each monster sits in a dark portrait WELL with a level chip, its bold name underneath (was a loose
-    // sprite over a "Name L1" caption).
     const shown = team.slice(0, 6), slotW = (rw - 36) / shown.length;
     const well = Math.max(36, Math.min(54, slotW - 18));
     const ps = Math.max(0.12, Math.min(0.22, well / 240));
@@ -161,7 +139,7 @@ export function drawProfilePanel(k, rect, state) {
       const x = rx + 18 + slotW * (i + 0.5), wy = y + 24;
       k.drawRect({ pos: k.vec2(x - well / 2, wy), width: well, height: well, radius: 12, color: T("bg"), opacity: 0.55, fixed: true });
       k.drawRect({ pos: k.vec2(x - well / 2, wy), width: well, height: well, radius: 12, fill: false, outline: { width: 1, color: k.rgb(255, 255, 255) }, opacity: 0.1, fixed: true });
-      drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x, cy: wy + well / 2 + 2, scale: ps, topY: wy + 3, fixed: true }); // TQ-351 fit tall sprites; TQ-373 typeName → authored html-model raster
+      drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x, cy: wy + well / 2 + 2, scale: ps, topY: wy + 3, fixed: true });
       drawChip(k, { x: x + well / 2 + 4, y: wy - 4, text: `Lv ${m.level || 1}`, color: THEME.textBody, size: 8, h: 14, padX: 5, anchor: "right", fixed: true });
       let nm = m.name || m.typeName || "?";
       const maxW = slotW - 8;
@@ -172,7 +150,6 @@ export function drawProfilePanel(k, rect, state) {
   }
   y += 116;
 
-  // ── Recent match history ──
   const rows = (data.history || []).slice(0, 8);
   const histH = Math.max(56, 36 + rows.length * 28);
   drawGlass(k, { rect: [rx + 2, y, rw - 4, histH], radius: 16, fixed: true });
@@ -191,14 +168,10 @@ export function drawProfilePanel(k, rect, state) {
   }
   y += histH + 8;
 
-  // content height for scroll (y is in shifted space → add scrollY back to get absolute extent)
   state._maxScroll = Math.max(0, (y + state.scrollY) - (ry + rh));
   state._rects = rects;
 }
 
-// Rename modal — drawn by the host OUTSIDE the shell's content clip (full screen, above the popup),
-// the same way the shared monster-detail popup composites over a station panel. The DOM <input> the
-// player types into layers above the canvas on its own (position:fixed).
 export function drawProfileModal(k, state) {
   if (!state.renaming) return;
   const T = (n) => k.rgb(...(THEME[n] || [255, 255, 255]));
@@ -219,7 +192,7 @@ export function profilePanelTap(k, rect, state, p, showToast) {
     const m = state._modalRects;
     if (m && inRect(p, m.save)) { submitRename(state, showToast); return true; }
     if (m && inRect(p, m.cancel)) { state.dispose(); return true; }
-    return true; // swallow taps under the modal
+    return true;
   }
   const r = state._rects; if (!r) return false;
   for (const c of r.chips) if (inRect(p, c.r)) { state.statsView = c.id; state.scrollY = 0; return true; }
@@ -232,10 +205,6 @@ export function profilePanelScroll(state, dy) {
   state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy));
 }
 
-// TQ-527: focus targets for controller nav — the stats-view chips + the Edit-username button, read from the
-// hitboxes the draw records in state._rects (so they match the tap targets). A on a chip switches the stats
-// view; A on Edit opens the rename modal (which needs the keyboard to type — B closes it via dispose). Empty
-// while renaming or before the first draw.
 export function profilePanelFocusables(_rect, state) {
   const r = state._rects;
   if (!r || state.renaming) return [];
@@ -245,7 +214,6 @@ export function profilePanelFocusables(_rect, state) {
   return out;
 }
 
-// ── Rename: a fixed-position DOM input (mobile keyboard) + the immediate-mode modal above ──
 function openRename(state) {
   if (state.renaming) return;
   state.renaming = true; state.renameErr = "";

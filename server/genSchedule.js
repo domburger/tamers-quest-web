@@ -1,13 +1,3 @@
-// Per-time AI generation scheduler (TQ-369, Epic TQ-363). Independently of round-start backfill
-// (TQ-368), an operator can have the server generate ONE new biome / tile / monster on a fixed
-// cadence — e.g. "a new biome every day, a new monster every hour" — to grow content variety over
-// time. Admin-editable, DB-persisted (settings id=7), applied live; mirrors the aiconfig/genConfig
-// override-registry pattern. The interval tick lives in index.js (alongside the game tick); this
-// module owns the config, the last-run bookkeeping, and the pure "what's due" decision.
-//
-// Defaults: all OFF (generation costs OpenAI — the operator opts in per asset). Last-run timestamps
-// are persisted so the cadence survives a restart.
-
 import { loadGenSchedule, saveGenSchedule } from "./db.js";
 
 const HOUR = 3600000;
@@ -18,7 +8,7 @@ export const DEFAULT_GEN_SCHEDULE = {
   monstersEnabled: false, monstersEveryMs: 24 * HOUR,
 };
 
-const MIN_MS = 60000, MAX_MS = 30 * 24 * HOUR; // 1 minute … 30 days
+const MIN_MS = 60000, MAX_MS = 30 * 24 * HOUR;
 const int = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) ? Math.max(lo, Math.min(hi, Math.round(n))) : undefined; };
 const bool = (v) => (v === true || v === "true" || v === "1" || v === 1) ? true : (v === false || v === "false" || v === "0" || v === 0) ? false : undefined;
 const everyOf = (v) => int(v, MIN_MS, MAX_MS);
@@ -28,8 +18,8 @@ const SPEC = {
   monstersEnabled: bool, monstersEveryMs: everyOf,
 };
 
-let overrides = {};      // config overrides (validated subset of DEFAULT_GEN_SCHEDULE)
-let lastRun = {};        // { biomes, tiles, monsters } → epoch ms of the last generation
+let overrides = {};
+let lastRun = {};
 
 export async function initGenSchedule() {
   try {
@@ -48,14 +38,12 @@ export function getGenSchedule(key) {
   return DEFAULT_GEN_SCHEDULE[key];
 }
 
-// The active config object (all keys resolved).
 function activeConfig() {
   const cfg = {};
   for (const k of Object.keys(DEFAULT_GEN_SCHEDULE)) cfg[k] = getGenSchedule(k);
   return cfg;
 }
 
-// For the admin editor: per-field current/default/overridden + the last-run timestamps.
 export function allGenSchedule() {
   const fields = {};
   for (const k of Object.keys(DEFAULT_GEN_SCHEDULE)) {
@@ -78,9 +66,6 @@ export async function setGenSchedule(patch) {
   return allGenSchedule();
 }
 
-// PURE: which assets are due to generate at `now`, given a resolved config + last-run map. An asset
-// is due when enabled AND at least its interval has elapsed since its last run (a never-run asset is
-// immediately due). Unit-tested without timers.
 export function computeDue(cfg, last, now) {
   const due = [];
   for (const asset of GEN_ASSETS) {
@@ -90,9 +75,7 @@ export function computeDue(cfg, last, now) {
   return due;
 }
 
-// One scheduler tick: generate ONE of each due asset (sequentially), stamp + persist its last-run.
-// `now` + `gen` (the per-asset generator fns) are injected so this is testable + decoupled from
-// content.js. Marks last-run BEFORE awaiting, so a slow/failed generation can't double-fire next tick.
+// Stamp last-run before awaiting gen so a slow run can't double-fire.
 export async function tickGenSchedule(now, gen) {
   const due = computeDue(activeConfig(), lastRun, now);
   if (!due.length) return [];

@@ -4,11 +4,6 @@ import { readFileSync } from "node:fs";
 import { GAME } from "./schemas.js";
 import { setGameData, getAttacksForMonster } from "./gamedata.js";
 
-// Data-integrity guard for the shipped content (public/assets/data/*.json). Lots of
-// tests USE this data, but none validated the FILES — a content authoring error (a
-// typo'd attack name, a duplicate id, a missing starter chain) would pass every other
-// test yet break the game at runtime. With AI generation + admin edits actively
-// touching content, this locks the invariants. (All pass on the current data.)
 const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
 const monsters = read("monstertype.json");
 const attacks = read("attacks.json");
@@ -36,11 +31,6 @@ test("data: every monster's attacks reference an attack that exists (no typo / r
 });
 
 test("data: every monster resolves to at least one usable attack (no unwinnable encounter)", () => {
-  // getAttacksForMonster prefers genAttacks, else the attack_1..4 pool refs, dropping any
-  // that don't resolve. A monster left with ZERO moves can't fight — the enemy just waits
-  // and the player has nothing to pick — yet it slips past the "refs exist" guard above
-  // (which only checks the refs that ARE present, not that any are). AI-gen + admin edits
-  // make a moveless monster a live authoring risk, so test the REAL resolver per monster.
   setGameData({ monsterTypes: monsters, attacks });
   const bad = monsters.filter((m) => getAttacksForMonster(m).length === 0);
   assert.deepEqual(bad.map((m) => m.typeName), [], "monsters that resolve to zero usable attacks");
@@ -52,12 +42,6 @@ test("data: every monster has a 1-5 rarity", () => {
 });
 
 test("data: every monster has finite stat fields with positive base + non-negative scaling", () => {
-  // stats.js getMonsterStats reads base{Stat}/{stat}Scaling1/{stat}Scaling2 for all
-  // seven stats. It defensively falls back to 60/1/1 on a bad value, so a malformed
-  // monster never NaN-crashes — but it silently collapses to identical bland stats and
-  // passes every test. A negative scaling is worse: stats SHRINK as the monster levels.
-  // AI generation authors new monsters, so lock the shape: finite numbers, base > 0
-  // (a base <= 0 health is an instant-death monster), scalings >= 0 (no inverted growth).
   const STAT_FIELDS = ["Health", "Strength", "Defense", "Speed", "Power", "Energy", "Luck"];
   const bad = [];
   for (const m of monsters) for (const k of STAT_FIELDS) {
@@ -78,10 +62,6 @@ test("data: attack names are unique and each has a name", () => {
 });
 
 test("data: every attack has finite numeric combat fields (no NaN damage at runtime)", () => {
-  // The combat formula (engine/combat.js performAttack) reads these eight fields
-  // directly; a missing/garbage value yields NaN damage that silently breaks a fight
-  // yet passes every other test. AI-generated + admin-edited moves make this a live
-  // authoring risk, so lock it. Probability-shaped fields must stay within [0,1].
   const FINITE = ["damage", "penetration", "elementalDiffusion", "accuracy", "critChance", "critMultiplier", "statusChance", "energyCost"];
   const UNIT = new Set(["penetration", "elementalDiffusion", "accuracy", "critChance", "statusChance"]);
   const bad = [];

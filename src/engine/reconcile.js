@@ -1,25 +1,12 @@
-// ACK-based reconciliation of the locally predicted player position (MP client prediction). Pure + framework-
-// free so it is unit-testable; onlineGame.js calls it every frame.
-//
-// The client records where its prediction was when each move input went out (`hist`: { seq, x, y, dx, dy }).
-// A snapshot's `ack` names the last input the server applied, so the server position is compared with OUR
-// position at that same input, not with "now". The legitimate prediction lead (including the lead along the
-// PREVIOUS heading right after a turn) is already inside the history, so a turn never reads as an error. The
-// old current-direction lead estimate yanked the player back along the old heading on every turn under lag.
-
 export const RECONCILE = {
-  SNAP_PX: 220,        // divergence beyond this is a teleport / respawn / region travel: snap and drop history
-  DEADZONE_PX: 4,      // below this, leave the prediction alone (no micro-corrections)
-  RATE: 8,             // per-second correction rate (frame-rate independent: min(1, dt * RATE))
-  ALONG_BEHIND_PX: 10, // the server may be up to a tick BEHIND along the acked input's direction
-  ALONG_AHEAD_S: 0.12, // ... and up to one input interval + a tick AHEAD of where we were when we sent it
+  SNAP_PX: 220,
+  DEADZONE_PX: 4,
+  RATE: 8,
+  ALONG_BEHIND_PX: 10,
+  ALONG_AHEAD_S: 0.12,
   ALONG_AHEAD_PAD: 6,
 };
 
-/**
- * Find the history entry for `ack`, dropping older entries (they can never be acked again). Returns the
- * entry or null (no ack yet / not in the window). Mutates `hist`.
- */
 export function takeAcked(hist, ack) {
   if (!ack || !hist.length) return null;
   let i = hist.length - 1;
@@ -29,14 +16,7 @@ export function takeAcked(hist, ack) {
   return hist[0];
 }
 
-/**
- * One reconciliation step. `pos` is the predicted render position (mutated), `server` the authoritative
- * snapshot position, `h` the acked history entry, `maxSpeed` the fastest legal speed (px/s, sprint).
- * Removes the movement the server may legitimately have applied for the acked input since it arrived, then
- * corrects what remains toward the server at RATE and SHIFTS the history by the same amount, so the next
- * frames see the reduced error (re-applying one snapshot's error every frame would overshoot).
- * Returns "snap" | "correct" | "none".
- */
+// Shift hist by each correction, else the same error is re-applied every frame.
 export function reconcileStep(pos, server, h, hist, dt, maxSpeed, cfg = RECONCILE) {
   let gx = server.x - h.x, gy = server.y - h.y;
   const hl = Math.hypot(h.dx, h.dy);

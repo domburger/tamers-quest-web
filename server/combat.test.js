@@ -18,7 +18,6 @@ function loadData() {
   });
 }
 
-// Build a minimal combat session (one full-HP player monster vs a wild enemy).
 function freshSession(level = 3) {
   const t = getMonsterTypes()[0];
   const st = getMonsterStats(t, level);
@@ -27,8 +26,6 @@ function freshSession(level = 3) {
 }
 const firstAttack = () => getAttacksForMonster(getMonsterTypes()[0])[0].name;
 
-// Monsters as per spec: a v2-generated monster's AI-authored attacks (genAttacks: title +
-// description) ARE its combat moves, judged by their descriptions (the now-default v2 judge).
 test("genAttacks: a v2 monster's AI attacks are its moves (name+description+crash-net numerics) and reach the judge", async () => {
   loadData();
   const mt = {
@@ -39,7 +36,7 @@ test("genAttacks: a v2 monster's AI attacks are its moves (name+description+cras
       { title: "Ember Lash", description: "Whips the foe with a fiery tail, searing their hide." },
       { title: "Cinder Veil", description: "Cloaks itself in embers, hardening its scales." },
     ],
-    attack_1: "Thorn Swipe", // a legacy pool ref that MUST be ignored in favor of genAttacks
+    attack_1: "Thorn Swipe",
   };
   addMonsterType(mt);
   const moves = getAttacksForMonster(mt);
@@ -51,7 +48,6 @@ test("genAttacks: a v2 monster's AI attacks are its moves (name+description+cras
   assert.ok(ownedAttack({ typeName: mt.typeName, level: 3 }, "Ember Lash"), "genAttack is an owned move");
   assert.equal(ownedAttack({ typeName: mt.typeName, level: 3 }, "Thorn Swipe"), null, "the ignored pool ref is NOT owned");
 
-  // The default v2 judge reads the chosen genAttack's description — it must reach the prompt.
   const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
   process.env.OPENAI_API_KEY = "test-key";
   const bodies = [];
@@ -66,23 +62,19 @@ test("genAttacks: a v2 monster's AI attacks are its moves (name+description+cras
   }
 });
 
-// Q8: between-encounter energy "breather" so a depleted team isn't stuck skipping.
 test("restoreEnergyPartial tops up by the pct, never exceeding max", () => {
   loadData();
   const mt = getMonsterTypes()[0];
   const max = getMonsterStats(mt, 1).energy;
 
-  // From empty: +50% of max.
   const drained = { typeName: mt.typeName, level: 1, currentEnergy: 0 };
   const after = restoreEnergyPartial(drained, 50);
   assert.equal(after, Math.min(max, Math.ceil(max * 0.5)));
   assert.equal(drained.currentEnergy, after);
 
-  // Near full: capped at max, never over.
   const nearFull = { typeName: mt.typeName, level: 1, currentEnergy: max - 1 };
   assert.equal(restoreEnergyPartial(nearFull, 50), max);
 
-  // Default pct is 50.
   const d2 = { typeName: mt.typeName, level: 1, currentEnergy: 0 };
   assert.equal(restoreEnergyPartial(d2), Math.min(max, Math.ceil(max * 0.5)));
 });
@@ -92,11 +84,9 @@ test("a drained monster reaches a usable energy level after one restore", () => 
   const mt = getMonsterTypes()[0];
   const inst = { typeName: mt.typeName, level: 1, currentEnergy: 0 };
   restoreEnergyPartial(inst);
-  // Enough to afford a typical low-cost attack (so it won't just skip its turn).
   assert.ok(inst.currentEnergy > 0);
 });
 
-// Anti-cheat (P6-T2): a client may name any attack; only the monster's own count.
 test("ownedAttack honors only the monster's own attacks", () => {
   loadData();
   const mt = getMonsterTypes()[0];
@@ -104,37 +94,29 @@ test("ownedAttack honors only the monster's own attacks", () => {
   const own = getAttacksForMonster(mt);
   assert.ok(own.length > 0, "fixture monster should have attacks");
 
-  // An owned attack resolves to the real server-side record.
   const got = ownedAttack(inst, own[0].name);
   assert.equal(got?.name, own[0].name);
 
-  // Unknown name, and blank/missing → null (resolver treats as a skip).
   assert.equal(ownedAttack(inst, "Definitely Not A Real Attack"), null);
   assert.equal(ownedAttack(inst, ""), null);
   assert.equal(ownedAttack(inst, undefined), null);
 
-  // A real attack that this monster does NOT have → null (the cheat we block).
   const ownNames = new Set(own.map((a) => a.name));
   const all = JSON.parse(readFileSync("./public/assets/data/attacks.json", "utf8"));
   const foreign = (Array.isArray(all) ? all : Object.values(all)).find((a) => a.name && !ownNames.has(a.name));
   if (foreign) assert.equal(ownedAttack(inst, foreign.name), null, "off-roster attack must be rejected");
 });
 
-// Robustness: an owned monster whose (AI-generated) type an admin later deleted
-// has an orphaned typeName → getMonsterType returns undefined. buildState must not
-// throw, and a full combat turn must resolve (degrades to fallback stats + no usable
-// moves) rather than crashing the round server-side.
 test("buildState + resolveCombatAction tolerate an orphaned/deleted monster type", async () => {
   loadData();
   const orphan = { id: "o1", typeName: "__deleted_type__", name: "Ghost", level: 3, currentHealth: 30, currentEnergy: 10, status: null };
   const s = buildState(orphan);
   assert.ok(Number.isFinite(s.maxHealth) && Number.isFinite(s.strength), "fallback stats are finite");
 
-  // End-to-end: an orphaned player monster vs a valid enemy still resolves.
   const enemy = makeEnemy({ typeName: getMonsterTypes()[0].typeName, level: 3 });
   const session = { combatId: "c1", team: [orphan], activeIdx: 0, enemy };
   const r = await resolveCombatAction(session, { kind: "attack", attackName: "whatever" }, makeRng(11));
-  assert.equal(typeof r.narrative, "string"); // no crash; turn resolved
+  assert.equal(typeof r.narrative, "string");
 });
 
 test("makeEnemy starts at full energy (sanity)", () => {
@@ -144,7 +126,6 @@ test("makeEnemy starts at full energy (sanity)", () => {
   assert.equal(e.currentEnergy, getMonsterStats(mt, 3).energy);
 });
 
-// resolveCombatAction — the core networked-combat resolver (the marquee feature).
 test("resolveCombatAction: flee ends the fight", async () => {
   loadData();
   const r = await resolveCombatAction(freshSession(), { kind: "flee" }, makeRng(1));
@@ -169,20 +150,18 @@ test("resolveCombatAction: catch on a weakened enemy resolves without throwing",
 
 test("resolveCombatAction: catch with no AI available fails safely (no rarity gate, no crash)", async () => {
   loadData();
-  // Capture is AI-evaluated now (no rarity gate / formula). With no key the throw fails
-  // SAFELY — never a free catch — and player-initiative still spares the retaliation.
   const origKey = process.env.OPENAI_API_KEY;
   delete process.env.OPENAI_API_KEY;
   try {
     const s = freshSession();
     s.enemy.currentHealth = 1;
     s.chainId = "tier1";
-    s.initiator = "player"; // chain-initiated → no enemy swing-back
+    s.initiator = "player";
     const hpBefore = s.team[0].currentHealth;
     const r = await resolveCombatAction(s, { kind: "catch" }, makeRng(3));
-    assert.notEqual(r.outcome, "caught");                 // no AI → throw fails, not a free catch
+    assert.notEqual(r.outcome, "caught");
     assert.equal(typeof r.narrative, "string");
-    assert.equal(s.team[0].currentHealth, hpBefore);      // player-initiative skipped retaliation
+    assert.equal(s.team[0].currentHealth, hpBefore);
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }
@@ -190,7 +169,6 @@ test("resolveCombatAction: catch with no AI available fails safely (no rarity ga
 
 test("resolveCombatAction: the AI capture judge catches when it returns caught:1", async () => {
   loadData();
-  // Mock the capture judge (catchJudgeSystem) returning a successful capture (1 + text).
   const origKey = process.env.OPENAI_API_KEY, origFetch = global.fetch;
   process.env.OPENAI_API_KEY = "test-key";
   global.fetch = async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: JSON.stringify({ caught: 1, text: "The chain binds it!" }) } }] }) });
@@ -212,7 +190,7 @@ test("resolveCombatAction: the AI capture judge catches when it returns caught:1
 test("resolveCombatAction: a fight always reaches a terminal outcome", async () => {
   loadData();
   const s = freshSession();
-  s.enemy.currentHealth = 1; // nearly dead → should end quickly
+  s.enemy.currentHealth = 1;
   let outcome = null;
   for (let i = 0; i < 80 && !outcome; i++) {
     outcome = (await resolveCombatAction(s, { kind: "attack", attackName: firstAttack() }, makeRng(100 + i))).outcome || null;
@@ -227,7 +205,7 @@ test("resolveCombatAction: AI failure falls back to the engine (combat never bre
   global.fetch = async () => { throw new Error("boom"); };
   try {
     const r = await resolveCombatAction(freshSession(), { kind: "attack", attackName: firstAttack() }, makeRng(5));
-    assert.equal(typeof r.narrative, "string"); // resolved via deterministic fallback, no throw
+    assert.equal(typeof r.narrative, "string");
     assert.ok(r.outcome || (r.active && r.enemy));
   } finally {
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
@@ -235,18 +213,12 @@ test("resolveCombatAction: AI failure falls back to the engine (combat never bre
   }
 });
 
-// TQ-457 (PvE fight logic) — the core turn loop:
-//   player chooses attack → judged & executed → simple AI picks the enemy's move →
-//   judged & executed → control returns to the player (next turn).
-// These lock the loop's contract so it can't silently regress.
-
 test("TQ-457: the enemy 'simple AI' only ever picks an affordable OWNED attack", () => {
   loadData();
   const mt = getMonsterTypes()[0];
   const enemy = makeEnemy({ typeName: mt.typeName, level: 3 });
   const own = new Set(getAttacksForMonster(mt).map((a) => a.name));
   const rng = makeRng(42);
-  // Many draws: every pick is one of the monster's own moves AND affordable right now.
   for (let i = 0; i < 50; i++) {
     const pick = chooseEnemyAttack(enemy, rng);
     assert.ok(pick && own.has(pick.name), "picks one of the enemy's own moves");
@@ -258,10 +230,8 @@ test("TQ-508: the enemy STRUGGLES (cheapest move → Struggle), not skips, when 
   loadData();
   const mt = getMonsterTypes()[0];
   const enemy = makeEnemy({ typeName: mt.typeName, level: 3 });
-  enemy.currentEnergy = 0; // can't afford anything
+  enemy.currentEnergy = 0;
   const pick = chooseEnemyAttack(enemy, makeRng(1));
-  // Returns a move (NOT null) so the resolver's Struggle path fires — the enemy keeps counter-attacking
-  // every turn instead of waiting forever once it's out of energy (the "only counters the first turn" bug).
   assert.ok(pick, "returns a move so the resolver downgrades it to a weak Struggle, not a skipped turn");
   const cheapest = getAttacksForMonster(mt).reduce((m, a) => (a.energyCost < m.energyCost ? a : m));
   assert.equal(pick.energyCost, cheapest.energyCost, "picks the cheapest move when nothing is affordable");
@@ -269,7 +239,7 @@ test("TQ-508: the enemy STRUGGLES (cheapest move → Struggle), not skips, when 
 
 test("TQ-457: a non-terminal attack turn resolves BOTH combatants and returns control to the player", async () => {
   loadData();
-  const s = freshSession(5); // both at full HP → the turn shouldn't end the fight
+  const s = freshSession(5);
   const r = await resolveCombatAction(s, { kind: "attack", attackName: firstAttack() }, makeRng(7));
   assert.ok(!r.outcome, "a single mid-fight turn is not terminal — the player acts again");
   assert.ok(r.active && typeof r.active.currentHealth === "number", "the player's monster state is returned");
@@ -297,8 +267,6 @@ test("TQ-457 hard-sequential: a lethal player attack WINS with NO enemy retaliat
   }
 });
 
-// FGT-T4 (SP/MP parity): the MP "swap" action — switch the active monster to another
-// living team member. A two-monster session for these.
 function twoMonsterSession(level = 3) {
   const t = getMonsterTypes()[0];
   const st = getMonsterStats(t, level);
@@ -321,8 +289,8 @@ test("resolveCombatAction: swap switches the active monster as a free action (no
 test("resolveCombatAction: swap to a dead/unknown/same monster is a no-op turn", async () => {
   loadData();
   const s = twoMonsterSession();
-  s.team[1].currentHealth = 0; // m1 fainted
-  for (const target of ["m1" /* dead */, "nope" /* unknown */, "m0" /* same */]) {
+  s.team[1].currentHealth = 0;
+  for (const target of ["m1", "nope", "m0"]) {
     const r = await resolveCombatAction(s, { kind: "swap", monsterId: target }, makeRng(1));
     assert.equal(s.activeIdx, 0, `no switch for "${target}"`);
     assert.ok(r.active && !r.switched, "no-op turn returns current state");

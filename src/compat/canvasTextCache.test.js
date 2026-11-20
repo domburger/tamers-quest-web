@@ -4,8 +4,6 @@ import { makeLabelCache } from "./canvasTextCache.js";
 import { cDrawText, textAlignFor, textBaselineFor } from "./canvasBackend.js";
 import { makeCanvasRenderer } from "./canvasRenderer.js";
 
-// A fake `document` whose canvas 2D contexts report deterministic actualBoundingBox metrics (so the bake
-// geometry is exactly predictable). Records every offscreen fillText + counts createElement calls.
 function fakeDoc({ bbox = true } = {}) {
   const calls = { create: 0, fills: [] };
   const doc = {
@@ -19,7 +17,7 @@ function fakeDoc({ bbox = true } = {}) {
               const w = String(s).length * 6;
               return bbox
                 ? { width: w, actualBoundingBoxLeft: 0, actualBoundingBoxRight: w, actualBoundingBoxAscent: 8, actualBoundingBoxDescent: 2 }
-                : { width: w }; // no bbox metrics → unbakeable
+                : { width: w };
             },
             fillText(...a) { calls.fills.push(a); },
           };
@@ -44,12 +42,9 @@ test("TQ-443 label cache: a label is baked only after it recurs `promoteAfter` t
 test("TQ-443 label cache: bake geometry places the bitmap origin exactly on the draw point, at device scale", () => {
   const { doc } = fakeDoc();
   const c = makeLabelCache({ doc, promoteAfter: 1 });
-  // "hi" → width 12; bbox L0 R12 A8 D2; PAD 2; scale 2.
   const e = c.acquire({ key: "k", text: "hi", size: 12, font: "sans-serif", anchor: "topleft", rgbStr: "rgb(0,0,0)", scale: 2 });
-  // device bitmap: wPx = ceil(0+12)+4 = 16, hPx = ceil(8+2)+4 = 14
   assert.equal(e.bmp.width, 16, "bitmap device width");
   assert.equal(e.bmp.height, 14, "bitmap device height");
-  // origin inside bmp = (aL+PAD, aA+PAD) = (2,10) device px → offsets are -origin/scale, dims are px/scale
   assert.equal(e.offX, -1, "offX = -2/2");
   assert.equal(e.offY, -5, "offY = -10/2");
   assert.equal(e.wDesign, 8, "wDesign = 16/2");
@@ -70,12 +65,11 @@ test("TQ-443 label cache: LRU-capped; a key touched every frame stays hot while 
   const { doc } = fakeDoc();
   const c = makeLabelCache({ doc, promoteAfter: 1, cap: 2 });
   const mk = (k) => ({ key: k, text: k, size: 12, font: "sans-serif", anchor: "topleft", rgbStr: "rgb(0,0,0)", scale: 1 });
-  c.acquire(mk("A"));            // {A}
-  c.acquire(mk("B"));            // {A,B}
-  c.acquire(mk("A"));            // touch A → {B,A}
-  c.acquire(mk("C"));            // over cap → evict oldest (B) → {A,C}
+  c.acquire(mk("A"));
+  c.acquire(mk("B"));
+  c.acquire(mk("A"));
+  c.acquire(mk("C"));
   assert.ok(c.size() <= 2, "cap respected");
-  // A was touched so it survived; re-acquiring it is still a hot hit (baked), C is present too.
   assert.ok(c.acquire(mk("A")).bmp, "hot key A survived eviction");
   assert.ok(c.acquire(mk("C")).bmp, "C present");
 });
@@ -99,7 +93,6 @@ test("TQ-443 renderer.drawText: a promoted label blits via drawImage (no per-fra
   assert.ok(di, "blits the cached bitmap");
   assert.deepEqual(di.slice(2), [99, 45, 8, 7], "drawImage dest = (x+offX, y+offY, wDesign, hDesign)");
   assert.ok(!ops.some(([op]) => op === "fillText"), "no fillText — the per-frame font/fillStyle parse is gone");
-  // opacity routed through globalAlpha and restored to its prior value
   assert.ok(ops.some(([op, v]) => op === "set:globalAlpha" && v === 0.5), "opacity applied via globalAlpha");
   assert.equal(ctx.globalAlpha, 1, "globalAlpha restored");
 });
@@ -136,18 +129,15 @@ test("TQ-443 cDrawText style guard: same-style runs skip redundant font/baseline
   const state = { font: null, baseline: null, align: null, fill: null, stroke: null };
   const base = { x: 0, y: 0, size: 14, color: [1, 2, 3], anchor: "left", font: "sans-serif" };
   cDrawText(ctx, { ...base, text: "a" }, state);
-  cDrawText(ctx, { ...base, text: "b" }, state); // identical style
+  cDrawText(ctx, { ...base, text: "b" }, state);
   assert.equal(ops.filter(([op]) => op === "set:font").length, 1, "font set once across identical-style draws");
   assert.equal(ops.filter(([op]) => op === "set:textBaseline").length, 1, "baseline set once");
   assert.equal(ops.filter(([op]) => op === "set:textAlign").length, 1, "align set once");
-  // TQ-343: fillStyle is now guarded through the same shadow → an identical-colour run sets it ONCE
   assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 1, "fillStyle set once across same-colour draws");
-  // a different size re-parses the font only (colour unchanged → no fillStyle re-set)
   cDrawText(ctx, { ...base, size: 18, text: "c" }, state);
   assert.equal(ops.filter(([op]) => op === "set:font").length, 2, "size change re-sets font");
   assert.equal(ops.filter(([op]) => op === "set:textAlign").length, 1, "align unchanged → still one set");
   assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 1, "colour unchanged → fillStyle still one set");
-  // a colour change re-assigns fillStyle (the guard only skips when the rgba string matches)
   cDrawText(ctx, { ...base, color: [9, 9, 9], text: "d" }, state);
   assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 2, "colour change re-sets fillStyle");
 });

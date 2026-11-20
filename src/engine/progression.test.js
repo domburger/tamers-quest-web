@@ -1,4 +1,3 @@
-// P10-T4 — shared grantXp (SP + server use one implementation).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -40,14 +39,11 @@ test("grantXp: levels up and heals to the new max at the threshold", () => {
 test("grantXp: applies multiple level-ups from one large grant, keeping remainder (exponential curve)", () => {
   load();
   const inst = { typeName: someName(), level: 1, xp: 0, currentHealth: 1, currentEnergy: 1 };
-  // 230 XP on the exponential curve: L1→2 costs xpForLevel(1)=100 (130 left), L2→3 costs
-  // xpForLevel(2)=115 (15 left), L3 needs 132 > 15 → stop. (Old FLAT curve gave xp 30.)
   grantXp(inst, 230);
   assert.equal(inst.level, 3);
   assert.equal(inst.xp, 15);
 });
 
-// TQ-186 — player-ACCOUNT XP/level (prestige track), same xpForLevel curve, no stats to recompute.
 test("grantPlayerXp: advances account level/xp via the shared curve", () => {
   const prof = { level: 1, xp: 0 };
   assert.equal(grantPlayerXp(prof, xpForLevel(1) - 1), false, "below threshold → no level-up");
@@ -59,7 +55,7 @@ test("grantPlayerXp: advances account level/xp via the shared curve", () => {
 
 test("grantPlayerXp: multi-level from one grant + remainder; non-positive / null are no-ops", () => {
   const prof = { level: 1, xp: 0 };
-  grantPlayerXp(prof, 230); // L1→2 (100), L2→3 (115) → 15 carry
+  grantPlayerXp(prof, 230);
   assert.equal(prof.level, 3);
   assert.equal(prof.xp, 15);
   assert.equal(grantPlayerXp(prof, 0), false);
@@ -108,7 +104,6 @@ test("healTeam heals every member (P10-T3 extract parity)", () => {
 
 test("extractGold = base PER_EXTRACT with no upgrades, scaled by Prospector", () => {
   assert.equal(extractGold({}), GAME.GOLD.PER_EXTRACT);
-  // prospector +20%/level → level 2 = 1.4× (matches goldMult in upgrades.js)
   assert.equal(extractGold({ upgrades: { prospector: 2 } }), Math.round(GAME.GOLD.PER_EXTRACT * 1.4));
 });
 
@@ -116,9 +111,6 @@ test("defeatGold = goldForDefeat(level) with no upgrades, scaled by Prospector",
   assert.equal(defeatGold({}, 3), goldForDefeat(3));
   assert.equal(defeatGold({ upgrades: { prospector: 2 } }, 3), Math.round(goldForDefeat(3) * 1.4));
 });
-
-// TQ-132: defeatEssence/chestEssence were removed — essence is the premium/paid currency,
-// no longer earned in runs. Chain upgrades now cost gold (see schemas.test.js craftUpgrade).
 
 test("grantExtractRewards banks extract gold but does NOT auto-heal survivors (TQ-203/TQ-207)", () => {
   load();
@@ -143,25 +135,22 @@ test("bumpStat initializes + increments lifetime counters; matches the server co
   bumpStat(p, "caught", 3);
   assert.equal(p.stats.runs, 2, "increments existing");
   assert.equal(p.stats.caught, 3, "honors n");
-  assert.doesNotThrow(() => bumpStat(null, "runs")); // no profile → no-op
-  assert.doesNotThrow(() => bumpStat(p)); // no key → no-op
+  assert.doesNotThrow(() => bumpStat(null, "runs"));
+  assert.doesNotThrow(() => bumpStat(p));
   assert.equal(Object.keys(p.stats).length, 2, "no-op calls add nothing");
 });
 
-// ── TQ-182: battle-pass XP earning + per-player season progress ──────────────
 test("TQ-182: ensureBattlePassSeason initializes + resets on season rollover", () => {
   const fresh = {};
   ensureBattlePassSeason(fresh);
   assert.equal(fresh.bpSeasonId, SEASON.id);
   assert.equal(fresh.bpXp, 0);
   assert.deepEqual(fresh.bpClaimed, []);
-  // a profile from a PRIOR season is wiped (no carry-over of XP/claims)
   const stale = { bpSeasonId: "s0", bpXp: 5000, bpClaimed: [1, 2, 3] };
   ensureBattlePassSeason(stale);
   assert.equal(stale.bpSeasonId, SEASON.id);
   assert.equal(stale.bpXp, 0);
   assert.deepEqual(stale.bpClaimed, []);
-  // current-season profile is untouched
   const cur = { bpSeasonId: SEASON.id, bpXp: 250, bpClaimed: [1] };
   ensureBattlePassSeason(cur);
   assert.equal(cur.bpXp, 250);
@@ -173,12 +162,10 @@ test("TQ-182: grantBattlePassXp accumulates for the current season", () => {
   assert.equal(grantBattlePassXp(p, 60), 60);
   assert.equal(grantBattlePassXp(p, 60), 120);
   assert.equal(p.bpSeasonId, SEASON.id);
-  assert.equal(tierForXp(p.bpXp), 1); // 120 XP → tier 1 (≥100)
-  // guards: non-positive / non-numeric add nothing
+  assert.equal(tierForXp(p.bpXp), 1);
   assert.equal(grantBattlePassXp(p, 0), 120);
   assert.equal(grantBattlePassXp(p, -5), 120);
   assert.equal(grantBattlePassXp(p, "x"), 120);
-  // a stale-season profile resets THEN adds (no carry-over)
   const stale = { bpSeasonId: "s0", bpXp: 9999 };
   assert.equal(grantBattlePassXp(stale, 40), 40);
 });
@@ -200,20 +187,19 @@ test("TQ-183/267: isPremiumEntitled reflects an ACTIVE subscription (expiry-base
   assert.equal(isPremiumEntitled({ subscribed: false }), false);
   assert.equal(isPremiumEntitled({ subscribed: true }), true, "legacy/perpetual flag");
   assert.equal(isPremiumEntitled(null), false);
-  // TQ-267: an active (future-dated) subscription entitles premium; a lapsed one does not.
   const now = 2_000_000;
   assert.equal(isPremiumEntitled({ subscribedUntil: now + 1 }, now), true, "active subscription → premium entitled");
   assert.equal(isPremiumEntitled({ subscribedUntil: now - 1 }, now), false, "lapsed subscription → no premium entitlement");
 });
 
 test("TQ-183: claimBattlePassTier — free track, reached-tier gating, idempotent", () => {
-  const p = { bpSeasonId: SEASON.id, bpXp: 250, bpClaimed: [] }; // tier 2 reached
-  assert.deepEqual(claimBattlePassTier(p, 3, "free"), { ok: false, reason: "locked-tier" }); // tier above reached
+  const p = { bpSeasonId: SEASON.id, bpXp: 250, bpClaimed: [] };
+  assert.deepEqual(claimBattlePassTier(p, 3, "free"), { ok: false, reason: "locked-tier" });
   const r1 = claimBattlePassTier(p, 1, "free");
   assert.equal(r1.ok, true);
   assert.deepEqual(r1.reward, rewardAt(1, "free"));
   assert.ok(p.bpClaimed.includes("free:1"));
-  assert.deepEqual(claimBattlePassTier(p, 1, "free"), { ok: false, reason: "claimed" }); // idempotent
+  assert.deepEqual(claimBattlePassTier(p, 1, "free"), { ok: false, reason: "claimed" });
 });
 
 test("TQ-183: claimBattlePassTier — premium track requires the entitlement", () => {
@@ -223,5 +209,5 @@ test("TQ-183: claimBattlePassTier — premium track requires the entitlement", (
   assert.equal(r.ok, true);
   assert.deepEqual(r.reward, rewardAt(1, "premium"));
   assert.ok(p.bpClaimed.includes("premium:1"));
-  assert.equal(claimBattlePassTier(p, 1, "free").ok, true); // free + premium of a tier are independent
+  assert.equal(claimBattlePassTier(p, 1, "free").ok, true);
 });

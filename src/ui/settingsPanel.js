@@ -1,38 +1,26 @@
-// TQ-121 (Settings half): Settings CONTENT for the in-lobby station popup. Re-implements the four
-// settings.js controls — Sound on/off, master Volume +/-, Reduce Motion (Auto/On/Off), Screen Shake
-// on/off — in the shell's immediate-mode draw(k,rect)+tap contract (settings.js itself is retained-mode
-// addButton/destroyAll, which can't mount in the clipped popup). Pure client prefs: each control reads +
-// writes the localStorage-backed stores (audio.js / a11y.js / shake.js) with no server round-trip. All draws
-// are fixed (screen-space) so the shell's k.pushClip masks them. The old full-screen settings scene was
-// removed on 2026-11-08; this popup is the only Settings UI.
 import { isMuted, toggleMuted, getVolume, setVolume, sfx, haptic } from "../systems/audio.js";
 import { reduceMotionSetting, setReduceMotion } from "../systems/a11y.js";
 import { shakeEnabled, toggleShake } from "../render/shake.js";
 import { THEME, FONT, FONT_BOLD, drawButton, drawEyebrow, drawHairline, drawSwitch, drawSegments, drawMeter, inRect } from "./theme.js";
-// TQ-458: remappable controls — the Controls section lists each action's key(s) and rebinds via a
-// transient DOM keydown capture (mapped with the shim's domKeyToken). Cleanup rides the popup's
-// state.dispose()/onEsc() hooks (hub.js calls them on close / Esc), so no host change is needed.
 import { ACTION_META, getBindings, setBinding, resetAllBindings, actionsForKey } from "../systems/keybinds.js";
 import { domKeyToken } from "../compat/canvasKeyboard.js";
-import { touchPrimary } from "../systems/inputMode.js"; // hide keyboard Controls on touch-primary devices
+import { touchPrimary } from "../systems/inputMode.js";
 import { drawIcon } from "./icons.js";
 import { sheetEntrance } from "./stationPopup.js";
 
 const PAD = 16, ROW_H = 62, HDR_H = 36, GAP = 8, BTN_W = 120, BTN_H = 40, STEP_W = 40;
 const RM_NEXT = { auto: "on", on: "off", off: "auto" };
 
-// Stop an in-progress key capture: detach the listener + clear the capturing flag. Idempotent.
 function cancelCapture(state) {
-  if (state._cleanup) { try { state._cleanup(); } catch { /* ignore */ } state._cleanup = null; }
+  if (state._cleanup) { try { state._cleanup(); } catch {} state._cleanup = null; }
   state.capturing = null;
 }
-// Arm a one-shot DOM keydown capture for `action`. The next key (in the capture phase, so it pre-empts
-// the game's own key handlers) rebinds the action; Escape cancels. Self-detaches after one key.
+// Capture phase + stopImmediatePropagation keep game key handlers from firing.
 function beginCapture(state, action, showToast) {
   cancelCapture(state);
   state.capturing = action;
   const onKey = (e) => {
-    try { e.preventDefault(); e.stopImmediatePropagation(); } catch { /* ignore */ }
+    try { e.preventDefault(); e.stopImmediatePropagation(); } catch {}
     const token = domKeyToken(e);
     if (token && token !== "escape") {
       setBinding(action, [token]);
@@ -40,7 +28,7 @@ function beginCapture(state, action, showToast) {
       const others = actionsForKey(token).filter((a) => a !== action);
       if (others.length && showToast) showToast(`"${token}" is also bound elsewhere`);
     }
-    cancelCapture(state); // Escape (or any key) ends capture
+    cancelCapture(state);
   };
   if (typeof window !== "undefined") {
     window.addEventListener("keydown", onKey, true);
@@ -50,12 +38,11 @@ function beginCapture(state, action, showToast) {
 
 export function settingsPanelState() {
   const state = { scrollY: 0, _maxScroll: 0, capturing: null, _cleanup: null, bindings: getBindings() };
-  state.dispose = () => cancelCapture(state);                                  // popup closed → drop any pending capture (hub closeStationPopup)
-  state.onEsc = () => { if (state.capturing) { cancelCapture(state); return true; } return false; }; // Esc cancels a rebind before closing the popup
+  state.dispose = () => cancelCapture(state);
+  state.onEsc = () => { if (state.capturing) { cancelCapture(state); return true; } return false; };
   return state;
 }
 
-// Deterministic vertical layout shared by draw + tap so hitboxes always match what's drawn.
 function layout(rect, scrollY = 0, touch = false) {
   const [rx, ry, rw] = rect;
   const right = rx + rw - PAD;
@@ -69,14 +56,11 @@ function layout(rect, scrollY = 0, touch = false) {
   const vol = ctl("volume");
   vol.plus = [right - STEP_W, vol.top + (ROW_H - BTN_H) / 2, STEP_W, BTN_H];
   vol.minus = [right - STEP_W - 92, vol.top + (ROW_H - BTN_H) / 2, STEP_W, BTN_H];
-  vol.pctX = (vol.minus[0] + vol.minus[2] + vol.plus[0]) / 2; // TQ-338: centre the % in the gap between −/+ (was right-STEP_W-46, which overlapped the − button)
+  vol.pctX = (vol.minus[0] + vol.minus[2] + vol.plus[0]) / 2;
   items.push(vol);
   items.push(hdr("Accessibility"));
   const rm = ctl("reduce"); rm.btn = [right - BTN_W, rm.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(rm);
   const shake = ctl("shake"); shake.btn = [right - BTN_W, shake.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(shake);
-  // TQ-458: Controls — one row per remappable action (label + current key button), then Reset.
-  // Hidden on touch-primary devices (phones / tablets without a keyboard): the bindings are keyboard
-  // keys the player can't press, so the section was six rows of noise there.
   if (!touch) {
     items.push(hdr("Controls"));
     for (const meta of ACTION_META) {
@@ -86,7 +70,6 @@ function layout(rect, scrollY = 0, touch = false) {
     }
     const resetKeys = ctl("resetkeys"); resetKeys.btn = [right - BTN_W, resetKeys.top + (ROW_H - BTN_H) / 2, BTN_W, BTN_H]; items.push(resetKeys);
   }
-  // Legal & compliance links (TQ-225) — /legal (privacy/terms/refund) + /pricing, opened in a new tab.
   items.push(hdr("Legal"));
   for (const lk of [{ label: "Legal & Privacy", url: "/legal" }, { label: "Pricing", url: "/pricing" }]) {
     const it = ctl("link"); it.label = lk.label; it.url = lk.url;
@@ -95,10 +78,6 @@ function layout(rect, scrollY = 0, touch = false) {
   return { items, contentH: y - y0 };
 }
 
-// UI v3: a settings LIST, not a stack of boxed cards — eyebrow section labels, hairline-separated rows with
-// the label on the left and a real control on the right: switches for on/off prefs, a segmented control for
-// Reduce Motion, a meter + glass steppers for Volume, glass buttons for rebinds and links. The hit rects are
-// unchanged (layout() above), so taps / controller focus keep working on the same geometry.
 const SUB = { sound: "Music and effects", volume: "Master level", reduce: "Fewer animations and flashes", shake: "Camera kick on hits" };
 const ROW_ICON = { sound: "sound", volume: "sound", reduce: "motion", shake: "shake", rebind: "keyboard", resetkeys: "cog", link: "external" };
 export function drawSettingsPanel(k, rect, state) {
@@ -106,7 +85,7 @@ export function drawSettingsPanel(k, rect, state) {
   const T = (n) => k.rgb(...THEME[n]);
   const mp = k.mousePos();
   const { items, contentH } = layout(rect, state.scrollY, touchPrimary(k));
-  state._maxScroll = Math.max(0, contentH - rh + 12); // scrolls when the Legal section overflows a short viewport (TQ-225)
+  state._maxScroll = Math.max(0, contentH - rh + 12);
   let prevRow = null, rowIdx = 0;
   for (const it of items) {
     if (it.kind === "hdr") {
@@ -120,14 +99,12 @@ export function drawSettingsPanel(k, rect, state) {
     if (rowHover) k.drawRect({ pos: k.vec2(it.row[0], it.row[1]), width: it.row[2], height: it.row[3], radius: 12, color: T("text"), opacity: 0.03, fixed: true });
     const ly = it.top + ROW_H / 2;
     const edy = sheetEntrance(k, rowIdx++, { step: 0.025 });
-    // Row icon in a small glass square (UI v4) — the label column starts after it.
     const ic = ROW_ICON[it.kind] || "dot";
     const iq = [it.row[0] + PAD - 4, ly - 19 + edy, 38, 38];
     k.drawRect({ pos: k.vec2(iq[0], iq[1]), width: iq[2], height: iq[3], radius: 12, color: T("primary"), opacity: 0.12, fixed: true });
     drawIcon(k, it.kind === "sound" && isMuted() ? "mute" : ic, { x: iq[0] + 19, y: iq[1] + 19, size: 20, color: THEME.primary, fixed: true });
     const lx = it.row[0] + PAD + 48;
     const sub = SUB[it.kind];
-    // The label column ends where the row's control begins (segmented control is the widest: btn[0] - 40).
     const ctrlLeft = it.kind === "reduce" ? it.btn[0] - 40 : it.kind === "volume" ? it.minus[0] : it.btn ? it.btn[0] : it.row[0] + it.row[2];
     const labW = Math.max(60, ctrlLeft - lx - 10);
     const fitW = (t, sz, font) => { const mw = typeof k.measureText === "function" ? (q) => k.measureText(q, sz, font) : (q) => q.length * sz * 0.56; if (mw(t) <= labW) return t; let lo = 0, hi = t.length; while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (mw(t.slice(0, mid) + "…") <= labW) lo = mid; else hi = mid - 1; } return t.slice(0, lo).trimEnd() + "…"; };
@@ -175,18 +152,16 @@ export function drawSettingsPanel(k, rect, state) {
   }
 }
 
-// Tap → toggle/step the matching pref (persisted client-side; no server sync). Returns true if consumed.
 export function settingsPanelTap(k, rect, state, p, showToast) {
   const { items } = layout(rect, state.scrollY, touchPrimary(k));
   for (const it of items) {
-    if (it.kind === "link" && inRect(p, it.btn)) { sfx("click"); try { window.open(it.url, "_blank", "noopener"); } catch { /* popup blocked — no-op */ } showToast && showToast("Opening in a new tab…"); return true; }
+    if (it.kind === "link" && inRect(p, it.btn)) { sfx("click"); try { window.open(it.url, "_blank", "noopener"); } catch {} showToast && showToast("Opening in a new tab…"); return true; }
     if (it.kind === "sound" && inRect(p, it.btn)) { haptic(6); sfx("click"); toggleMuted(); return true; }
     if (it.kind === "volume") {
       if (inRect(p, it.minus)) { setVolume(Math.round(getVolume() * 100 - 10) / 100); sfx("ui"); return true; }
       if (inRect(p, it.plus)) { setVolume(Math.round(getVolume() * 100 + 10) / 100); sfx("ui"); return true; }
     }
     if (it.kind === "reduce" && inRect(p, [it.btn[0] - 40, it.btn[1], it.btn[2] + 40, it.btn[3]])) {
-      // Segmented control: a tap on a segment selects it directly; a controller activate (centre) cycles.
       const seg = [it.btn[0] - 40, it.btn[1] + 5, it.btn[2] + 40, it.btn[3] - 10], sw = (seg[2] - 4) / 3;
       const idx = Math.max(0, Math.min(2, Math.floor((p.x - seg[0] - 2) / sw)));
       const picked = ["auto", "on", "off"][idx];
@@ -202,10 +177,6 @@ export function settingsPanelTap(k, rect, state, p, showToast) {
 
 export function settingsPanelScroll(state, dy) { state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy)); }
 
-// TQ-527: the rows a controller can focus + activate with A — every interactive row EXCEPT the volume
-// stepper (which needs left/right, not a single activate, so it stays pointer-only for now). Each yields
-// its action-button rect, used both for the focus ring AND as the point the hub hands to settingsPanelTap.
-// Reuses the shared layout() so the rects always match what's drawn/tapped.
 export function settingsPanelFocusables(rect, state = {}) {
   return layout(rect, state.scrollY || 0).items
     .filter((it) => it.btn && it.kind !== "volume" && it.kind !== "hdr")

@@ -28,7 +28,7 @@ test("hubSnapshot populates hubPlayers; missing players → [] (TQ-258 lobby pre
   assert.equal(s.hubPlayers.length, 1);
   assert.equal(s.hubPlayers[0].id, "a");
   assert.equal(s.hubPlayers[0].chainTier, 2);
-  applyMessage(s, { t: "hubSnapshot" }, { storage: memStorage() }); // no players field → cleared
+  applyMessage(s, { t: "hubSnapshot" }, { storage: memStorage() });
   assert.deepEqual(s.hubPlayers, []);
 });
 
@@ -48,7 +48,6 @@ test("welcome + snapshot sync the spirit-chain inventory", () => {
   applyMessage(s, { t: "welcome", you: { id: "p", nickname: "N", token: "t", team: [], chains: [{ chainId: "tier1", throwCount: 3, durability: 1 }], equippedChainId: "tier1" } }, { storage: memStorage() });
   assert.equal(s.equippedChainId, "tier1");
   assert.equal(s.chains[0].throwCount, 3);
-  // A snapshot carrying updated counters refreshes the inventory; projectiles sync. TQ-493: chains ride youMeta.
   applyMessage(s, { t: "snapshot", you: { id: "p", x: 0, y: 0, ack: 1 }, youMeta: { chains: [{ chainId: "tier1", throwCount: 2, durability: 1 }], equippedChainId: "tier1" }, projectiles: [{ id: "pr1", x: 5, y: 6, vx: 1, vy: 0, chainId: "tier1" }], chests: [{ id: "ch1", x: 9, y: 9 }] });
   assert.equal(s.chains[0].throwCount, 2);
   assert.equal(s.projectiles.length, 1);
@@ -103,14 +102,13 @@ test("roundStart sets seed/spawn/players and goes in_round", () => {
 
 test("roundStart clears stale combat (mid-fight reconnect resumes roaming, not a dead overlay)", () => {
   const s = freshState();
-  s.combat = { combatId: "c1", enemy: {}, log: [], outcome: null }; // mid-fight when the socket dropped
+  s.combat = { combatId: "c1", enemy: {}, log: [], outcome: null };
   applyMessage(s, { t: "roundStart", roundId: "r1", seed: 1, mapSize: 10, spawn: { x: 0, y: 0 } });
-  assert.equal(s.combat, null); // server tore the combat down on disconnect; client must not stay stuck
+  assert.equal(s.combat, null);
 });
 
 test("roundStart clears stale spatial view state (no previous-round monsters/chests/circle flash at spawn)", () => {
   const s = freshState();
-  // Leftovers from the prior round still in state when the new round starts.
   s.monsters = [{ id: "m_old" }];
   s.chests = [{ id: "ch_old" }];
   s.projectiles = [{ id: "pr_old" }];
@@ -139,14 +137,12 @@ test("snapshot updates self + ack + players + monsters", () => {
 
 test("snapshot stores team HP and keeps last-known across frames", () => {
   const s = freshState();
-  applyMessage(s, { t: "snapshot", you: { id: "p1", x: 1, y: 2, ack: 1 }, youMeta: { team: [{ hp: 30, max: 50 }] } }); // TQ-493: team rides youMeta
+  applyMessage(s, { t: "snapshot", you: { id: "p1", x: 1, y: 2, ack: 1 }, youMeta: { team: [{ hp: 30, max: 50 }] } });
   assert.deepEqual(s.self.team, [{ hp: 30, max: 50 }]);
-  // A snapshot without youMeta keeps the last-known team (and adds no undefined key).
   applyMessage(s, { t: "snapshot", you: { id: "p1", x: 3, y: 4, ack: 2 } });
   assert.deepEqual(s.self, { x: 3, y: 4, team: [{ hp: 30, max: 50 }], danger: 0 });
 });
 
-// The onlineGame disconnect overlay relies on state.connected flipping on close.
 test("net client tracks connected across open/close", () => {
   class FakeWS {
     constructor() { this.readyState = 0; FakeWS.last = this; }
@@ -176,25 +172,25 @@ test("net client auto-reconnects and re-joins after an unexpected drop", async (
   const net = createNetClient({ url: "ws://x", WebSocketImpl: FakeWS, storage: memStorage(), reconnectIntervalMs: 5, reconnectWindowMs: 1000 });
   net.connect();
   FakeWS.last.readyState = 1; FakeWS.last.onopen();
-  net.join("Ash"); // marks hasJoined
+  net.join("Ash");
   applyMessage(net.state, { t: "welcome", you: { id: "p1", nickname: "Ash", token: "tk1", team: [] } }, { storage: memStorage() });
   assert.equal(net.state.token, "tk1");
 
-  FakeWS.last.readyState = 3; FakeWS.last.onclose(); // unexpected drop (CLOSED)
+  FakeWS.last.readyState = 3; FakeWS.last.onclose();
   assert.equal(net.state.connected, false);
   assert.equal(net.state.reconnecting, true);
   const before = FakeWS.count;
 
-  await new Promise((r) => setTimeout(r, 20)); // let the retry interval open a fresh socket
+  await new Promise((r) => setTimeout(r, 20));
   assert.ok(FakeWS.count > before, "a new socket was created");
-  FakeWS.last.readyState = 1; FakeWS.last.onopen(); // reconnect succeeds
+  FakeWS.last.readyState = 1; FakeWS.last.onopen();
   assert.equal(net.state.connected, true);
   assert.equal(net.state.reconnecting, false);
   assert.ok(
     FakeWS.sent.some((o) => { try { const m = JSON.parse(o); return m.t === "join" && m.token === "tk1"; } catch { return false; } }),
     "auto re-join with the token was sent"
   );
-  net.close(); // cleanup timers
+  net.close();
 });
 
 test("pong computes a non-negative smoothed rtt", () => {
@@ -203,7 +199,7 @@ test("pong computes a non-negative smoothed rtt", () => {
   assert.equal(typeof s.rtt, "number");
   assert.ok(s.rtt >= 0 && s.rtt < 60000);
   const first = s.rtt;
-  applyMessage(s, { t: "pong", t0: Date.now() - 40 }); // stays a sane number when smoothing
+  applyMessage(s, { t: "pong", t0: Date.now() - 40 });
   assert.ok(s.rtt >= 0 && s.rtt < 60000 && Number.isFinite(first));
 });
 
@@ -228,14 +224,12 @@ test("applyMessage emits the message type", () => {
 
 test("resumed roundStart restores live round state; fresh clears it (NC-10)", () => {
   const base = { t: "roundStart", roundId: "r", seed: 1, mapSize: 400, spawn: { x: 1, y: 2 } };
-  // Resumed: zone/timer/portals/chests come from the payload (no first-snapshot flash).
   const s = freshState();
   applyMessage(s, { ...base, resumed: true, time: 123, circle: { x: 5, y: 6, r: 50 }, portals: [{ x: 9, y: 9 }], chests: [{ id: "c1", x: 1, y: 1 }] }, { storage: memStorage() });
   assert.equal(s.time, 123);
   assert.deepEqual(s.circle, { x: 5, y: 6, r: 50 });
   assert.equal(s.portals.length, 1);
   assert.equal(s.chests.length, 1);
-  // Fresh round: spatial state cleared (the first snapshot fills it).
   const s2 = freshState();
   applyMessage(s2, base, { storage: memStorage() });
   assert.equal(s2.circle, null);
@@ -258,13 +252,11 @@ test("setSkin sends the cosmetic id; snapshot carries rivals' skinId (CN-12)", (
     FakeWS.sent.some((o) => { try { const m = JSON.parse(o); return m.t === "setSkin" && m.skinId === "void"; } catch { return false; } }),
     "setSkin message sent with the id"
   );
-  // setCharSkin syncs the body-model skin the same way.
   net.setCharSkin("knight");
   assert.ok(
     FakeWS.sent.some((o) => { try { const m = JSON.parse(o); return m.t === "setCharSkin" && m.charId === "knight"; } catch { return false; } }),
     "setCharSkin message sent with the id"
   );
-  // Rivals' skinId + charId ride the snapshot through to state.players (for per-player rendering).
   applyMessage(net.state, { t: "snapshot", players: [{ id: "r1", name: "Riv", x: 1, y: 2, skinId: "ember", charId: "wisp" }] }, { storage: memStorage() });
   assert.equal(net.state.players[0].skinId, "ember");
   assert.equal(net.state.players[0].charId, "wisp", "rival body model rides the snapshot");
@@ -274,13 +266,11 @@ test("setSkin sends the cosmetic id; snapshot carries rivals' skinId (CN-12)", (
 test("TQ-476 snapshot delta: full keyframe populates, delta updates/adds/removes, unchanged entities persist", () => {
   const s = freshState();
   const ctx = { storage: memStorage() };
-  // full keyframe: two monsters + one rival, populated from the upd lists
   applyMessage(s, { t: "snapshot", full: true, you: { x: 1, y: 2, ack: 0 },
     monsters: [{ id: "m1", x: 10, y: 10 }, { id: "m2", x: 20, y: 20 }], players: [{ id: "p1", x: 5, y: 5 }] }, ctx);
   assert.equal(s.monsters.length, 2, "keyframe populated monsters");
   assert.equal(s.players.length, 1, "keyframe populated players");
   const playersRef1 = s.players;
-  // delta: m1 moved, a new m3 entered, m2 unchanged (absent), p1 left view (pGone)
   applyMessage(s, { t: "snapshot", you: { x: 1, y: 2, ack: 1 },
     monsters: [{ id: "m1", x: 11, y: 10 }, { id: "m3", x: 30, y: 30 }], pGone: ["p1"] }, ctx);
   const byId = new Map(s.monsters.map((m) => [m.id, m]));
@@ -297,7 +287,7 @@ test("TQ-476 snapshot delta: a no-change snapshot keeps the view (new array ref,
   const ctx = { storage: memStorage() };
   applyMessage(s, { t: "snapshot", full: true, you: { x: 0, y: 0 }, monsters: [{ id: "m1", x: 9, y: 9 }] }, ctx);
   const ref = s.monsters;
-  applyMessage(s, { t: "snapshot", you: { x: 0, y: 0 } }, ctx); // no entity fields at all
+  applyMessage(s, { t: "snapshot", you: { x: 0, y: 0 } }, ctx);
   assert.equal(s.monsters.length, 1, "unchanged monster still rendered");
   assert.equal(s.monsters[0].x, 9, "at its last position");
   assert.notEqual(s.monsters, ref, "still a fresh array reference");
@@ -309,7 +299,6 @@ test("TQ-476 snapshot delta: roundStart resets the delta view store (no last-rou
   applyMessage(s, { t: "snapshot", full: true, you: { x: 0, y: 0 }, monsters: [{ id: "m1", x: 1, y: 1 }] }, ctx);
   assert.equal(s.monsters.length, 1);
   applyMessage(s, { t: "roundStart", roundId: "r2", seed: 1, mapSize: 10, spawn: { x: 0, y: 0 }, players: [] }, ctx);
-  // a fresh full keyframe with a different monster → the old m1 must be gone, not merged
   applyMessage(s, { t: "snapshot", full: true, you: { x: 0, y: 0 }, monsters: [{ id: "m9", x: 2, y: 2 }] }, ctx);
   assert.equal(s.monsters.length, 1, "only the new round's monster");
   assert.equal(s.monsters[0].id, "m9", "last round's m1 did not linger");

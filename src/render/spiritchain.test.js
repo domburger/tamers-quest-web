@@ -2,8 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { drawChest, drawSpiritChainModel, drawSpiritChainProjectile, chainColor } from "./spiritchain.js";
 
-// Minimal Kaboom stub recording the primitive draws, so we can assert the
-// success-vs-fail capture distinction without a browser (mirrors portal.test.js).
 function mockK() {
   const calls = [];
   return {
@@ -18,7 +16,6 @@ function mockK() {
 }
 test("chainColor: uses the def tint, else a valid fallback triple", () => {
   assert.deepEqual(chainColor({ color: [10, 20, 30] }), [10, 20, 30]);
-  // Don't pin the exact fallback (it's a tunable PAL token) — just require a sane RGB.
   for (const fb of [chainColor(null), chainColor({})]) {
     assert.ok(Array.isArray(fb) && fb.length === 3, "fallback is an RGB triple");
     assert.ok(fb.every((c) => Number.isFinite(c) && c >= 0 && c <= 255), "fallback channels valid");
@@ -46,7 +43,6 @@ test("drawSpiritChainProjectile: draws the in-flight chain + trail; zero velocit
   const moving = mockK();
   assert.doesNotThrow(() => drawSpiritChainProjectile(moving, { x: 5, y: 5, vx: 30, vy: -10 }, [70, 230, 198], 1));
   assert.ok(moving.calls.length > 3, "comet trail + head");
-  // A stationary projectile: the `hypot||1` guard must prevent a divide-by-zero → NaN coords.
   const still = mockK();
   assert.doesNotThrow(() => drawSpiritChainProjectile(still, { x: 0, y: 0, vx: 0, vy: 0 }, [70, 230, 198], 0));
   const finite = still.calls.every((c) => [c.pos, c.p1, c.p2].every((v) => !v || (Number.isFinite(v.x) && Number.isFinite(v.y))));

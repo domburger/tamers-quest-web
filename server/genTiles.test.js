@@ -4,19 +4,16 @@ import { normalizeGeneratedTile, aiGenerateTile, buildTileDesignerPrompt, buildT
 import { DEFAULT_PROMPTS, setPrompts, resetPrompts } from "./prompts.js";
 import { setAiConfig } from "./aiconfig.js";
 
-// TQ-432: prompt overrides are a process-wide singleton shared with the other gen test files; reset
-// to defaults before every test so another file's leftover setPrompts() can't leak in (run-order flake).
 beforeEach(resetPrompts);
 
 test("normalizeGeneratedTile: maps one colour into the base colorProfile_full_* set + flags", () => {
   const t = normalizeGeneratedTile(
     { name: "Glowing Moss", description: "Soft luminous moss over damp stone.", color: { r: 40, g: 120, b: 70 }, emissiveness: 3, slipperiness: 6, rarity: 25 },
-    { id: 99, biome: "Fungal Hollow", collidable: 1 }, // collidable is an INPUT (opts), not a designer output
+    { id: 99, biome: "Fungal Hollow", collidable: 1 },
   );
   assert.equal(t.id, 99);
   assert.equal(t.name, "Glowing Moss");
   assert.equal(t.biome, "Fungal Hollow", "opts.biome wins (so the tile pools correctly)");
-  // the base colour is the only colour profile a tile carries (TQ-407: per-side edges removed)
   assert.deepEqual([t.colorProfile_full_r, t.colorProfile_full_g, t.colorProfile_full_b], [40, 120, 70]);
   assert.equal(t.collidable, 1, "collidable comes from opts (the input)");
   assert.equal(t.emissiveness, 3, "emissiveness ON by default (TQ-361)");
@@ -27,7 +24,6 @@ test("normalizeGeneratedTile: maps one colour into the base colorProfile_full_* 
 });
 
 test("TQ-361: tile-modifier toggles gate slipperiness / speed / emissiveness generation", async () => {
-  // Defaults: slipperiness OFF → 0, speed OFF → uniform 1, emissiveness ON → keeps the value.
   let t = normalizeGeneratedTile({ slipperiness: 8, speedModifier: 1.5, emissiveness: 4 }, {});
   assert.equal(t.slipperiness, 0, "slipperiness off by default");
   assert.equal(t.speedModifier, 1, "speed off by default → uniform 1");
@@ -39,14 +35,11 @@ test("TQ-361: tile-modifier toggles gate slipperiness / speed / emissiveness gen
     assert.equal(t.speedModifier, 1.5, "enabled → per-tile speed generated");
     assert.equal(t.emissiveness, 0, "disabled → emissiveness forced to 0");
   } finally {
-    // reset shared aiconfig state so other suites see the defaults
     await setAiConfig({ tileSlipperinessEnabled: false, tileSpeedModifierEnabled: false, tileEmissivenessEnabled: true });
   }
 });
 
 test("TQ-407: the per-side edge-colour concept is gone — a tile carries ONLY its full base colour", () => {
-  // Even if a (legacy/over-eager) model echoes top/bottom/left/right colours, they are dropped: the
-  // edge concept was removed game-wide. A tile profile is just colorProfile_full_*.
   const t = normalizeGeneratedTile(
     { color: { r: 80, g: 80, b: 80 },
       top: { r: 96, g: 96, b: 96 }, bottom: { r: 64, g: 64, b: 64 },
@@ -67,7 +60,6 @@ test("normalizeGeneratedTile: clamps colours/flags and defaults a missing tile",
   assert.equal(t.collidable, 0, "unparseable collidable → 0");
   assert.equal(t.rarity, 100, "rarity clamped to 100");
   assert.equal(t.name, "Cracked Ground", "missing name → default");
-  // alt colour field names + array form are accepted
   assert.deepEqual(
     [normalizeGeneratedTile({ fill: { red: 10, green: 20, blue: 30 } }).colorProfile_full_r,
      normalizeGeneratedTile({ fill: { red: 10, green: 20, blue: 30 } }).colorProfile_full_g], [10, 20]);
@@ -79,12 +71,9 @@ test("normalizeGeneratedTile: name is made unique vs existingNames", () => {
 });
 
 test("collidable is an INPUT only: set from opts (never the designer output) + directive in the prompts", () => {
-  // collidable is an INPUT — the requested opts.collidable is authoritative; the designer no longer
-  // outputs a collidable field, so a stray one in the designer response is IGNORED.
   assert.equal(normalizeGeneratedTile({ collidable: 0 }, { collidable: 1 }).collidable, 1, "opts.collidable=1 forces collidable");
   assert.equal(normalizeGeneratedTile({ collidable: 1 }, { collidable: 0 }).collidable, 0, "opts.collidable=0 forces walkable");
   assert.equal(normalizeGeneratedTile({ collidable: 1 }, {}).collidable, 0, "no opts → default walkable; the designer's stray collidable is ignored (input-only)");
-  // inspiration + designer prompts carry the directive when requested, and nothing when unspecified
   assert.ok(/COLLIDABLE/i.test(buildTileInspirationPrompt("Volcano", "", 1).user), "inspiration carries the collidable directive");
   assert.ok(/WALKABLE/i.test(buildTileDesignerPrompt("x", "Volcano", 0).user), "designer carries the walkable directive");
   assert.ok(!/REQUIRED:/.test(buildTileDesignerPrompt("x", "Volcano").user), "no directive when collidability is unspecified");
@@ -97,7 +86,7 @@ test("aiGenerateTile: a requested collidable is forced on the result + steers th
   const chat = async (system, user) => {
     calls.push({ system, user });
     if (calls.length === 1) return { inspiration: "deep black water" };
-    if (calls.length === 2) return { name: "Black Water", color: { r: 10, g: 14, b: 28 }, collidable: 0 }; // designer says walkable…
+    if (calls.length === 2) return { name: "Black Water", color: { r: 10, g: 14, b: 28 }, collidable: 0 };
     return { html: `<div style="width:256px;height:256px;background:#0a0e1c"></div>` };
   };
   try {
@@ -111,13 +100,13 @@ test("aiGenerateTile: a requested collidable is forced on the result + steers th
 
 test("aiGenerateTile: inspiration -> designer -> builder -> normalized tile (mocked chat)", async () => {
   const origKey = process.env.OPENAI_API_KEY;
-  process.env.OPENAI_API_KEY = "test-key"; // aiEnabled()
+  process.env.OPENAI_API_KEY = "test-key";
   const calls = [];
   const chat = async (system, user) => {
     calls.push({ system, user });
-    if (calls.length === 1) return { inspiration: "cracked obsidian slab" };                                        // stage 1
-    if (calls.length === 2) return { name: "Obsidian Slab", description: "Black volcanic glass underfoot.", color: { r: 28, g: 24, b: 32 } }; // stage 2 (designer: no visual)
-    return { html: `<div style="position:relative;width:256px;height:256px;background:#1c181f"><div style="position:absolute;left:20px;top:30px;width:40px;height:3px;background:#0e0c12"></div></div>` }; // stage 3: builder authors free HTML/CSS (TQ-393)
+    if (calls.length === 1) return { inspiration: "cracked obsidian slab" };
+    if (calls.length === 2) return { name: "Obsidian Slab", description: "Black volcanic glass underfoot.", color: { r: 28, g: 24, b: 32 } };
+    return { html: `<div style="position:relative;width:256px;height:256px;background:#1c181f"><div style="position:absolute;left:20px;top:30px;width:40px;height:3px;background:#0e0c12"></div></div>` };
   };
   try {
     const t = await aiGenerateTile({ id: 7, biome: "Volcano" }, { chat });
@@ -152,7 +141,7 @@ test("TQ-372: aiGenerateTile skips the Builder when tileBuilderEnabled is off (n
     assert.equal(t.html, undefined, "no authored html → renderer falls back to procedural grain");
     assert.equal(t.name, "Ash Dust");
   } finally {
-    await setAiConfig({ tileBuilderEnabled: true }); // reset shared aiconfig for other suites
+    await setAiConfig({ tileBuilderEnabled: true });
     if (origKey === undefined) delete process.env.OPENAI_API_KEY; else process.env.OPENAI_API_KEY = origKey;
   }
 });
@@ -168,11 +157,8 @@ test("tile prompts: inspiration carries biome + kind; designer survives an overr
   const idea = (DEFAULT_PROMPTS.tileIdeaSystem + " " + DEFAULT_PROMPTS.tileIdeaUser).toLowerCase();
   assert.ok(idea.includes("2-4 words"));
   assert.ok(DEFAULT_PROMPTS.tileIdeaUser.includes("{biome}") && DEFAULT_PROMPTS.tileIdeaUser.includes("{kind}"));
-  // the inspiration prompt fills both the biome and the kind slots
   const insp = buildTileInspirationPrompt("Tundra", "frozen crust").user;
   assert.ok(insp.includes("Tundra") && insp.includes("frozen crust"));
-  // an override that DROPS {inspiration}+{biome} is respected — NO append-if-missing (the slots are
-  // gone for a reason; the prompt is literal). The operator keeps the placeholders if they want them.
   await setPrompts({ tileDesignerUser: "Design a floor tile as JSON." });
   try {
     const out = buildTileDesignerPrompt("cracked obsidian slab", "Volcano").user;
@@ -180,6 +166,6 @@ test("tile prompts: inspiration carries biome + kind; designer survives an overr
     assert.ok(!out.includes("cracked obsidian slab"), "dropped {inspiration} is NOT re-appended");
     assert.ok(!out.includes("Volcano"), "dropped {biome} is NOT re-appended");
   } finally {
-    await setPrompts({ tileDesignerUser: "" }); // reset to default
+    await setPrompts({ tileDesignerUser: "" });
   }
 });

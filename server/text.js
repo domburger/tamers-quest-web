@@ -1,11 +1,3 @@
-// Shared text helpers (server-side). Pure, dependency-free.
-
-// Trim a string to <=max chars on a CLEAN boundary instead of chopping a word (or
-// a multibyte char) in half (FGT-T7). If a sentence end (.!?) lands in the back of
-// the window we cut there (a complete thought, no marker); otherwise we back off to
-// the last word boundary and append an ASCII "..." to signal the cut. ASCII-only
-// output (respects the no-decorative-glyph UI rule); non-string/nullish → safe
-// string. Used for AI combat narrative and generated monster lore/effects.
 export function clampText(s, max = 240) {
   const t = String(s == null ? "" : s).trim();
   if (t.length <= max) return t;
@@ -18,14 +10,7 @@ export function clampText(s, max = 240) {
   return body + "...";
 }
 
-// Insert a slot value into an (admin-overridable) prompt template by replacing EVERY occurrence of
-// the {placeholder}. NO append-if-missing: if a prompt override DROPS the placeholder, the value is
-// intentionally omitted — a dropped slot is respected (it's "missing for a reason"), so the prompt the
-// operator sees/edits in /admin is exactly what the model receives (Dominik 2026-06-16). replaceAll
-// fills repeated placeholders too (no literal "{slot}" leaking on the 2nd+); a FUNCTION replacement
-// keeps a "$" in the value (e.g. "$&" / "$`" / "$$") VERBATIM rather than a String.replace special.
-// Pure; shared by the monster / item / biome / tile generation pipelines. (The old optional `label`
-// arg drove the removed append branch; extra args are harmless, so callers passing it still work.)
+// Replacer fn on purpose: a string replacement would expand $& / $$ in val.
 export function fillSlot(tpl, key, val) {
   const t = String(tpl == null ? "" : tpl);
   const v = val == null ? "" : String(val);

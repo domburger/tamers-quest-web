@@ -47,7 +47,6 @@ test("nextChainId cycles owned chains forward/back with wrap; null when ≤1", (
   assert.equal(nextChainId(chains, "c", 1), "a", "wraps forward");
   assert.equal(nextChainId(chains, "a", -1), "c", "wraps backward");
   assert.equal(nextChainId(chains, "unknown", 1), "b", "missing current → start from index 0, step forward");
-  // Nothing to cycle to.
   assert.equal(nextChainId([{ chainId: "only" }], "only", 1), null);
   assert.equal(nextChainId([], "x", 1), null);
   assert.equal(nextChainId(null, "x", 1), null);
@@ -57,10 +56,8 @@ test("equipChain only equips a chain the player owns (untrusted-id gate)", () =>
   const p = { chains: [{ chainId: "tier1" }, { chainId: "tier2" }], equippedChainId: "tier1" };
   assert.equal(equipChain(p, "tier2"), true);
   assert.equal(p.equippedChainId, "tier2");
-  // A chain the player doesn't own is rejected; the equip is unchanged.
   assert.equal(equipChain(p, "guaranteed"), false);
   assert.equal(p.equippedChainId, "tier2");
-  // Junk / empty id → no-op.
   assert.equal(equipChain(p, ""), false);
   assert.equal(equipChain({ chains: [] }, "tier1"), false);
 });
@@ -74,10 +71,8 @@ test("equipChain keeps the active chain inside the 3-slot loadout", () => {
 
 test("setChainSlots: validates ownership, dedupes, caps at CHAIN_SLOTS, pins the active id", () => {
   const p = { chains: [{ chainId: "tier1" }, { chainId: "tier2" }, { chainId: "tier3" }, { chainId: "tier4" }], equippedChainId: "tier1" };
-  // unowned + duplicate ids are dropped; capped at 3; order preserved.
   setChainSlots(p, ["tier3", "tier3", "guaranteed", "tier2", "tier1"]);
   assert.deepEqual(p.equippedChainIds, ["tier3", "tier2", "tier1"]);
-  // active wasn't in the new loadout (it was tier1 → still present here) — choose tier3 case:
   setChainSlots(p, ["tier4", "tier2"]);
   assert.deepEqual(p.equippedChainIds, ["tier4", "tier2"]);
   assert.equal(p.equippedChainId, "tier4", "active re-points to slot 0 when it falls out of the loadout");
@@ -98,13 +93,11 @@ test("ensureChainSlots: drops unowned ids, backfills empties, pins active to a s
   assert.ok(p.equippedChainIds.includes(p.equippedChainId), "active points at an owned, slotted chain");
 });
 
-// applyRoster — the shared field/store/swap rule (PT2-T11 PARITY-2/3), consumed by
-// both SP and MP, was the one inventory-engine export without tests.
 test("applyRoster: fields a vault monster and benches the displaced active one", () => {
   const p = { activeMonsters: [mon(0), mon(1)], vaultMonsters: [mon(2)] };
   assert.equal(applyRoster(p, ["m2", "m1"]), true);
-  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m2", "m1"]); // m2 fielded
-  assert.deepEqual(p.vaultMonsters.map((m) => m.id), ["m0"]);        // m0 benched
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m2", "m1"]);
+  assert.deepEqual(p.vaultMonsters.map((m) => m.id), ["m0"]);
 });
 
 test("applyRoster: refuses to empty the team (no mutation on empty / all-invalid ids)", () => {
@@ -117,7 +110,7 @@ test("applyRoster: refuses to empty the team (no mutation on empty / all-invalid
 test("applyRoster: dedups repeated ids and ignores ids not in the pool", () => {
   const p = { activeMonsters: [mon(0)], vaultMonsters: [mon(1)] };
   assert.equal(applyRoster(p, ["m1", "m1", "bogus"]), true);
-  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m1"]); // dup + bogus dropped
+  assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m1"]);
   assert.deepEqual(p.vaultMonsters.map((m) => m.id), ["m0"]);
 });
 
@@ -126,10 +119,9 @@ test("applyRoster: caps the active team at TEAM_SIZE; the overflow goes to the v
   const p = { activeMonsters: all, vaultMonsters: [] };
   assert.equal(applyRoster(p, all.map((m) => m.id)), true);
   assert.equal(p.activeMonsters.length, GAME.TEAM_SIZE);
-  assert.equal(p.vaultMonsters.length, 1); // the one that didn't fit
+  assert.equal(p.vaultMonsters.length, 1);
 });
 
-// releaseMonster — INV-T7: free a monster for a level-scaled GOLD refund (TQ-132: no essence).
 test("releaseMonster: removes a vault monster and banks the scaled refund", () => {
   const p = { activeMonsters: [mon(0)], vaultMonsters: [mon(1)], gold: 100, essence: 5 };
   const r = releaseMonster(p, "m1");
@@ -167,14 +159,12 @@ test("releaseMonster: refuses to release the player's last monster (no mutation)
   assert.equal(p.gold, 50, "no refund on a refused release");
 });
 
-// loseRunTeam — Q10 death stake: lose the run team, refill from vault / starters.
 test("loseRunTeam: death refills the active team from the vault (old team lost)", () => {
   const p = { activeMonsters: [mon(0), mon(1)], vaultMonsters: [mon(2), mon(3), mon(4)] };
   const team = loseRunTeam(p, () => [mon(99)]);
   assert.deepEqual(p.activeMonsters.map((m) => m.id), ["m2", "m3", "m4"], "vault monsters become active");
   assert.deepEqual(p.vaultMonsters.map((m) => m.id), [], "they left the vault");
   assert.equal(team, p.activeMonsters);
-  // The old active team (m0/m1) is gone entirely — that's the stake.
   assert.ok(!p.activeMonsters.concat(p.vaultMonsters).some((m) => m.id === "m0"));
 });
 

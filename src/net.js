@@ -1,21 +1,8 @@
-// Client networking — connects the browser client to the authoritative server.
-// Framework-agnostic (no Kaboom): scenes call connect/join/queue/move and
-// subscribe to events. The session token is persisted so an anonymous player
-// resumes their profile across reloads. Testable by injecting a WebSocket impl
-// and a storage shim; the message→state reducer (applyMessage) is pure.
-
-import { decodeSnapshot } from "./snapshotCodec.js"; // TQ-477: binary snapshot frames
-import { addEvolvedType } from "./engine/gamedata.js"; // TQ-551: register evolved type defs so the client can render evolved monsters
+import { decodeSnapshot } from "./snapshotCodec.js";
+import { addEvolvedType } from "./engine/gamedata.js";
 
 export const TOKEN_KEY = "tq_session_token";
 
-// WS endpoint. Prod (https) → same origin (`wss://host`). Local dev → the server
-// on :8080 (the standard `npm run server` port, even when the client is served by
-// Vite on :5173). A `?ws=<url>` query param overrides both — used by multi-port QA
-// harnesses that run a combined client+server on a non-8080 port (without it, the
-// http fallback below would point the socket at :8080, a *different* server).
-// Opt-in only: no query param ⇒ identical to before, so prod/standard-dev are
-// unaffected.
 function resolveDefaultWsUrl() {
   if (typeof location === "undefined") return "ws://localhost:8080";
   const override = new URLSearchParams(location.search).get("ws");
@@ -24,26 +11,17 @@ function resolveDefaultWsUrl() {
 }
 const DEFAULT_URL = resolveDefaultWsUrl();
 
-// TQ-476 (RT-NET 2/5): apply one category's snapshot delta onto a keyed view store — set/replace the
-// changed entries (`upd`, keyed by id), then drop the ids that left view (`gone`). Absent args = no change.
 function applyDelta(map, upd, gone) {
   if (upd) for (const o of upd) map.set(o.id, o);
   if (gone) for (const id of gone) map.delete(id);
 }
 
-// Pure reducer: fold a server message into the client state. Exported for tests.
-// `ctx.storage` persists the session token; `ctx.emit(event, data)` notifies.
 export function applyMessage(state, m, ctx = {}) {
   const { storage, emit = () => {} } = ctx;
-  // Defensive: ignore a non-object / typeless message (mirrors the server's
-  // handleMessage guard). The server only sends well-formed messages, but a
-  // protocol skew on deploy (a stale tab + a new message shape) or non-object JSON
-  // must not throw on `m.t` and break the session.
   if (!m || typeof m.t !== "string") return state;
   switch (m.t) {
     case "welcome":
-      // TQ-551: register the player's evolved type defs BEFORE the team is read, so getMonsterType resolves
-      // their evolved monsters (evolved types are excluded from /api/monstertypes, the boot type source).
+      // Register evolved types before reading the team (getMonsterType needs them).
       if (Array.isArray(m.you.evolvedTypes)) for (const t of m.you.evolvedTypes) addEvolvedType(t);
       state.playerId = m.you.id;
       state.nickname = m.you.nickname;
@@ -52,20 +30,20 @@ export function applyMessage(state, m, ctx = {}) {
       state.stats = m.you.stats || {};
       state.chains = m.you.chains || [];
       state.equippedChainId = m.you.equippedChainId || null;
-      state.equippedChainIds = m.you.equippedChainIds || []; // CHAIN_SLOTS: 3-slot loadout
+      state.equippedChainIds = m.you.equippedChainIds || [];
       state.gold = m.you.gold || 0;
-      state.essence = m.you.essence || 0; // TQ-132: premium currency (server-authoritative; never client-trusted)
-      state.level = m.you.level || 1; // TQ-186: account prestige level (server-authoritative)
-      state.xp = m.you.xp || 0; // TQ-186: carry-over XP toward the next account level
-      state.bpSeasonId = m.you.bpSeasonId || null; // TQ-182: battle-pass season + progress (server-authoritative)
+      state.essence = m.you.essence || 0;
+      state.level = m.you.level || 1;
+      state.xp = m.you.xp || 0;
+      state.bpSeasonId = m.you.bpSeasonId || null;
       state.bpXp = m.you.bpXp || 0;
       state.bpClaimed = m.you.bpClaimed || [];
-      state.adFree = m.you.adFree || false; // TQ-174: ad-free entitlement (server-authoritative)
-      state.subscribed = m.you.subscribed || false; // TQ-267: legacy/perpetual subscription flag
-      state.subscribedUntil = m.you.subscribedUntil || 0; // TQ-270: recurring-subscription expiry (epoch ms; active while now < this)
+      state.adFree = m.you.adFree || false;
+      state.subscribed = m.you.subscribed || false;
+      state.subscribedUntil = m.you.subscribedUntil || 0;
       state.upgrades = m.you.upgrades || {};
-      state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] }; // CN-9
-      state.items = m.you.items || []; // combat items (plan "Decide general items")
+      state.ownedCosmetics = m.you.ownedCosmetics || { chain: [], char: [] };
+      state.items = m.you.items || [];
       if (m.you.token) {
         state.token = m.you.token;
         storage && storage.setItem(TOKEN_KEY, m.you.token);
@@ -80,64 +58,48 @@ export function applyMessage(state, m, ctx = {}) {
       break;
     case "roundStart":
       state.phase = "in_round";
-      state.atRisk = m.atRisk || { catches: 0, items: 0 }; // a fresh run has nothing at risk; a resume carries the live count
+      state.atRisk = m.atRisk || { catches: 0, items: 0 };
       state.roundId = m.roundId;
       state.seed = m.seed;
-      state.roundBiomes = m.biomes || null; // TQ-365: exact biome set → generateMap regenerates the identical map
-      state.roundComp = m.comp || null; // TQ-367: per-biome tile composition → same tile pools client-side
+      state.roundBiomes = m.biomes || null;
+      state.roundComp = m.comp || null;
       state.mapSize = m.mapSize;
-      state.adventure = !!m.adventure; // TQ-529: endless solo mode (no timer / storm / portals; edges travel)
+      state.adventure = !!m.adventure;
       state.depth = m.depth || 1;
       state.self = { x: m.spawn.x, y: m.spawn.y };
       state.players = m.players || [];
       state.roundResult = null;
-      state.killfeed = []; // P8-T5: fresh feed each round
-      // Clear the transient AoI view state (monsters/projectiles) — the first
-      // snapshot refills them ~1-2 ticks later; until then they'd render the PREVIOUS
-      // round's entities at the new spawn.
+      state.killfeed = [];
       state.monsters = [];
       state.projectiles = [];
-      // TQ-476: reset the delta view store too, so a fresh/resumed round starts from an empty baseline
-      // (the server sends a full keyframe; without this, last round's entities would linger until evicted).
       if (state._view) { state._view.players.clear(); state._view.monsters.clear(); state._view.projectiles.clear(); state._view.chests.clear(); }
-      // NC-10: a RESUMED roundStart (reconnect / redeploy) carries the live round
-      // state, so render it immediately instead of flashing the fresh-round defaults
-      // (full zone / no portals / wrong timer) until the first snapshot. A FRESH
-      // round clears it (the snapshot fills it shortly after).
       state.circle = m.resumed ? (m.circle || null) : null;
       state.portals = m.resumed ? (m.portals || []) : [];
       state.chests = m.resumed ? (m.chests || []) : [];
       if (m.resumed && m.time != null) state.time = m.time;
-      // Clear any stale combat: a mid-fight disconnect tears the combat down
-      // server-side (removePlayer → "resume roaming"), so a resumed roundStart
-      // must not leave the client stuck on a dead combat overlay. Harmless on a
-      // fresh round (combat is only ever set later via combatStart).
       state.combat = null;
       break;
     case "snapshot":
       if (m.you) {
-        // TQ-493: `you` carries only the per-tick scalars. The rarely-changing meta (team HP, chains,
-        // wallet, upgrades) arrives in `youMeta` only when it changed — keep last-known when it's absent.
+        // youMeta is sent only on change; keep last-known values when absent.
         const prevTeam = state.self?.team;
         state.self = { x: m.you.x, y: m.you.y };
-        state.self.danger = m.you.danger || 0; // zone-death meter (0..1): fills outside the safe zone, drains in safety
+        state.self.danger = m.you.danger || 0;
         state.ack = m.you.ack;
         if (m.you.stamina !== undefined) state.stamina = m.you.stamina;
-        const team = (m.youMeta && m.youMeta.team) || prevTeam; // keep last-known team HP across frames
+        const team = (m.youMeta && m.youMeta.team) || prevTeam;
         if (team) state.self.team = team;
       }
-      if (m.youMeta) { // TQ-493: rarely-changing player meta, sent only on change
+      if (m.youMeta) {
         const ym = m.youMeta;
         if (ym.chains) state.chains = ym.chains;
         if (ym.equippedChainId !== undefined) state.equippedChainId = ym.equippedChainId;
-        if (ym.equippedChainIds !== undefined) state.equippedChainIds = ym.equippedChainIds; // CHAIN_SLOTS
+        if (ym.equippedChainIds !== undefined) state.equippedChainIds = ym.equippedChainIds;
         if (ym.gold !== undefined) state.gold = ym.gold;
         if (ym.essence !== undefined) state.essence = ym.essence;
         if (ym.upgrades) state.upgrades = ym.upgrades;
       }
-      // TQ-476: snapshots are DELTAS. Merge changed entries onto a keyed view store, drop the `*Gone`
-      // ids, then rebuild the public arrays as NEW references (the scene's render smoothing detects a
-      // fresh snapshot by the array reference changing). `full` (fresh round / resync) resets the store.
+      // Rebuild arrays as new refs: render smoothing detects new snapshots by reference.
       if (!state._view) state._view = { players: new Map(), monsters: new Map(), projectiles: new Map(), chests: new Map() };
       const v = state._view;
       if (m.full) { v.players.clear(); v.monsters.clear(); v.projectiles.clear(); v.chests.clear(); }
@@ -153,37 +115,34 @@ export function applyMessage(state, m, ctx = {}) {
       state.circle = m.circle || null;
       state.portals = m.portals || [];
       break;
-    case "hubSnapshot": // TQ-258: roster of other players currently in the lobby/hub (positions + cosmetics)
+    case "hubSnapshot":
       state.hubPlayers = m.players || [];
       break;
     case "combatStart":
       state.combat = { combatId: m.combatId, enemy: m.enemy, active: m.active, attacks: m.attacks || [], team: m.team || [], activeIdx: m.activeIdx ?? 0, log: [], outcome: null, pvp: !!m.pvp, opponent: m.opponent || null, waiting: false };
       break;
-    case "combatUnavailable": // FGT-T1: AI judge offline — combat can't start (shown as a toast)
+    case "combatUnavailable":
       state.combatNotice = { text: m.reason || "Combat needs a connection.", at: Date.now() };
       break;
-    case "lootNotice": // TQ-66: chest loot couldn't be taken (bag full) — transient top-centre toast
+    case "lootNotice":
       state.lootNotice = { text: m.text || "Bag full", at: Date.now() };
       break;
     case "combatUpdate":
       if (state.combat) {
         if (m.active) state.combat.active = m.active;
         if (m.enemy) state.combat.enemy = m.enemy;
-        // PvP advance fix: a faint promotes the next monster, whose MOVES + team slot
-        // differ — adopt the fresh attacks/team/activeIdx the server sends so the action
-        // menu doesn't keep offering the fainted monster's moves.
         if (m.attacks) state.combat.attacks = m.attacks;
         if (m.team) state.combat.team = m.team;
         if (m.activeIdx != null) state.combat.activeIdx = m.activeIdx;
-        if (m.items) state.items = m.items; // an item use consumed one → reflect the bag
+        if (m.items) state.items = m.items;
         if (m.narrative) state.combat.log.push(m.narrative);
-        state.combat.waiting = !!m.waiting; // PvP: true while awaiting the opponent's move
+        state.combat.waiting = !!m.waiting;
       }
       break;
     case "combatEnd":
       if (state.combat) {
         state.combat.outcome = m.outcome; if (m.caughtPlacement) state.combat.placement = m.caughtPlacement;
-        state.combat.gains = m.gains || null; state.combat.caught = m.caught || null; // TQ-554: end-of-fight overview data
+        state.combat.gains = m.gains || null; state.combat.caught = m.caught || null;
         state.combat.endedAt = Date.now();
       }
       if (m.team) state.team = m.team;
@@ -198,8 +157,6 @@ export function applyMessage(state, m, ctx = {}) {
       state.combat = null;
       if (m.team) state.team = m.team;
       if (m.stats) state.stats = m.stats;
-      // The run changed the WHOLE profile server-side (extract gold/XP, chains banked or lost, the vault refilling a
-      // lost team, items used/looted) — apply the synced snapshot so the village shows the truth immediately.
       if (m.profile) {
         const y = m.profile;
         state.vault = y.vault || []; state.chains = y.chains || []; state.equippedChainId = y.equippedChainId || null; state.equippedChainIds = y.equippedChainIds || [];
@@ -207,47 +164,45 @@ export function applyMessage(state, m, ctx = {}) {
         state.bpXp = y.bpXp || 0; state.bpClaimed = y.bpClaimed || [];
       }
       break;
-    case "evolved": // TQ-551: a survivor evolved at level 30 (arrives a beat after extraction — the AI runs async)
-      if (Array.isArray(m.types)) for (const t of m.types) addEvolvedType(t); // register the evolved defs first
-      if (m.team) state.team = m.team; // repointed to the evolved type(s) → roster shows the new form + name
-      state.evolved = { events: m.events || [], at: Date.now() }; // UI reads this to show the "X evolved into Y!" moment
+    case "evolved":
+      if (Array.isArray(m.types)) for (const t of m.types) addEvolvedType(t);
+      if (m.team) state.team = m.team;
+      state.evolved = { events: m.events || [], at: Date.now() };
       break;
-    case "roster": // P8-T2: full collection sync (active team + vault)
+    case "roster":
       state.team = m.team || [];
       state.vault = m.vault || [];
-      // INV-T7: a release reply also syncs the wallet (refund banked) + stashes the
-      // outcome so the roster UI can toast "Released  +Ng +M essence" / a refusal.
       if (m.gold !== undefined) state.gold = m.gold;
       if (m.essence !== undefined) state.essence = m.essence;
       if (m.released) state.lastRelease = { ok: !!m.ok, reward: m.reward || null, reason: m.reason || null, locked: !!m.locked, at: Date.now() };
       break;
-    case "shop": // spirit shop / craft result — sync gold + essence + chain inventory
+    case "shop":
       if (m.gold !== undefined) state.gold = m.gold;
       if (m.essence !== undefined) state.essence = m.essence;
       if (m.chains) state.chains = m.chains;
       if (m.equippedChainId !== undefined) state.equippedChainId = m.equippedChainId;
-      if (m.equippedChainIds !== undefined) state.equippedChainIds = m.equippedChainIds; // CHAIN_SLOTS: keep the lobby loadout fresh after buy/craft
+      if (m.equippedChainIds !== undefined) state.equippedChainIds = m.equippedChainIds;
       break;
-    case "upgrades": // account upgrade purchase result — sync gold + upgrade levels
+    case "upgrades":
       if (m.gold !== undefined) state.gold = m.gold;
       if (m.upgrades) state.upgrades = m.upgrades;
       break;
-    case "market": // TQ-113 monster marketplace: a browse result OR a list/cancel/buy outcome
-      if (Array.isArray(m.evolvedTypes)) for (const t of m.evolvedTypes) addEvolvedType(t); // TQ-556: render evolved listings
+    case "market":
+      if (Array.isArray(m.evolvedTypes)) for (const t of m.evolvedTypes) addEvolvedType(t);
       if (m.browse) state.market = { listings: m.listings || [], at: Date.now() };
-      else state.marketResult = { ok: !!m.ok, reason: m.reason || null, at: Date.now() }; // a list/cancel/buy reply
-      if (m.sales) state.marketSales = { items: m.sales, at: Date.now() }; // TQ-537: deliver-once sale receipts for the seller (toasted on open)
-      if (m.vault) state.vault = m.vault;                // an escrow change moved a monster in/out of your vault
-      if (m.gold !== undefined) state.gold = m.gold;     // a buy debits the buyer / credits the seller
+      else state.marketResult = { ok: !!m.ok, reason: m.reason || null, at: Date.now() };
+      if (m.sales) state.marketSales = { items: m.sales, at: Date.now() };
+      if (m.vault) state.vault = m.vault;
+      if (m.gold !== undefined) state.gold = m.gold;
       if (m.essence !== undefined) state.essence = m.essence;
       break;
-    case "cosmetic": // CN-9 cosmetic purchase result — sync wallet + owned skin ids
+    case "cosmetic":
       if (m.gold !== undefined) state.gold = m.gold;
       if (m.essence !== undefined) state.essence = m.essence;
       if (m.ownedCosmetics) state.ownedCosmetics = m.ownedCosmetics;
-      state.lastCosmetic = { ok: !!m.ok, reason: m.reason || null, at: Date.now() }; // scene reads the outcome for a toast
+      state.lastCosmetic = { ok: !!m.ok, reason: m.reason || null, at: Date.now() };
       break;
-    case "bp": // TQ-183 battle-pass claim result — sync progress + wallet + owned (server-authoritative)
+    case "bp":
       if (m.bpSeasonId !== undefined) state.bpSeasonId = m.bpSeasonId;
       if (m.bpXp !== undefined) state.bpXp = m.bpXp;
       if (m.bpClaimed) state.bpClaimed = m.bpClaimed;
@@ -255,15 +210,15 @@ export function applyMessage(state, m, ctx = {}) {
       if (m.essence !== undefined) state.essence = m.essence;
       if (m.ownedCosmetics) state.ownedCosmetics = m.ownedCosmetics;
       if (m.chains) state.chains = m.chains;
-      state.lastBp = { ok: !!m.ok, reason: m.reason || null, tier: m.tier, track: m.track, at: Date.now() }; // UI reads the outcome for a toast
+      state.lastBp = { ok: !!m.ok, reason: m.reason || null, tier: m.tier, track: m.track, at: Date.now() };
       break;
-    case "killfeed": // P8-T5: round event feed (PvP defeats, eliminations, extractions)
+    case "killfeed":
       state.killfeed = state.killfeed || [];
       state.killfeed.push({ killer: m.killer || null, victim: m.victim || "?", cause: m.cause || "", recvAt: Date.now() });
       if (state.killfeed.length > 6) state.killfeed.shift();
       break;
     case "pong": {
-      const sample = Date.now() - m.t0; // round-trip on the client clock only
+      const sample = Date.now() - m.t0;
       state.rtt = state.rtt == null ? sample : Math.round(state.rtt * 0.7 + sample * 0.3);
       break;
     }
@@ -276,59 +231,59 @@ export function createNetClient(opts = {}) {
   const url = opts.url || DEFAULT_URL;
   const WS = opts.WebSocketImpl || (typeof WebSocket !== "undefined" ? WebSocket : null);
   const storage = opts.storage || browserStorage();
-  // Auto-reconnect window matches the server's 120s grace (Q12); retry interval.
+  // Must match the server's 120s reconnect grace.
   const RECONNECT_WINDOW_MS = opts.reconnectWindowMs ?? 120000;
   const RECONNECT_INTERVAL_MS = opts.reconnectIntervalMs ?? 2000;
 
-  const listeners = new Map(); // event -> Set(cb)
+  const listeners = new Map();
   const state = {
     connected: false,
-    phase: "idle", // idle | queued | matched | in_round
+    phase: "idle",
     playerId: null,
     nickname: null,
     token: storage.getItem(TOKEN_KEY) || null,
     team: [],
-    vault: [], // owned monsters not on the active team (P8-T2); synced via welcome/roster
-    items: [], // combat items (plan "Decide general items"); synced via welcome
-    chains: [], // owned spirit chains (live throwCount/durability counters)
-    equippedChainId: null, // which owned chain is ACTIVE (throws/captures)
-    equippedChainIds: [], // CHAIN_SLOTS: the 3-slot chain loadout (hot-swappable in a run)
-    gold: 0, // in-game currency (earned in runs); spirit shop + chain upgrades
-    essence: 0, // premium currency (TQ-132); paid-for via Paddle, server-authoritative, never earned
-    level: 1, // TQ-186: account prestige level (server-authoritative; earned from play, non-pay-to-win)
-    xp: 0, // TQ-186: carry-over XP toward the next account level (xpForLevel curve)
-    bpSeasonId: null, bpXp: 0, bpClaimed: [], // TQ-182: battle-pass season progress (server-authoritative)
-    adFree: false, // TQ-174: ad-free entitlement (server-authoritative; set from welcome payload)
-    subscribed: false, // TQ-267: legacy/perpetual subscription flag (server-authoritative)
-    subscribedUntil: 0, // TQ-270: recurring-subscription expiry (epoch ms; 0 = none; active while now < this)
-    upgrades: {}, // account meta-progression levels (engine/upgrades.js)
-    stamina: 100, // sprint stamina (server-authoritative; GAME.SPRINT.STAMINA_MAX)
+    vault: [],
+    items: [],
+    chains: [],
+    equippedChainId: null,
+    equippedChainIds: [],
+    gold: 0,
+    essence: 0,
+    level: 1,
+    xp: 0,
+    bpSeasonId: null, bpXp: 0, bpClaimed: [],
+    adFree: false,
+    subscribed: false,
+    subscribedUntil: 0, // epoch ms; 0 = none; active while now < this
+    upgrades: {},
+    stamina: 100,
     roundId: null,
     seed: null,
     mapSize: 0,
     self: { x: 0, y: 0 },
     players: [],
-    hubPlayers: [], // TQ-258: other players present in the lobby/hub (idle-presence channel, separate from in-round `players`)
+    hubPlayers: [],
     monsters: [],
-    projectiles: [], // in-flight spirit chains broadcast by the server
-    chests: [], // loot chests in view (open by walking up)
+    projectiles: [],
+    chests: [],
     combat: null,
-    combatNotice: null, // FGT-T1: transient "combat judge offline" toast ({text, at})
-    lootNotice: null, // TQ-66: transient "bag full — item left behind" toast ({text, at})
+    combatNotice: null,
+    lootNotice: null,
     time: 0,
     circle: null,
     portals: [],
-    killfeed: [], // P8-T5: recent round events (PvP defeats, eliminations, extractions)
+    killfeed: [],
     roundResult: null,
     ack: 0,
-    rtt: null, // smoothed round-trip latency (ms), null until the first pong
-    reconnecting: false, // true while auto-retrying after an unexpected drop
-    stats: {}, // lifetime profile stats (runs/extractions/deaths/caught/pvpWins) — P8-T1
+    rtt: null,
+    reconnecting: false,
+    stats: {},
   };
   let ws = null;
   let seq = 0;
-  let deliberate = false; // true when close() was called intentionally (no auto-reconnect)
-  let hasJoined = false; // only auto-reconnect after an initial join (we have a token to resume)
+  let deliberate = false;
+  let hasJoined = false;
   let reconnectTimer = null;
   let reconnectDeadline = 0;
 
@@ -343,23 +298,20 @@ export function createNetClient(opts = {}) {
     });
   }
   function send(obj) {
-    if (ws && ws.readyState === 1 /* OPEN */) ws.send(JSON.stringify(obj));
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
   }
 
   function connect() {
     if (!WS) throw new Error("[net] no WebSocket implementation available");
     deliberate = false;
     ws = new WS(url);
-    try { ws.binaryType = "arraybuffer"; } catch { /* test stub */ } // TQ-477: receive snapshot frames as ArrayBuffer
+    try { ws.binaryType = "arraybuffer"; } catch {}
     ws.onopen = () => {
       stopReconnect();
       state.connected = true;
       state.reconnecting = false;
       reconnectDeadline = 0;
       emit("open");
-      // On a reconnect we resume our session automatically (server restores the
-      // round within its grace window, Q12). The lobby's own open→join handles
-      // the first connect (hasJoined still false then).
       if (hasJoined && state.token) send({ t: "join", token: state.token });
     };
     ws.onclose = () => {
@@ -372,14 +324,11 @@ export function createNetClient(opts = {}) {
       let m;
       try {
         const d = evt.data;
-        if (typeof d === "string") m = JSON.parse(d);                       // control messages (JSON)
-        else if (d instanceof ArrayBuffer) m = decodeSnapshot(new Uint8Array(d)); // TQ-477: binary snapshot
-        else if (d && typeof d.byteLength === "number") m = decodeSnapshot(new Uint8Array(d.buffer || d)); // typed array
+        if (typeof d === "string") m = JSON.parse(d);
+        else if (d instanceof ArrayBuffer) m = decodeSnapshot(new Uint8Array(d));
+        else if (d && typeof d.byteLength === "number") m = decodeSnapshot(new Uint8Array(d.buffer || d));
         else m = JSON.parse(String(d));
       } catch { return; }
-      // A malformed/unexpected server message (e.g. a missing field after a
-      // protocol-skew deploy) must not break the live session — log + drop it and
-      // keep processing. applyMessage also self-guards non-object messages.
       try { applyMessage(state, m, { storage, emit }); }
       catch (e) { console.error("[net] dropped bad message", m && m.t, e.message); }
     };
@@ -389,9 +338,6 @@ export function createNetClient(opts = {}) {
   function stopReconnect() {
     if (reconnectTimer) { clearInterval(reconnectTimer); reconnectTimer = null; }
   }
-  // Auto-reconnect after an unexpected drop: every interval, if still down and
-  // within the grace window, open a fresh socket (onopen auto-resumes the session).
-  // Give up after the window → "Connection lost".
   function scheduleReconnect() {
     if (reconnectTimer || state.connected) return;
     if (!reconnectDeadline) reconnectDeadline = Date.now() + RECONNECT_WINDOW_MS;
@@ -405,46 +351,40 @@ export function createNetClient(opts = {}) {
         emit("reconnect_failed");
         return;
       }
-      if (!ws || ws.readyState === 3 /* CLOSED */) { try { connect(); } catch {} }
+      if (!ws || ws.readyState === 3) { try { connect(); } catch {} }
     }, RECONNECT_INTERVAL_MS);
   }
 
-  // Actions
   function join(nickname) { hasJoined = true; send({ t: "join", token: state.token || undefined, nickname }); }
   function queue() { send({ t: "queue" }); }
-  function queueSolo(mode) { send(mode ? { t: "queueSolo", mode } : { t: "queueSolo" }); } // SP/MP unify: instant private 1-player round; TQ-529: mode "adventure" = endless solo
-  function returnHome() { send({ t: "returnHome" }); } // TQ-529: leave an adventure round with team + finds kept
-  function leaveRun() { send({ t: "leaveRun" }); }     // pause-menu leave: adventure → kept; normal round → forfeited (team lost), result card then village
+  function queueSolo(mode) { send(mode ? { t: "queueSolo", mode } : { t: "queueSolo" }); }
+  function returnHome() { send({ t: "returnHome" }); }
+  function leaveRun() { send({ t: "leaveRun" }); }
   function unqueue() { send({ t: "unqueue" }); }
   function move(dx, dy, sprint = false) { seq += 1; send({ t: "input", seq, type: "move", payload: { dx, dy, sprint } }); return seq; }
-  function hubMove(x, y) { send({ t: "hubMove", x, y }); } // TQ-258: report the player's lobby position so the server can broadcast hub presence to other idle players
-  function throwChain(dir, chainId, charge = 0) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId, charge } }); return seq; } // TQ-450: charge ∈ [0,1] hold-to-charge throw
+  function hubMove(x, y) { send({ t: "hubMove", x, y }); }
+  function throwChain(dir, chainId, charge = 0) { seq += 1; send({ t: "input", seq, type: "throw", payload: { dx: dir.x, dy: dir.y, chainId, charge } }); return seq; }
   function setEquippedChain(chainId) { send({ t: "setEquippedChain", chainId }); }
-  function setChainSlots(chainIds) { send({ t: "setChainSlots", chainIds }); } // CHAIN_SLOTS: set the 3-slot loadout
-  function setSkin(skinId) { send({ t: "setSkin", skinId }); } // CN-12: sync chain cosmetic so others see it
-  function setCharSkin(charId) { send({ t: "setCharSkin", charId }); } // sync character body-model skin so rivals render it
+  function setChainSlots(chainIds) { send({ t: "setChainSlots", chainIds }); }
+  function setSkin(skinId) { send({ t: "setSkin", skinId }); }
+  function setCharSkin(charId) { send({ t: "setCharSkin", charId }); }
   function buyChain(chainId) { send({ t: "buyChain", chainId }); }
   function craftChain(chainId) { send({ t: "craftChain", chainId }); }
   function buyUpgrade(upgradeId) { send({ t: "buyUpgrade", upgradeId }); }
-  function claimBpTier(tier, track) { send({ t: "claimBpTier", tier, track }); } // TQ-183: claim a battle-pass tier reward
-  function buyCosmetic(kind, skinId) { send({ t: "buyCosmetic", kind, skinId }); } // CN-9 MP cosmetic buy
-  // TQ-113 monster marketplace senders. Replies all arrive as { t: "market", ... } (handled above).
+  function claimBpTier(tier, track) { send({ t: "claimBpTier", tier, track }); }
+  function buyCosmetic(kind, skinId) { send({ t: "buyCosmetic", kind, skinId }); }
   function marketBrowse() { send({ t: "marketBrowse" }); }
-  function marketList(monsterId, gold, essence) { send({ t: "marketList", monsterId, gold, essence }); } // list a VAULT monster (server idle-gated)
+  function marketList(monsterId, gold, essence) { send({ t: "marketList", monsterId, gold, essence }); }
   function marketCancel(listingId) { send({ t: "marketCancel", listingId }); }
   function marketBuy(listingId) { send({ t: "marketBuy", listingId }); }
-  // TQ-479: piggyback the client's view-lag (how far in the PAST it renders remote entities ≈ half RTT +
-  // the interpolation delay) on the ping, so the server can lag-compensate proximity hits to what the
-  // player actually SAW. 120 ≈ INTERP_DELAY (0.12s) in ms.
+  // 120 = INTERP_DELAY (0.12s) in ms; keep in sync.
   function ping() { send({ t: "ping", t0: Date.now(), lag: Math.round((state.rtt || 0) / 2 + 120) }); }
   function combatAction(action) { send({ t: "combatAction", combatId: state.combat?.combatId, action }); }
   function clearCombat() { state.combat = null; }
-  // Roster/vault (P8-T2). getRoster refreshes team+vault; setRoster sets the active
-  // team to the given ordered monster ids (server rejects mid-round).
   function getRoster() { send({ t: "getRoster" }); }
   function setRoster(activeIds) { send({ t: "setRoster", activeIds }); }
-  function release(monsterId) { send({ t: "release", monsterId }); } // INV-T7: free a monster for a refund (server-gated to idle)
-  function heal() { send({ t: "heal" }); } // task 50: free lobby Healer — heal active team to full (server-gated to idle)
+  function release(monsterId) { send({ t: "release", monsterId }); }
+  function heal() { send({ t: "heal" }); }
   function close() {
     deliberate = true;
     stopReconnect();
@@ -473,16 +413,11 @@ function memStorage() {
   };
 }
 
-// Pick a storage backend SAFELY. In a sandboxed iframe or with "block all cookies",
-// even *touching* window.localStorage throws SecurityError — and createNetClient runs at
-// module load (netClient.js), so an unguarded access white-screens the whole app at boot.
-// Probe access in a try and fall back to an in-memory store, so the game still runs (the
-// session token just won't persist across reloads) — matching the try/catch every other
-// localStorage caller (storage.js, audio.js, a11y.js, …) already uses.
+// Touching localStorage can throw (blocked storage); runs at module load, keep guarded.
 function browserStorage() {
   try {
     if (typeof localStorage === "undefined") return memStorage();
-    localStorage.getItem("__tq_probe__"); // throws if storage access is blocked
+    localStorage.getItem("__tq_probe__");
     return localStorage;
   } catch {
     return memStorage();

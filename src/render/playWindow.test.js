@@ -31,16 +31,12 @@ test("playWindowRect: memoizes the margin=0 path and returns a frozen, reusable 
   const c = playWindowRect(800, 800);
   assert.notEqual(c, a, "a different viewport recomputes");
   assert.equal(c.size, 800);
-  // The memo must not leak into the margin path: a non-zero margin is always fresh + correct.
   const m = playWindowRect(1280, 720, { margin: 20 });
   assert.equal(m.size, 680, "720 - 2*20");
   assert.notEqual(m, a, "margin result is not the cached margin=0 rect");
-  // And the cache still serves the margin=0 rect afterwards.
   assert.equal(playWindowRect(1280, 720).size, 720);
 });
 
-// The peripheral bands are now FULLY OPAQUE bezel (color [10,11,16], opacity 1) so the
-// world is hidden outside the square — no translucent dim, no world bleed.
 const isBezel = (o) => o.color.r === 10 && o.color.g === 11 && o.color.b === 16;
 
 test("drawPlayWindow: landscape occludes left/right gutters opaquely, not top/bottom", () => {
@@ -75,7 +71,7 @@ test("drawPlayWindow: portrait occludes top/bottom gutters opaquely, not left/ri
     vec2: (x, y) => ({ x, y }), rgb: (r, g, b) => ({ r, g, b }),
     drawRect: (o) => calls.push(o),
   };
-  drawPlayWindow(k); // square = 480, y = 160, bottom = 640
+  drawPlayWindow(k);
   const bands = calls.filter(isBezel);
   assert.equal(bands.length, 2, "two top/bottom gutters in portrait (sides have zero width)");
   assert.ok(bands.every((o) => o.width === 480 && o.height === 160), "gutters fill the top/bottom margins");
@@ -103,8 +99,6 @@ test("playWindowLayout: portrait exposes top/bottom gutters; left/right are empt
   assert.equal(L.right.w, 0, "right gutter has zero width in portrait");
 });
 
-// TQ-96 (Dominik's TQ-117 decision): maxAspect lets the window be a bit wider than square,
-// capped at ~4:3 — applied identically across surfaces via this shared helper.
 const A43 = 4 / 3;
 
 test("playWindowRect: maxAspect 4:3 widens the LANDSCAPE window toward the long axis (smaller side gutters)", () => {
@@ -118,7 +112,6 @@ test("playWindowRect: maxAspect 4:3 widens the LANDSCAPE window toward the long 
 });
 
 test("playWindowRect: maxAspect never exceeds the canvas (letterboxes to gutters beyond)", () => {
-  // 800 wide, 720 tall: 4:3 would want 960 but the canvas is only 800 → full width, aspect < 4:3.
   const r = playWindowRect(800, 720, { maxAspect: A43 });
   assert.equal(r.w, 800, "clamped to the canvas width");
   assert.equal(r.h, 720);
@@ -136,7 +129,7 @@ test("playWindowRect: maxAspect 4:3 heightens the PORTRAIT window (smaller top/b
 
 test("playWindowRect: maxAspect 1 is exact back-compat (square)", () => {
   const a = playWindowRect(1280, 720, { maxAspect: 1 });
-  const b = playWindowRect(1280, 720); // default
+  const b = playWindowRect(1280, 720);
   assert.equal(a.w, a.h, "square");
   assert.equal(a.size, 720);
   assert.equal(a.x, 280);
@@ -147,13 +140,9 @@ test("playWindowLayout + maxAspect: gutters fully TILE the canvas (no world blee
   for (const [W, H] of [[1280, 720], [800, 720], [480, 800], [720, 720]]) {
     const L = playWindowLayout(W, H, { maxAspect: A43 });
     const s = L.square;
-    // Horizontal: left gutter + window width + right gutter === W (nothing of the world peeks through).
     assert.equal(L.left.w + (s.right - s.x) + L.right.w, W, `${W}x${H}: horizontal bands tile the width`);
-    // Vertical: top gutter + window height + bottom gutter === H.
     assert.equal(L.top.h + (s.bottom - s.y) + L.bottom.h, H, `${W}x${H}: vertical bands tile the height`);
-    // The window never spills past the canvas.
     assert.ok(s.x >= 0 && s.y >= 0 && s.right <= W && s.bottom <= H, `${W}x${H}: window within canvas`);
-    // Aspect capped at ~4:3 (long/short ≤ 4/3 + rounding slack).
     const long = Math.max(s.right - s.x, s.bottom - s.y), short = Math.min(s.right - s.x, s.bottom - s.y);
     assert.ok(long / short <= A43 + 0.01, `${W}x${H}: aspect ≤ 4:3`);
   }

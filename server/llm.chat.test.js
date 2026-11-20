@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { chatJson } from "./llm.js";
 
-// TQ-405: the router refuses a provider with no key, so the tests run with a dummy OpenAI key set.
 process.env.OPENAI_API_KEY = process.env.OPENAI_API_KEY || "test-key";
 
 test("chatJson: sends max_completion_tokens (not legacy max_tokens) + sampling; parses content", async () => {
@@ -31,7 +30,6 @@ test("chatJson: retries without sampling when a model locks temperature, then re
     const r1 = await chatJson({ model: "zzz-locked-model", system: "s", user: "u", temperature: 0.7 });
     assert.deepEqual(r1, { ok: true });
     assert.equal(calls, 2, "1st attempt (with temp) 400s → retry without temp succeeds");
-    // Now remembered → a later call skips temperature up front (a single request, no fail+retry).
     calls = 0; bodies.length = 0;
     const r2 = await chatJson({ model: "zzz-locked-model", system: "s", user: "u", temperature: 0.7 });
     assert.deepEqual(r2, { ok: true });

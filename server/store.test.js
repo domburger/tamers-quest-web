@@ -22,7 +22,6 @@ import {
   claimAccount,
 } from "./store.js";
 
-// The store needs monster types to roll starters; feed the engine real data.
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
   setGameData({
@@ -33,9 +32,6 @@ function loadData() {
     spiritChains: read("spiritchains.json"),
   });
 }
-
-// These run without DATABASE_URL, so they exercise the pure in-memory path —
-// the durable Postgres path is verified by a separate live smoke test.
 
 test("initStore is a no-op (false) without DATABASE_URL", async () => {
   loadData();
@@ -65,7 +61,7 @@ test("LS-2: the session token is a crypto-random (unguessable) string, and uniqu
   loadData();
   const a = createProfile("A");
   const b = createProfile("B");
-  assert.match(a.token, /^tk_[0-9a-f]{48}$/); // 24 random bytes as hex — not randomSeed()+counter
+  assert.match(a.token, /^tk_[0-9a-f]{48}$/);
   assert.notEqual(a.token, b.token);
 });
 
@@ -77,7 +73,6 @@ test("createProfile grants a starter spirit chain; getByToken backfills legacy p
   assert.ok(!p.chains.some((c) => c.chainId === "tier5"), "the Astral Chain is earned, not given");
   assert.equal(p.chains[0].chainId, GAME.SPIRIT_CHAIN.STARTER_CHAIN_ID);
 
-  // Simulate a profile persisted before the chains field existed.
   delete p.chains;
   p.equippedChainId = null;
   saveProfile(p);
@@ -108,7 +103,7 @@ test("topProfiles ranks by a stat and excludes zeros", () => {
   loadData();
   const a = createProfile("LB-A"); bumpStat(a, "extractions", 5); saveProfile(a);
   const b = createProfile("LB-B"); bumpStat(b, "extractions", 9); saveProfile(b);
-  createProfile("LB-C"); // 0 extractions → excluded
+  createProfile("LB-C");
   const top = topProfiles("extractions", 10);
   assert.equal(top[0].name, "LB-B");
   assert.equal(top[0].value, 9);
@@ -129,14 +124,11 @@ test("createAccount + findByEmail: native-account round-trip; passwordless (gues
   assert.equal(acct.passwordHash, "hash#1");
   assert.ok(Array.isArray(acct.activeMonsters) && acct.activeMonsters.length > 0, "starters were rolled");
 
-  // Found by email...
   assert.equal(findByEmail("ada@example.com"), acct, "round-trips by email");
-  // ...but ONLY because it has a passwordHash — a guest with an email is not a native account.
   const guest = createProfile("Guesty", { isGuest: true });
-  guest.email = "guest@example.com"; // email but no passwordHash
+  guest.email = "guest@example.com";
   saveProfile(guest);
   assert.equal(findByEmail("guest@example.com"), null, "a passwordless (guest) profile is not matched as an account");
-  // unknown / nullish email → null (never throws)
   assert.equal(findByEmail("nobody@example.com"), null);
   assert.equal(findByEmail(null), null);
   assert.equal(findByEmail(""), null);
@@ -144,7 +136,6 @@ test("createAccount + findByEmail: native-account round-trip; passwordless (gues
 
 test("OAuth + account linking (store): link/claim flows and their one-time guards", () => {
   loadData();
-  // linkOAuth: a guest gains a provider id, loses guest status, backfills email; findByOAuth locates it.
   const g1 = createProfile("Linker", { isGuest: true });
   linkOAuth(g1, "google", 12345, "ada@oauth.com");
   assert.equal(g1.googleId, "12345", "provider id stored as a string");
@@ -155,7 +146,6 @@ test("OAuth + account linking (store): link/claim flows and their one-time guard
   assert.equal(findByOAuth(null, "x"), null);
   assert.equal(findByOAuth("google", "nope"), null);
 
-  // claimOAuth: claim a guest token for an OAuth login; refuses a re-claim of the same provider (no hijack).
   const g2 = createProfile("Claimer", { isGuest: true });
   assert.equal(claimOAuth(g2.token, "discord", 999, null), g2);
   assert.equal(g2.discordId, "999");
@@ -163,7 +153,6 @@ test("OAuth + account linking (store): link/claim flows and their one-time guard
   assert.equal(claimOAuth(g2.token, "discord", 1000, null), null, "already linked to discord → no re-link");
   assert.equal(claimOAuth("bad-token", "google", 1, null), null, "unknown token → null");
 
-  // claimAccount: claim a guest token for a native account; refuses if it's already a native account.
   const g3 = createProfile("Native", { isGuest: true });
   assert.equal(claimAccount(g3.token, "n@e.com", "pw#hash"), g3);
   assert.equal(g3.passwordHash, "pw#hash");

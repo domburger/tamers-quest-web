@@ -2,20 +2,14 @@ import { THEME, addMenuBackground, drawToast, inRect } from "../ui/theme.js";
 import { drawStationPopup, stationContentRect, stationCloseRect } from "../ui/stationPopup.js";
 import { drawProfilePanel, drawProfileModal, profilePanelState, profilePanelTap, profilePanelScroll } from "../ui/profilePanel.js";
 
-// Profile page: the login indicator's detail view (avatar, editable username, lifetime player data, team,
-// per-run match history). UI v4: this standalone page renders the SAME sheet + content module as the
-// village's Profile popup (ui/stationPopup.js + ui/profilePanel.js) instead of keeping a second, older copy
-// of the layout. Reachable from the character-select identity chip and the account page (both carry Sign
-// out); the village opens the popup directly. The sheet's close button and Esc go back. The module owns data
-// loading (/account/me for accounts, local data for guests), the per-tamer stats selector and rename.
 export default function profileScene(k) {
   k.scene("profile", (args = {}) => {
     addMenuBackground(k);
-    const backScene = args.backScene || "characterSelect"; // lobby dropdown passes "lobby"; chip passes nothing
+    const backScene = args.backScene || "characterSelect";
     const backArgs = args.backArgs;
     const state = profilePanelState(args.characterId || null);
     const openedT = k.time();
-    const busy = () => !!state.renaming; // the rename modal captures input
+    const busy = () => !!state.renaming;
     const goBack = () => { state.dispose(); k.go(backScene, backArgs); };
 
     let toast = null;
@@ -24,11 +18,10 @@ export default function profileScene(k) {
     k.onDraw(() => {
       drawStationPopup(k, { title: "Profile", eyebrow: "Your account", icon: "person", accent: THEME.primary, openedT, pointer: k.mousePos(),
         content: (kk, rect) => drawProfilePanel(kk, rect, state) });
-      drawProfileModal(k, state); // the rename modal, full screen, outside the clip
+      drawProfileModal(k, state);
       if (toast) { const t = toast.until - k.time(); if (t > 0) drawToast(k, { text: toast.text, t }); else toast = null; }
     });
 
-    // Input: tap = close button or profilePanelTap; drag (touch or mouse) and the wheel scroll the content.
     let press = null;
     k.onMousePress(() => { press = { y: k.mousePos().y, last: k.mousePos().y, moved: false }; });
     k.onMouseMove(() => {

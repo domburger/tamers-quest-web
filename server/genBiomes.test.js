@@ -4,8 +4,6 @@ import { normalizeGeneratedBiome, aiGenerateBiome, buildBiomeDesignerPrompt } fr
 import { DEFAULT_PROMPTS, setPrompts, resetPrompts } from "./prompts.js";
 import { setGenConfig } from "./genConfig.js";
 
-// TQ-432: prompt overrides are a process-wide singleton shared with the other gen test files; reset
-// to defaults before every test so another file's leftover setPrompts() can't leak in (run-order flake).
 beforeEach(resetPrompts);
 
 test("normalizeGeneratedBiome: a defaulted + clamped { name, tint, rarity, size }", () => {
@@ -15,34 +13,29 @@ test("normalizeGeneratedBiome: a defaulted + clamped { name, tint, rarity, size 
   assert.equal(b.rarity, 75);
   assert.equal(b.size, 90);
   assert.equal(b.generated, true);
-  // clamps + defaults
   const c = normalizeGeneratedBiome({ tint: [999, -10, "x"], rarity: 9999, size: 1 });
   assert.deepEqual(c.tint, [255, 0, 128], "RGB clamped (b falls back to the default 128)");
   assert.equal(c.rarity, 100, "rarity clamped");
   assert.equal(c.size, 30, "size clamped to its floor");
   assert.equal(c.name, "Wilds", "missing name → default");
-  // accepts `color`/`colour` as tint aliases
   assert.deepEqual(normalizeGeneratedBiome({ color: { r: 1, g: 2, b: 3 } }).tint, [1, 2, 3]);
 });
 
 test("admin toggles: disabling biome rarity/size forces a fixed default + drops the prompt field", async () => {
   try {
     await setGenConfig({ biomeRarity: false, biomeSize: false });
-    // The LLM values are ignored in favour of the fixed mid-range defaults.
     const b = normalizeGeneratedBiome({ name: "Emberflats", rarity: 75, size: 90 });
     assert.equal(b.rarity, 50, "rarity falls back to the fixed default when generation is off");
     assert.equal(b.size, 60, "size falls back to the fixed default when generation is off");
-    // The designer prompt no longer asks for the disabled fields (describeFields emits "- <label>:").
     const user = buildBiomeDesignerPrompt("ashen plain").user;
     assert.ok(!/- rarity:/.test(user), "rarity guidance dropped from the prompt");
     assert.ok(!/- size:/.test(user), "size guidance dropped from the prompt");
-    // Re-enabling restores both.
     await setGenConfig({ biomeRarity: true, biomeSize: true });
     assert.equal(normalizeGeneratedBiome({ rarity: 75, size: 90 }).rarity, 75);
     const user2 = buildBiomeDesignerPrompt("ashen plain").user;
     assert.ok(/- rarity:/.test(user2) && /- size:/.test(user2), "guidance restored when re-enabled");
   } finally {
-    await setGenConfig({ biomeRarity: "", biomeSize: "" }); // reset to defaults
+    await setGenConfig({ biomeRarity: "", biomeSize: "" });
   }
 });
 
@@ -58,8 +51,8 @@ test("aiGenerateBiome: inspiration -> designer -> normalized biome (mocked chat)
   const chat = async (system, user) => {
     calls.push({ system, user });
     return calls.length === 1
-      ? { inspiration: "drowned fungal trench" }                                          // stage 1
-      : { name: "Mire Trench", description: "Black water and pale fungus.", rarity: 60, size: 70, tint: { r: 60, g: 90, b: 80 } }; // stage 2
+      ? { inspiration: "drowned fungal trench" }
+      : { name: "Mire Trench", description: "Black water and pale fungus.", rarity: 60, size: 70, tint: { r: 60, g: 90, b: 80 } };
   };
   try {
     const b = await aiGenerateBiome({}, { chat });
@@ -82,15 +75,13 @@ test("aiGenerateBiome: returns null when AI is disabled (no key)", async () => {
 test("biome prompts: designer asks for a tint; {inspiration} fills when present, omitted when dropped", async () => {
   const des = (DEFAULT_PROMPTS.biomeDesignerSystem).toLowerCase();
   assert.ok(des.includes("tint") || des.includes("colour") || des.includes("color"), "designer asks for a minimap tint");
-  // Default keeps {inspiration} → it is filled.
   assert.ok(buildBiomeDesignerPrompt("drowned fungal trench").user.includes("drowned fungal trench"), "inspiration fills the default slot");
-  // An override that DROPS {inspiration} respects that — no append-if-missing (the slot is gone for a reason).
   await setPrompts({ biomeDesignerUser: "Design a biome as JSON." });
   try {
     const out = buildBiomeDesignerPrompt("drowned fungal trench").user;
     assert.ok(out.includes("Design a biome"), "override text used verbatim");
     assert.ok(!out.includes("drowned fungal trench"), "dropped {inspiration} is NOT re-appended");
   } finally {
-    await setPrompts({ biomeDesignerUser: "" }); // reset to default
+    await setPrompts({ biomeDesignerUser: "" });
   }
 });

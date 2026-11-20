@@ -7,7 +7,6 @@ const newId = (p) => `${p}_${++_n}`;
 const mk = (token, { gold = 0, essence = 0, vault = [], active = [] } = {}) => ({ token, gold, essence, vaultMonsters: vault.slice(), activeMonsters: active.slice() });
 const mon = (id) => ({ id, typeName: "Test", level: 5, currentHealth: 20 });
 
-// The whole feature rests on this: count every place a monster id can be, across all profiles + all listings.
 const places = (id, profiles, listings) => {
   let c = 0;
   for (const p of profiles) { for (const m of (p.vaultMonsters || [])) if (m.id === id) c++; for (const m of (p.activeMonsters || [])) if (m.id === id) c++; }
@@ -51,7 +50,7 @@ test("TQ-535 buy: atomic transfer — buyer pays FULL price, seller credited pri
   const buyer = mk("b", { gold: 500, essence: 5 });
   const listings = [];
   const id = listMonster(listings, seller, { monsterId: "m1", gold: 120, essence: 2, newId }).listing.id;
-  const fee = marketFee(120, 2); // 10% → { gold: 12, essence: 0 }
+  const fee = marketFee(120, 2);
   const res = buyListing(listings, buyer, seller, id);
   assert.equal(res.ok, true);
   assert.deepEqual(res.fee, fee, "house cut returned");
@@ -81,7 +80,6 @@ test("TQ-531 buy: rejects own listing, insufficient funds, and a missing listing
   assert.equal(buyListing(listings, poor, seller, id).error, "need_gold");
   poor.gold = 1000; assert.equal(buyListing(listings, poor, seller, id).error, "need_essence");
   assert.equal(buyListing(listings, poor, seller, "ghost").error, "no_listing");
-  // No failed attempt above moved money or the monster.
   assert.equal(poor.gold, 1000); assert.equal(poor.essence, 0);
   assert.equal((poor.vaultMonsters || []).length, 0, "no monster delivered on a failed buy");
   assert.equal(listings.length, 1, "listing intact after failed buys");
@@ -96,7 +94,6 @@ test("TQ-531 listingView hides the seller token but carries the monster + price"
   assert.equal(v.mon.id, "m1");
 });
 
-// ── handleMarketMessage: the WS dispatch (pure, injected store accessors) ──
 function harness({ profiles = {}, listings = [], isIdle = true } = {}) {
   let persisted = 0; const sent = [];
   const ctx = {
@@ -119,7 +116,6 @@ test("TQ-531 handler: marketBrowse returns token-free listing views; marketList 
   assert.equal(h.sent[1].listed.sellerToken, undefined, "no token leaked");
   assert.equal(self.vaultMonsters.length, 0, "escrowed");
   assert.equal(self._saved, 1); assert.equal(h.persistedCount(), 1, "listings persisted on change");
-  // browse now shows it
   handleMarketMessage(h.ctx, { t: "marketBrowse" }, h.send, null);
   assert.equal(h.sent[2].listings.length, 1);
 });
@@ -143,17 +139,14 @@ test("TQ-536 handler: marketBrowse flags the caller's OWN listings (mine) withou
 test("TQ-535 handler: marketList ACCEPTS essence pricing (Decision resolved) — escrows + persists", () => {
   const self = mk("s", { vault: [mon("m1"), mon("m2")] }); self.token = "s";
   const h = harness({ profiles: { self }, listings: [] });
-  // essence-only price
   handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m1", gold: 0, essence: 5 }, h.send, null);
   assert.equal(h.sent[0].ok, true, "essence-priced listing accepted");
   assert.equal(h.ctx.listings.find((l) => l.mon.id === "m1").essence, 5, "essence price escrowed on the listing");
-  // gold+essence mix
   handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m2", gold: 100, essence: 1 }, h.send, null);
   assert.equal(h.sent[1].ok, true, "gold+essence listing accepted");
   const l2 = h.ctx.listings.find((l) => l.mon.id === "m2");
   assert.equal(l2.gold, 100); assert.equal(l2.essence, 1);
   assert.equal(self.vaultMonsters.length, 0, "both monsters escrowed");
-  // a zero/zero price is still rejected (nothing to charge)
   self.vaultMonsters.push(mon("m3"));
   handleMarketMessage(h.ctx, { t: "marketList", monsterId: "m3", gold: 0, essence: 0 }, h.send, null);
   assert.equal(h.sent[2].ok, false); assert.equal(h.sent[2].reason, "price_required");
@@ -174,7 +167,6 @@ test("TQ-556 handler: marketBrowse ships evolved type defs referenced by listing
   handleMarketMessage(h.ctx, { t: "marketBrowse" }, h.send, null);
   assert.equal(h.sent[0].evolvedTypes.length, 1);
   assert.equal(h.sent[0].evolvedTypes[0].typeName, "Wolf#evo30#x");
-  // no evolved listings → no evolvedTypes field (kept lean)
   const h2 = harness({ profiles: { self }, listings: [] });
   h2.ctx.collectEvolvedDefs = () => [];
   handleMarketMessage(h2.ctx, { t: "marketBrowse" }, h2.send, null);
@@ -186,20 +178,17 @@ test("TQ-537 handler: a buy leaves the seller a pending-sale receipt; marketBrow
   const seller = mk("seller", { vault: [{ id: "mx", typeName: "Test", name: "Floofy", level: 5 }] }); seller.token = "seller";
   const listings = [];
   listMonster(listings, seller, { monsterId: "mx", gold: 120, newId });
-  // buyer buys
   const hb = harness({ profiles: { self: buyer, seller }, listings, isIdle: true });
   handleMarketMessage(hb.ctx, { t: "marketBuy", listingId: listings[0].id }, hb.send, null);
   assert.equal(hb.sent[0].ok, true);
-  const net120 = 120 - marketFee(120, 0).gold; // seller nets price − house cut
+  const net120 = 120 - marketFee(120, 0).gold;
   assert.equal((seller.pendingMarketSales || []).length, 1, "receipt recorded on the seller");
   assert.deepEqual(seller.pendingMarketSales[0], { name: "Floofy", gold: net120, essence: 0 }, "receipt shows NET proceeds");
-  // seller browses → gets the receipt, and it's cleared + the profile saved
   const hs = harness({ profiles: { self: seller }, listings });
   handleMarketMessage(hs.ctx, { t: "marketBrowse" }, hs.send, null);
   assert.deepEqual(hs.sent[0].sales, [{ name: "Floofy", gold: net120, essence: 0 }], "delivered on browse");
   assert.ok(seller._saved >= 1, "profile saved after clearing");
   assert.equal(seller.pendingMarketSales.length, 0, "cleared after delivery");
-  // a second browse carries NO sales (deliver-once)
   const hs2 = harness({ profiles: { self: seller }, listings });
   handleMarketMessage(hs2.ctx, { t: "marketBrowse" }, hs2.send, null);
   assert.equal(hs2.sent[0].sales, undefined, "no sales on the next browse");
@@ -209,12 +198,10 @@ test("TQ-531 handler: marketList/marketBuy are idle-gated; marketBuy settles + p
   const self = mk("self", { gold: 500 }); self.token = "self";
   const seller = mk("seller", { vault: [mon("mx")] }); seller.token = "seller";
   const listings = [];
-  listMonster(listings, seller, { monsterId: "mx", gold: 120, newId }); // pre-list from the seller
-  // busy buyer can't buy
+  listMonster(listings, seller, { monsterId: "mx", gold: 120, newId });
   const busy = harness({ profiles: { self, seller }, listings, isIdle: false });
   handleMarketMessage(busy.ctx, { t: "marketBuy", listingId: listings[0].id }, busy.send, null);
   assert.equal(busy.sent[0].ok, false); assert.equal(busy.sent[0].reason, "busy");
-  // idle buyer buys → buyer debited, seller paid + saved, listing consumed + persisted
   const h = harness({ profiles: { self, seller }, listings, isIdle: true });
   handleMarketMessage(h.ctx, { t: "marketBuy", listingId: listings[0].id }, h.send, null);
   assert.equal(h.sent[0].ok, true);
@@ -224,15 +211,10 @@ test("TQ-531 handler: marketList/marketBuy are idle-gated; marketBuy settles + p
 });
 
 test("TQ-545 handler: marketBuy with an unresolvable seller profile rejects cleanly — buyer untouched, monster stays escrowed", () => {
-  // The seller's profile is NOT in the store (token can't be resolved → getProfileByToken returns null).
-  // buyListing must reject BEFORE settling: no buyer debit, no monster delivered, listing + escrow intact.
-  // This guards the anti-dupe/lost-payment invariant against a future "handle offline sellers" refactor that
-  // might drop the null-seller guard and settle anyway (buyer charged + monster delivered, seller pay vanishes).
   const seller = mk("ghost", { vault: [mon("mz")] }); seller.token = "ghost";
   const buyer = mk("buyer", { gold: 500, essence: 3 }); buyer.token = "buyer";
   const listings = [];
-  listMonster(listings, seller, { monsterId: "mz", gold: 120, newId }); // escrow the monster
-  // Harness store knows the BUYER only — the seller token won't resolve.
+  listMonster(listings, seller, { monsterId: "mz", gold: 120, newId });
   const h = harness({ profiles: { self: buyer }, listings, isIdle: true });
   handleMarketMessage(h.ctx, { t: "marketBuy", listingId: listings[0].id }, h.send, null);
   assert.equal(h.sent[0].ok, false); assert.equal(h.sent[0].reason, "seller_mismatch");

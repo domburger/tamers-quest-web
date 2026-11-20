@@ -1,5 +1,3 @@
-// AUTH-T3: unit coverage for the password/validation core (server/accounts.js).
-
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { hashPassword, verifyPassword, normalizeEmail, validateEmail, validatePassword } from "./accounts.js";

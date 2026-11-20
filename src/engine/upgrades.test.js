@@ -42,8 +42,6 @@ test("every upgrade def is well-formed", () => {
 });
 
 test("effect getters are driven by each def's `per` (single source of truth, not hardcoded)", () => {
-  // Guards against the getters drifting from UPGRADE_DEFS: the per-level magnitude
-  // must equal the def's `per`, so tuning `per` actually changes the effect.
   const prosLvl3 = goldMult({ upgrades: { prospector: 3 } }) - 1;
   assert.ok(Math.abs(prosLvl3 - getUpgradeDef("prospector").per * 3) < 1e-9);
   const vault = vaultCapacity({ upgrades: { deepVault: 4 } }, 0);

@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { CHAIN_SKINS, DEFAULT_SKIN, getSkin, RARITY_COLOR, getEquippedSkinId, setEquippedSkinId, getEquippedSkin, tierColor, drawChainGlyph, drawChainSkin, drawChainShopIcon } from "./chainCosmetics.js";
 import { CHARACTER_SKINS, DEFAULT_CHARACTER_SKIN } from "./characterCosmetics.js";
 
-// A minimal k that records circle colours, to assert the tier centre-dot (TQ-143) without a canvas.
 function mockK() {
   const calls = { circle: [] };
   return {
@@ -21,8 +20,6 @@ test("equipped chain skin: set→get round-trips; getEquippedSkin always resolve
   setEquippedSkinId("void");
   assert.equal(getEquippedSkinId(), "void", "set value reads back (cache-backed; localStorage-safe in node)");
   assert.equal(getEquippedSkin().id, "void", "resolves to the equipped skin object");
-  // a stale/unknown equipped id still resolves to a valid skin (getSkin → DEFAULT_SKIN) — never
-  // undefined, so drawChainSkin can't crash on an equipped id for a removed cosmetic.
   setEquippedSkinId("does-not-exist");
   assert.equal(getEquippedSkin().id, DEFAULT_SKIN.id, "stale equipped id → default skin");
 });
@@ -33,8 +30,6 @@ test("getSkin: returns the matching chain skin by id", () => {
 });
 
 test("getSkin: falls back to DEFAULT for unknown/stale ids — guards MP rival render (CN-12)", () => {
-  // A rival's equipped skinId rides the snapshot (CN-12). An old/removed id must
-  // NOT yield undefined — drawChainSkin(undefined) would crash the rival render.
   assert.equal(getSkin("removed_skin_v1"), DEFAULT_SKIN);
   assert.equal(getSkin(undefined), DEFAULT_SKIN);
   assert.equal(getSkin(null), DEFAULT_SKIN);
@@ -55,8 +50,6 @@ test("CHAIN_SKINS: every skin is well-formed (drawChainSkin needs ring/link/core
   assert.ok(CHAIN_SKINS.includes(DEFAULT_SKIN), "DEFAULT is one of the skins");
 });
 
-// TQ-134: exactly ONE free default skin per type (the starting look, owned by every account); every
-// OTHER skin must cost currency to unlock.
 test("TQ-134: one free default per type; all other skins have a real cost", () => {
   const free = (arr) => arr.filter((s) => !s.acquire || s.acquire.kind === "free");
   const cf = free(CHAIN_SKINS), pf = free(CHARACTER_SKINS);
@@ -72,7 +65,6 @@ test("TQ-134: one free default per type; all other skins have a real cost", () =
   }
 });
 
-// ── TQ-143 (decision TQ-151 "143 only"): tier shown by the centre-dot COLOUR, badge removed ──
 const sameRgb = (a, b) => Array.isArray(a) && Array.isArray(b) && a.join() === b.join();
 
 test("tierColor: a distinct, valid RGB per tier 1..6; clamps out of range (TQ-143)", () => {
@@ -107,11 +99,11 @@ test("drawChainSkin: centre dot is tier-coloured when a tier is supplied, else t
 });
 
 test("drawChainShopIcon: renders the equipped skin overlaid with the chain's TIER core; null-safe (TQ-439)", () => {
-  setEquippedSkinId("void"); // a distinctive equipped cosmetic
+  setEquippedSkinId("void");
   const g = mockK(); drawChainShopIcon(g.k, { id: "tier5", tier: 5 }, { x: 0, y: 0, r: 13, t: 0 });
   assert.ok(g.calls.circle.some((c) => sameRgb(c.color, tierColor(5))), "shop icon paints the chain's tier core (the overlay)");
   assert.ok(g.calls.circle.some((c) => sameRgb(c.color, getSkin("void").ring)), "shop icon uses the EQUIPPED cosmetic skin's ring, not a flat glyph");
   const z = mockK(); assert.doesNotThrow(() => drawChainShopIcon(z.k, null, { x: 0, y: 0 }));
   assert.equal(z.calls.circle.length, 0, "null chain → draws nothing");
-  setEquippedSkinId(DEFAULT_SKIN.id); // restore default for other tests
+  setEquippedSkinId(DEFAULT_SKIN.id);
 });

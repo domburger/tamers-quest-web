@@ -2,8 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { designWidthFor, viewport, pointerToDesign, cDrawRect, cDrawCircle, cDrawEllipse, cDrawText, cDrawLine, cDrawPoly, wrapText } from "./canvasBackend.js";
 
-// A tiny fake 2D context that records canvas ops — lets us exercise the pure draw code in Node.
-// measureText returns a deterministic 6px/char stub so word-wrap (cDrawText width) is testable.
 function fakeCtx(ops = []) {
   return new Proxy({}, {
     get: (_t, p) => {
@@ -33,21 +31,16 @@ test("TQ-294 designWidthFor/viewport: aspect-matched design width (H fixed), cla
 });
 
 test("TQ-279/294 pointerToDesign: inverts the aspect-match transform (no letterbox; scale=rect.h/720)", () => {
-  // exact-ratio 1280×720: 1:1
   assert.deepEqual(pointerToDesign(640, 360, { left: 0, top: 0, width: 1280, height: 720 }), { x: 640, y: 360 });
   assert.deepEqual(pointerToDesign(0, 0, { left: 0, top: 0, width: 1280, height: 720 }), { x: 0, y: 0 });
-  // 2× (2560×1440): scale 2 → halve
   assert.deepEqual(pointerToDesign(1280, 720, { left: 0, top: 0, width: 2560, height: 1440 }), { x: 640, y: 360 });
-  // ultrawide 2000×720: scale 1, NO letterbox offset → pointer maps straight through (design width is 2000)
   assert.deepEqual(pointerToDesign(360, 0, { left: 0, top: 0, width: 2000, height: 720 }), { x: 360, y: 0 });
   assert.deepEqual(pointerToDesign(1000, 360, { left: 0, top: 0, width: 2000, height: 720 }), { x: 1000, y: 360 });
-  // offset rect: subtract rect.left/top first
   assert.deepEqual(pointerToDesign(140, 60, { left: 100, top: 40, width: 1280, height: 720 }), { x: 40, y: 20 });
 });
 
 
 test("core primitives draw onto a minimal 2D-context stub without throwing", () => {
-  // A tiny fake ctx records the calls — proves the primitives issue the expected canvas ops.
   const ops = [];
   const ctx = new Proxy({}, {
     get: (_t, p) => (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|close|rect|fillText|setTransform|clear|save|restore)/.test(p)
@@ -56,7 +49,7 @@ test("core primitives draw onto a minimal 2D-context stub without throwing", () 
   });
   assert.doesNotThrow(() => {
     cDrawRect(ctx, { x: 1, y: 2, w: 10, h: 10, color: [10, 20, 30], opacity: 0.5, radius: 4 });
-    cDrawRect(ctx, { x: 0, y: 0, w: 5, h: 5, color: [1, 2, 3] }); // square path
+    cDrawRect(ctx, { x: 0, y: 0, w: 5, h: 5, color: [1, 2, 3] });
     cDrawCircle(ctx, { x: 5, y: 5, radius: 3, color: [9, 9, 9] });
     cDrawLine(ctx, { p1: { x: 0, y: 0 }, p2: { x: 4, y: 4 }, width: 2 });
     cDrawText(ctx, { text: "hi", x: 2, y: 2, size: 12, anchor: "center" });
@@ -67,14 +60,13 @@ test("core primitives draw onto a minimal 2D-context stub without throwing", () 
 });
 
 test("rgba: a KColor {r,g,b} yields the SAME fillStyle as the [r,g,b] array (adapter pass-through, byte-identical)", () => {
-  // Captures the fillStyle string a primitive sets, so we can assert rgba's output for each colour shape.
   const fillOf = (color, opacity = 1) => {
     let fill = null;
     const ctx = new Proxy({}, {
       get: (_t, p) => (typeof p === "string" && /^(fill|stroke|begin|move|line|arc|close|rect)/.test(p) ? () => {} : undefined),
       set: (_t, p, v) => { if (p === "fillStyle") fill = v; return true; },
     });
-    cDrawRect(ctx, { x: 0, y: 0, w: 2, h: 2, color, opacity }); // square fill path → one fillStyle set, no outline
+    cDrawRect(ctx, { x: 0, y: 0, w: 2, h: 2, color, opacity });
     return fill;
   };
   assert.equal(fillOf({ r: 10, g: 20, b: 30 }, 0.5), fillOf([10, 20, 30], 0.5), "KColor === array");
@@ -92,20 +84,16 @@ test("TQ-343 fill/stroke shadow guard: a shared style object skips redundant fil
     set: (_t, p, v) => { ops.push(["set:" + p, v]); return true; },
   });
   const style = { font: null, baseline: null, align: null, fill: null, stroke: null };
-  // Three same-colour fills across DIFFERENT primitives → fillStyle assigned ONCE.
   cDrawRect(ctx, { x: 0, y: 0, w: 2, h: 2, color: [1, 2, 3] }, style);
   cDrawEllipse(ctx, { x: 0, y: 0, radiusX: 1, radiusY: 1, color: [1, 2, 3] }, style);
   cDrawCircle(ctx, { x: 0, y: 0, radius: 1, color: [1, 2, 3] }, style);
   assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 1, "same colour across rect/ellipse/circle → one fillStyle set");
-  // A colour change re-assigns.
   cDrawRect(ctx, { x: 0, y: 0, w: 2, h: 2, color: [9, 9, 9] }, style);
   assert.equal(ops.filter(([op]) => op === "set:fillStyle").length, 2, "colour change re-sets fillStyle");
-  // Stroke is guarded on its own channel: two same-colour outlines → one strokeStyle set.
   const before = ops.filter(([op]) => op === "set:strokeStyle").length;
   cDrawLine(ctx, { p1: { x: 0, y: 0 }, p2: { x: 1, y: 1 }, color: [5, 5, 5] }, style);
   cDrawLine(ctx, { p1: { x: 1, y: 1 }, p2: { x: 2, y: 2 }, color: [5, 5, 5] }, style);
   assert.equal(ops.filter(([op]) => op === "set:strokeStyle").length - before, 1, "same stroke colour → one strokeStyle set");
-  // Without a style object the guard is OFF (back-compat: every call assigns).
   const ops2 = [];
   const ctx2 = new Proxy({}, { get: (_t, p) => (typeof p === "string" && /^(fill|begin|move|line|arc|close|rect|ellipse)/.test(p) ? () => {} : undefined), set: (_t, p, v) => { ops2.push("set:" + p); return true; } });
   cDrawRect(ctx2, { x: 0, y: 0, w: 2, h: 2, color: [1, 2, 3] });
@@ -114,36 +102,27 @@ test("TQ-343 fill/stroke shadow guard: a shared style object skips redundant fil
 });
 
 test("TQ-272 wrapText: greedy word-wrap honoring an injected measure + explicit newlines", () => {
-  const measure = (s) => s.length * 6; // 6px per char (matches the fake ctx)
-  // maxWidth 60px = 10 chars: "the quick" (9) fits; adding " brown" (15) wraps.
+  const measure = (s) => s.length * 6;
   assert.deepEqual(wrapText(measure, "the quick brown fox", 60), ["the quick", "brown fox"]);
-  // explicit newlines split regardless of width
   assert.deepEqual(wrapText(measure, "a\nb", 1000), ["a", "b"]);
-  // a single over-long word stands alone (no mid-word break)
   assert.deepEqual(wrapText(measure, "supercalifragilistic", 30), ["supercalifragilistic"]);
-  // falsy width → unchanged (newline-split only)
   assert.deepEqual(wrapText(measure, "no wrap here", 0), ["no wrap here"]);
   assert.deepEqual(wrapText(measure, "", 50), [""]);
 });
 
 test("TQ-273 cDrawRect/cDrawCircle: outline + fill-toggle match k.draw* (fill, outline, both)", () => {
-  // rect: fill+outline → fillRect + strokeRect
   const both = [];
   cDrawRect(fakeCtx(both), { x: 0, y: 0, w: 10, h: 8, color: [1, 2, 3], outline: { width: 2, color: [9, 9, 9] } });
   assert.ok(both.some(([op]) => op === "fillRect") && both.some(([op]) => op === "strokeRect"), "fill+outline rect strokes and fills");
-  // rect: outline-only (fill:false) → strokeRect, NO fillRect
   const ringOnly = [];
   cDrawRect(fakeCtx(ringOnly), { x: 0, y: 0, w: 10, h: 8, fill: false, outline: { width: 1, color: [9, 9, 9] } });
   assert.ok(ringOnly.some(([op]) => op === "strokeRect") && !ringOnly.some(([op]) => op === "fillRect"), "fill:false rect only strokes");
-  // rounded rect outline-only → stroke (path), no fill
   const rounded = [];
   cDrawRect(fakeCtx(rounded), { x: 0, y: 0, w: 10, h: 8, radius: 3, fill: false, outline: { width: 1, color: [9, 9, 9] } });
   assert.ok(rounded.some(([op]) => op === "stroke") && !rounded.some(([op]) => op === "fill"), "rounded fill:false strokes the path only");
-  // circle: outline-only ring (fill:false) → stroke, no fill
   const circ = [];
   cDrawCircle(fakeCtx(circ), { x: 5, y: 5, radius: 4, fill: false, outline: { width: 2, color: [9, 9, 9] } });
   assert.ok(circ.some(([op]) => op === "stroke") && !circ.some(([op]) => op === "fill"), "fill:false circle only strokes");
-  // default (no fill/outline opts) stays a plain fill — back-compat
   const plain = [];
   cDrawCircle(fakeCtx(plain), { x: 1, y: 1, radius: 2, color: [1, 2, 3] });
   assert.ok(plain.some(([op]) => op === "fill") && !plain.some(([op]) => op === "stroke"), "default circle fills, no stroke");
@@ -160,10 +139,10 @@ test("TQ-272 cDrawEllipse: issues a filled ellipse path matching k.drawEllipse r
 
 test("TQ-272 cDrawText: width wraps into multiple fillText lines; no width stays single-line", () => {
   const wrapped = [];
-  cDrawText(fakeCtx(wrapped), { text: "the quick brown fox", x: 0, y: 0, size: 12, width: 60 }); // 60px=10 chars
+  cDrawText(fakeCtx(wrapped), { text: "the quick brown fox", x: 0, y: 0, size: 12, width: 60 });
   assert.equal(wrapped.filter(([op]) => op === "fillText").length, 2, "wraps to 2 lines");
   const single = [];
-  cDrawText(fakeCtx(single), { text: "the quick brown fox", x: 0, y: 0, size: 12 }); // no width
+  cDrawText(fakeCtx(single), { text: "the quick brown fox", x: 0, y: 0, size: 12 });
   assert.equal(single.filter(([op]) => op === "fillText").length, 1, "single line without width");
 });
 
@@ -172,6 +151,6 @@ test("cDrawPoly: fills a closed path for >=3 points, no-ops below 3", () => {
   cDrawPoly(fakeCtx(ops), { points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 5, y: 8 }], color: [1, 2, 3] });
   assert.ok(ops.some(([op]) => op === "closePath") && ops.some(([op]) => op === "fill"), "triangle fills a closed path");
   const ops2 = [];
-  cDrawPoly(fakeCtx(ops2), { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] }); // 2 points
+  cDrawPoly(fakeCtx(ops2), { points: [{ x: 0, y: 0 }, { x: 1, y: 1 }] });
   assert.equal(ops2.length, 0, "fewer than 3 points draws nothing");
 });

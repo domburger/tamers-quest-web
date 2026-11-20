@@ -6,7 +6,7 @@ test("emit adds particles and caps at the budget", () => {
   clearFx();
   emit({ x: 0, y: 0, n: 10 });
   assert.equal(fxCount(), 10);
-  emit({ x: 0, y: 0, n: 5000 }); // far exceeds the cap
+  emit({ x: 0, y: 0, n: 5000 });
   assert.ok(fxCount() <= 220 && fxCount() >= 220 - 0, "stays within MAX budget");
 });
 
@@ -22,7 +22,7 @@ test("MOB-T3: setFxBudget lowers the particle ceiling (mobile perf mode)", () =>
     emit({ x: 0, y: 0, n: 10 });
     assert.equal(fxCount(), 0, "a zero budget drops all FX");
   } finally {
-    setFxBudget(orig); // restore so other tests see the default cap
+    setFxBudget(orig);
     clearFx();
   }
 });
@@ -47,8 +47,8 @@ test("drawFx draws a bloom halo + a core circle per live particle", () => {
 
 test("fixed particles draw via drawFxScreen; world particles via drawFx", () => {
   clearFx();
-  emit({ x: 0, y: 0, n: 2, life: 1 }); // world-space
-  emit({ x: 0, y: 0, n: 3, life: 1, fixed: true }); // screen-space
+  emit({ x: 0, y: 0, n: 2, life: 1 });
+  emit({ x: 0, y: 0, n: 3, life: 1, fixed: true });
   let world = 0, screen = 0;
   const kW = { drawCircle: () => { world++; }, vec2: () => ({}), rgb: () => [] };
   const kS = { drawCircle: () => { screen++; }, vec2: () => ({}), rgb: () => [] };
@@ -74,8 +74,8 @@ test("emitText spawns a labelled particle drawn as text, not a circle", () => {
 test("clearFx empties the pool; updateFx/drawFx are safe when empty", () => {
   clearFx();
   assert.equal(fxCount(), 0);
-  updateFx(0.016); // no throw on empty
+  updateFx(0.016);
   const k = { drawCircle: () => {}, vec2: () => ({}), rgb: () => [] };
-  drawFx(k); // no throw on empty
+  drawFx(k);
   assert.ok(true);
 });

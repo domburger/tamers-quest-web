@@ -1,5 +1,4 @@
-// Baseline UI tour: title → guest → char create → hub → every station popup + every tqGo scene, at desktop
-// and phone-portrait. Writes PNGs to the scratch shots dir (prefix via PFX).
+// UI tour screenshots of every popup/scene (MOBILE=1, LANDSCAPE=1). Needs: npx vite + node server/index.js.
 import { chromium, devices } from "playwright";
 import { mkdirSync } from "node:fs";
 const URL = process.env.GAME_URL || "http://localhost:5173";
@@ -8,7 +7,7 @@ mkdirSync(OUT, { recursive: true });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const MOBILE = process.env.MOBILE === "1";
 const b = await chromium.launch({ headless: true, args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
-const LANDSCAPE = process.env.LANDSCAPE === "1"; // landscape PHONE (844x390 touch) — the gutter layout the portrait tour never covers
+const LANDSCAPE = process.env.LANDSCAPE === "1";
 const ctx = LANDSCAPE ? await b.newContext({ ...devices["iPhone 13 landscape"], deviceScaleFactor: Number(process.env.DSF) || 1 })
   : MOBILE ? await b.newContext({ ...devices["iPhone 13"], deviceScaleFactor: Number(process.env.DSF) || 1 }) : await b.newContext({ viewport: { width: 1280, height: 720 }, deviceScaleFactor: 1 });
 const p = await ctx.newPage();
@@ -35,10 +34,9 @@ for (const id of ["shop", "vault", "bestiary", "cosmetics", "battlepass", "setti
   await p.evaluate(() => window.__closeStation && window.__closeStation()); await sleep(500);
   if (await p.evaluate(() => window.__stationPopupId && window.__stationPopupId())) { await p.keyboard.press("Escape"); await sleep(400); }
 }
-// account dropdown (avatar badge)
 const av = await p.evaluate(() => window.__avatarBadge && window.__avatarBadge());
 if (av) { const pt = await p.evaluate(([x, y]) => (window.__designToPage ? window.__designToPage(x, y) : null), [av.x, av.y]); if (pt) { await tap(pt.x, pt.y); await sleep(800); await shot("11-account-menu"); await p.keyboard.press("Escape"); await sleep(400); } }
-for (const scene of ["bestiary", "profile", "friends", "account"]) { // the remaining full-screen scenes (stations are village popups)
+for (const scene of ["bestiary", "profile", "friends", "account"]) {
   const ok = await p.evaluate(([s, cid]) => { try { window.tqGo(s, { characterId: cid, backScene: "hub" }); return true; } catch (e) { return String(e); } }, [scene, charId]);
   await sleep(1800); await shot(`20-scene-${scene}`); if (ok !== true) console.log("tqGo", scene, ok);
 }

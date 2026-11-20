@@ -1,23 +1,6 @@
-// Item VISUAL-BUILDER contract.
-//
-// TQ-393 (Dominik 2026-06-16): the item builder authors a FREE-FORM HTML/CSS icon, exactly like the
-// monster visual builder (htmlModel.js + htmlSanitize.js). itemHtmlBrief() is the render-target spec the
-// Builder agent targets; the item stores `html` ({canvas, base}) shaped like monster.html, rendered via
-// an SVG-foreignObject raster (src/render/htmlRaster.js) into the icon grids + admin preview. SECURITY:
-// the markup goes through the SAME default-deny sanitizer the monsters use (sanitizeHtmlModel,
-// htmlSanitize.js) before any DOM/raster.
-//
-// The previous structured shape-layer "visual" builder (coerceItemVisual + the disc/ring/roundrect/…
-// schema + render/itemIcon.js) was REMOVED with the back-compat path (Dominik 2026-06-16) — items render
-// ONLY from `html` now (no `visual` fallback). Framework-agnostic (no DOM) so the server (genItems.js)
-// can import the brief.
-import { HTML_CANVAS, HTML_ALLOWED_TAGS, HTML_ALLOWED_CSS_PROPS, HTML_FORBIDDEN } from "./htmlModel.js"; // free HTML/CSS icon builder (reuse the monster allow-lists/sanitizer)
+// Pure, no DOM: imported by server/genItems.js.
+import { HTML_CANVAS, HTML_ALLOWED_TAGS, HTML_ALLOWED_CSS_PROPS, HTML_FORBIDDEN } from "./htmlModel.js";
 
-// TQ-393: the HTML/CSS render-target brief for the item ICON builder. Mirrors htmlModelBrief() (monsters)
-// but tuned for a small, TRANSPARENT, facing-agnostic inventory icon rather than a right-facing creature.
-// Re-asserts the allow-list/forbidden set so
-// the model targets exactly what the sanitizer (htmlSanitize.js) keeps even if the editable prompt is
-// overridden. The builder's SOLE task is the appearance.
 export function itemHtmlBrief() {
   const G = HTML_CANVAS;
   return `RENDER TARGET — your SOLE TASK is to draw THIS ITEM as a single self-contained HTML+CSS fragment that renders inside a ${G}x${G}px square box (an inventory ICON).

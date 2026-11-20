@@ -1,17 +1,10 @@
-// Admin panel API (P7). Auth-gated (ADMIN_TOKEN) endpoints to read/edit the
-// live-tunable game config and review generated content. Mounted before the
-// static handler in index.js. No-op (503) unless ADMIN_TOKEN is set.
-
 import { createHash, timingSafeEqual } from "node:crypto";
 import { saveSettings, loadMonsterTypes, wipeMonsterTypes, wipeItems, wipeGroundTiles, wipeBiomes } from "./db.js";
 import { getMonsterTypes, getItems, getGroundTiles, getBiomes, clearMonsterTypes, clearItems, clearGeneratedTiles, clearBiomes } from "../src/engine/gamedata.js";
 import { generateMonster, removeMonster, generateItem, removeGenItem, generateTile, removeGenTile, generateBiome, removeGenBiome,
-  saveGeneratedMonster, saveGeneratedItem, saveGeneratedBiome, saveGeneratedTile, genInFlightState, setMonsterGenConcurrency } from "./content.js"; // TQ-216: gen-hub save-to-pool; TQ-317: live in-flight gen state; TQ-492: bulk-queue concurrency
-import { makeGenQueue } from "./genQueue.js"; // TQ-492: admin bulk-generation queue
+  saveGeneratedMonster, saveGeneratedItem, saveGeneratedBiome, saveGeneratedTile, genInFlightState, setMonsterGenConcurrency } from "./content.js";
+import { makeGenQueue } from "./genQueue.js";
 
-// TQ-492: the app-wide bulk-generation queue. runGen runs the LIVE pipeline (auto-saves to the pool — no
-// dryRun) for the queued type; raising concurrency lifts content's monster single-flight cap so monster
-// jobs actually parallelise (item/biome/tile already do). Single instance for the server lifetime.
 const GEN_FNS = { monster: generateMonster, item: generateItem, biome: generateBiome, tile: generateTile };
 const genQueue = makeGenQueue({
   runGen: (type, opts) => { const fn = GEN_FNS[type]; return fn ? fn({ ...(opts || {}), dryRun: false }) : Promise.resolve(null); },
@@ -21,26 +14,24 @@ import { wipeAllProfiles } from "./store.js";
 import { allPrompts, setPrompts } from "./prompts.js";
 import { allAiConfig, setAiConfig } from "./aiconfig.js";
 import { allSchemaDesc, setSchemaDesc } from "./schemaDesc.js";
-import { allGenConfig, setGenConfig } from "./genConfig.js"; // TQ-364: round-composition + generation knobs
-import { allGenSchedule, setGenSchedule } from "./genSchedule.js"; // TQ-369: per-time generation scheduler
-import { aiEnabled } from "./ai.js"; // so /admin can show whether any AI provider key is set
-import { listAllModels, providerStatus } from "./llm.js"; // TQ-405: live per-provider model lists + key status
-import { aiMetricsSnapshot } from "./aiMetrics.js"; // TQ-40: fight-agent health for the stats panel
-import { aiCostSnapshot } from "./aiCost.js"; // TQ-403: live API token-usage / cost estimate
-import { clientErrorsSnapshot } from "./clientErrors.js"; // client JS error beacon ring buffer
-import { hasHtmlModel } from "../src/systems/htmlModel.js"; // TQ-498: detect AI-generated monsters (html model) for the gen-stats split
-import { genTraceSnapshot, judgeTraceSnapshot } from "./genTrace.js"; // TQ-331/TQ-404: recent gen inputs/outputs; TQ-491: recent fight-judge calls
+import { allGenConfig, setGenConfig } from "./genConfig.js";
+import { allGenSchedule, setGenSchedule } from "./genSchedule.js";
+import { aiEnabled } from "./ai.js";
+import { listAllModels, providerStatus } from "./llm.js";
+import { aiMetricsSnapshot } from "./aiMetrics.js";
+import { aiCostSnapshot } from "./aiCost.js";
+import { clientErrorsSnapshot } from "./clientErrors.js";
+import { hasHtmlModel } from "../src/systems/htmlModel.js";
+import { genTraceSnapshot, judgeTraceSnapshot } from "./genTrace.js";
 
-// Constant-time token comparison (avoids leaking length/contents via timing).
+// Constant-time compare: don't simplify to ===.
 function tokenMatches(provided, expected) {
   const a = createHash("sha256").update(String(provided)).digest();
   const b = createHash("sha256").update(String(expected)).digest();
   return timingSafeEqual(a, b);
 }
 
-// Brute-force throttle: after too many failed auths in a window, lock admin out
-// briefly (deters guessing ADMIN_TOKEN). In-memory; resets on a clean restart.
-const FAILS = []; // timestamps of recent failed auths
+const FAILS = [];
 const FAIL_WINDOW_MS = 60000, FAIL_MAX = 10, LOCK_MS = 60000;
 let lockedUntil = 0;
 function authThrottle(now) {
@@ -52,8 +43,6 @@ function recordFail(now) {
   if (FAILS.length >= FAIL_MAX) { lockedUntil = now + LOCK_MS; FAILS.length = 0; }
 }
 
-// The live-tunable world.cfg fields and their validation. (More — AoI radii, map
-// size, etc. — follow once those move into cfg.)
 export const TUNABLES = {
   minPlayers: { min: 1, max: 16, int: true },
   roundDurationS: { min: 30, max: 3600, int: true },
@@ -61,20 +50,18 @@ export const TUNABLES = {
   portalIntervalS: { min: 1, max: 600, int: true },
   monsterGenRate: { min: 0, max: 1 },
   pvpEnabled: { bool: true },
-  salesEnabled: { bool: true }, // TQ-198: real-money sales (Paddle checkout) master kill-switch — default OFF
+  salesEnabled: { bool: true },
   baseSpeed: { min: 50, max: 600, int: true },
   stormDps: { min: 0, max: 500, int: true },
-  dangerFillS: { min: 5, max: 300, int: true }, // zone-death timer: seconds outside before you die
-  dangerDrainS: { min: 1, max: 120, int: true }, // seconds in safety to clear a full danger bar
+  dangerFillS: { min: 5, max: 300, int: true },
+  dangerDrainS: { min: 1, max: 120, int: true },
   encounterRadius: { min: 10, max: 200, int: true },
   hiddenMonsterPct: { min: 0, max: 100, int: true },
   energyRestorePct: { min: 0, max: 100, int: true },
   pvpRadius: { min: 10, max: 200, int: true },
-  // Wild-monster approach (cfbf705): documented "admin-tunable" but the validation was missing,
-  // so these cfg fields couldn't actually be tuned. Wire them up like the rest.
-  monsterApproachPct: { min: 0, max: 100, int: true }, // % of monsters that slowly hunt players
-  monsterApproachSpeedFrac: { min: 0, max: 1 }, // approach speed as a fraction of baseSpeed
-  monsterApproachRadius: { min: 0, max: 4000, int: true }, // aggro range — how close a hunter notices
+  monsterApproachPct: { min: 0, max: 100, int: true },
+  monsterApproachSpeedFrac: { min: 0, max: 1 },
+  monsterApproachRadius: { min: 0, max: 4000, int: true },
 };
 
 export function adminConfig(world) {
@@ -83,7 +70,6 @@ export function adminConfig(world) {
   return out;
 }
 
-// Read-only live-ops snapshot (P7-T4).
 export function adminStats(world) {
   const rounds = [...world.rounds.values()].map((r) => ({
     roundId: r.roundId, phase: r.phase, players: r.players.size,
@@ -98,18 +84,14 @@ export function adminStats(world) {
     activeDuels: world.pvps.size,
     monsterPool: getMonsterTypes().length,
     recentResults: (world.recentResults || []).slice().reverse(),
-    clientErrors: clientErrorsSnapshot(), // client JS error beacon (POST /api/clienterror) — newest first + total
-    fightAgent: aiMetricsSnapshot(), // TQ-40: judge call volume / fallback+timeout rate / latency / alert
-    generation: genInFlightState(), // TQ-317: live in-flight content generation — { active, type, startedAt } (or { active:false })
-    generationStats: generationStats(), // TQ-498: content counts per type + AI-generated split
-    apiCost: aiCostSnapshot(), // TQ-403: live API token usage + cost estimate (combat judges + gen pipeline)
+    clientErrors: clientErrorsSnapshot(),
+    fightAgent: aiMetricsSnapshot(),
+    generation: genInFlightState(),
+    generationStats: generationStats(),
+    apiCost: aiCostSnapshot(),
   };
 }
 
-// TQ-498: aggregate counts of the live content pools, with the AI-generated split where there's a
-// reliable marker (monsters carry an html model and/or AI-authored genAttacks; tiles carry an html
-// texture). Items/biomes report totals only — the runtime pool doesn't tag a built-in vs generated
-// origin for them. Pure read of the loaded game data; cheap enough for the read-only stats poll.
 function generationStats() {
   const monsters = getMonsterTypes() || [], items = getItems() || [], tiles = getGroundTiles() || [], biomes = getBiomes() || [];
   const htmlTile = (t) => !!(t && t.html && typeof t.html.base === "string" && t.html.base.trim());
@@ -122,7 +104,6 @@ function generationStats() {
   };
 }
 
-// Validate+coerce one value against its spec; null if invalid.
 export function coerce(spec, v) {
   if (spec.bool) return v === true || v === "true" ? true : v === false || v === "false" ? false : null;
   let n = Number(v);
@@ -131,7 +112,6 @@ export function coerce(spec, v) {
   return Math.min(spec.max, Math.max(spec.min, n));
 }
 
-// Apply a config patch to world.cfg (validated). Returns the fields applied.
 export function applyConfig(world, patch) {
   const applied = {};
   if (patch && typeof patch === "object") {
@@ -154,7 +134,6 @@ function readBody(req) {
   });
 }
 
-// Handle an /api/admin/* request. Returns true if it owned the route.
 export async function handleAdmin(req, res, world) {
   if (!req.url.startsWith("/api/admin/")) return false;
   const json = (code, obj) => { res.writeHead(code, { "Content-Type": "application/json", "Cache-Control": "no-store" }); res.end(JSON.stringify(obj)); };
@@ -177,8 +156,6 @@ export async function handleAdmin(req, res, world) {
     return true;
   }
   if (path === "/api/admin/aiconfig" && req.method === "GET") { json(200, { ...allAiConfig(), aiEnabled: aiEnabled() }); return true; }
-  // TQ-405: LIVE model ids from every configured provider (OpenAI / Anthropic / Gemini / DeepSeek / Groq),
-  // cached 10 min server-side; ?refresh=1 forces a re-fetch. Powers the admin model dropdowns.
   if (path === "/api/admin/models" && req.method === "GET") { json(200, { models: await listAllModels({ refresh: /[?&]refresh=1\b/.test(req.url) }), providers: providerStatus() }); return true; }
   if (path === "/api/admin/aiconfig" && req.method === "POST") {
     const body = await readBody(req);
@@ -186,19 +163,9 @@ export async function handleAdmin(req, res, world) {
     json(200, { ok: true, aiconfig: await setAiConfig(body) });
     return true;
   }
-  // Schema field descriptions (the structured-output guidance the LLM reads per field).
   if (path === "/api/admin/schemadesc" && req.method === "GET") { json(200, allSchemaDesc()); return true; }
-  // TQ-331: gen telemetry — the recent per-stage model inputs (system+user prompt, model id) and raw
-  // outputs, so an operator can review exactly what each agent was asked/returned when debugging a bad
-  // generation (e.g. a missing name or an off-brief visual). In-memory ring buffer, newest last.
   if (path === "/api/admin/gen/trace" && req.method === "GET") { json(200, { trace: genTraceSnapshot() }); return true; }
-  // TQ-491: fight-judge telemetry — the recent combat/capture judge calls (the exact system+user prompt
-  // sent + raw output/error), so an operator can review what the judge actually saw/returned. Separate
-  // in-memory ring buffer from gen (fight turns fire far more often), newest last.
   if (path === "/api/admin/combat/trace" && req.method === "GET") { json(200, { trace: judgeTraceSnapshot() }); return true; }
-  // TQ-213: dry-run TEST generation for the generation hub (TQ-211). Runs the gen pipeline with the
-  // CURRENT live settings for the chosen type and RETURNS the generated object WITHOUT writing to the
-  // live pool, so the operator can preview/tweak/re-run. Explicit 'save to pool' is a separate action.
   if (path === "/api/admin/gen/test" && req.method === "POST") {
     const body = await readBody(req);
     if (body === null) { json(400, { error: "invalid JSON" }); return true; }
@@ -217,8 +184,6 @@ export async function handleAdmin(req, res, world) {
     json(200, { type, result });
     return true;
   }
-  // TQ-216: persist a PREVIEWED test generation to the live pool — explicit operator action only.
-  // Reuses the same add+upsert path the generate* functions use; 409 on an invalid shape or duplicate.
   if (path === "/api/admin/gen/save" && req.method === "POST") {
     const body = await readBody(req);
     if (body === null) { json(400, { error: "invalid JSON" }); return true; }
@@ -236,10 +201,6 @@ export async function handleAdmin(req, res, world) {
     } catch (e) { json(500, { error: String((e && e.message) || e) }); return true; }
     return true;
   }
-  // TQ-492: BULK-GENERATION QUEUE — enqueue many generations (50 / 1000 / endless) of a type; a worker
-  // pool drains them with a configurable concurrency (some in parallel), auto-saving each to the pool.
-  // GET = live status (running/done/failed/pending/recent); POST = enqueue { type, count } (count a number
-  // or "endless"); POST .../control = { action: pause|resume|clear, concurrency }.
   if (path === "/api/admin/gen/queue" && req.method === "GET") { json(200, genQueue.status()); return true; }
   if (path === "/api/admin/gen/queue" && req.method === "POST") {
     const body = await readBody(req);
@@ -268,10 +229,6 @@ export async function handleAdmin(req, res, world) {
     json(200, { ok: true, schemaDesc: await setSchemaDesc(body) });
     return true;
   }
-  // TQ-364: round-composition + generation knobs (Epic TQ-363) — biomes/round, monsters/biome, the
-  // collidable/non-collidable tile split per biome, reused-vs-new biome count, and the per-round new-
-  // monster cap. DB-persisted (settings id=5) + applied live to round formation / map-gen / the gen
-  // trigger + scheduler tasks. Mirrors the aiconfig GET/POST shape.
   if (path === "/api/admin/genconfig" && req.method === "GET") { json(200, allGenConfig()); return true; }
   if (path === "/api/admin/genconfig" && req.method === "POST") {
     const body = await readBody(req);
@@ -279,7 +236,6 @@ export async function handleAdmin(req, res, world) {
     json(200, { ok: true, genconfig: await setGenConfig(body) });
     return true;
   }
-  // TQ-369: per-time generation scheduler (one new biome/tile/monster on a configurable cadence).
   if (path === "/api/admin/genschedule" && req.method === "GET") { json(200, allGenSchedule()); return true; }
   if (path === "/api/admin/genschedule" && req.method === "POST") {
     const body = await readBody(req);
@@ -302,19 +258,12 @@ export async function handleAdmin(req, res, world) {
     return true;
   }
   if (path === "/api/admin/stats" && req.method === "GET") { json(200, adminStats(world)); return true; }
-  // Clean wipe (admin) — clear AI-generated content and/or ALL player data, in BOTH the live
-  // in-memory pools AND the DB, so the reset is immediate (no restart). Body flags select what:
-  //   { monsters?:bool, items?:bool, tiles?:bool, biomes?:bool, profiles?:bool } — ALL default OFF.
-  // OPT-IN per category (TQ-244): a category is wiped ONLY when its flag is explicitly === true, so
-  // omitting a flag preserves that pool ({monsters:true} clears monsters only — never collateral
-  // tiles/biomes loss). An empty body {} wipes nothing.
+  // Wipe a category only when its flag === true; omitted flags must preserve data.
   if (path === "/api/admin/wipe" && req.method === "POST") {
     const body = (await readBody(req)) || {};
     const wiped = {};
     if (body.monsters === true) { wiped.monsters = await wipeMonsterTypes().catch(() => 0); clearMonsterTypes(); }
     if (body.items === true) { wiped.items = await wipeItems().catch(() => 0); clearItems(); }
-    // clearGeneratedTiles keeps the seed tiles (maps still need them); clearBiomes drops only the
-    // generated pool (built-in BIOME_DEFS stays).
     if (body.tiles === true) { wiped.tiles = await wipeGroundTiles().catch(() => 0); clearGeneratedTiles(); }
     if (body.biomes === true) { wiped.biomes = await wipeBiomes().catch(() => 0); clearBiomes(); }
     if (body.profiles === true) { wiped.profiles = await wipeAllProfiles().catch(() => 0); }
@@ -323,10 +272,8 @@ export async function handleAdmin(req, res, world) {
     return true;
   }
   if (path === "/api/admin/monsters/generate" && req.method === "POST") {
-    // Generation is driven by the Idea agent's inspiration words alone — there is no targeting
-    // hints / "Constraints" input (removed 2026-06-15); any body fields are ignored.
-    const mt = await generateMonster({}).catch(() => null); // generates → pool → DB
-    if (mt) json(200, { ok: true, monster: mt }); // full record so the test view can inspect it
+    const mt = await generateMonster({}).catch(() => null);
+    if (mt) json(200, { ok: true, monster: mt });
     else json(502, { error: "generation failed (AI off or error)" });
     return true;
   }
@@ -336,7 +283,6 @@ export async function handleAdmin(req, res, world) {
     json(200, { ok });
     return true;
   }
-  // AI items (plan "Decide general items") — mirror the monster curation routes.
   if (path === "/api/admin/items" && req.method === "GET") { json(200, { items: getItems() }); return true; }
   if (path === "/api/admin/items/generate" && req.method === "POST") {
     const it = await generateItem().catch(() => null);
@@ -349,7 +295,6 @@ export async function handleAdmin(req, res, world) {
     json(200, { ok: body?.name ? await removeGenItem(body.name).catch(() => false) : false });
     return true;
   }
-  // AI biomes (themed map regions) — mirror the monster/item curation routes. Optional {kind}.
   if (path === "/api/admin/biomes" && req.method === "GET") { json(200, { biomes: getBiomes() }); return true; }
   if (path === "/api/admin/biomes/generate" && req.method === "POST") {
     const body = (await readBody(req)) || {};
@@ -365,14 +310,12 @@ export async function handleAdmin(req, res, world) {
     json(200, { ok: body?.name ? await removeGenBiome(body.name).catch(() => false) : false });
     return true;
   }
-  // AI floor tiles (ground types within a biome) — mirror the curation routes. Optional {biome, kind, collidable}.
   if (path === "/api/admin/tiles" && req.method === "GET") { json(200, { tiles: getGroundTiles().filter((t) => t.generated) }); return true; }
   if (path === "/api/admin/tiles/generate" && req.method === "POST") {
     const body = (await readBody(req)) || {};
     const opts = {};
     if (typeof body.biome === "string" && body.biome.trim()) opts.biome = body.biome.trim().slice(0, 40);
     if (typeof body.kind === "string" && body.kind.trim()) opts.kind = body.kind.trim().slice(0, 120);
-    // Optional collidability request (1/0/true/false). Omit → the balancer picks the neediest type.
     if (body.collidable != null && body.collidable !== "") opts.collidable = body.collidable;
     const t = await generateTile(opts).catch(() => null);
     if (t) json(200, { ok: true, tile: t });

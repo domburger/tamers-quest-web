@@ -1,82 +1,47 @@
-// Authoritative world: sessions + lobby/matchmaking + concurrent rounds + tick.
-// Imports the shared engine so client and server run identical rules.
-// Flow: join (session) → queue → matchmaker forms a round (≤16, fresh seed) →
-// roundStart → in-round movement/snapshots. Combat (P3), seeded-map spawns (P2),
-// and DB persistence (P1-T2) plug in later behind the existing seams.
-
 import { randomSeed, makeRng, hashString } from "../src/engine/rng.js";
 import { GAME, grantChain, finalizeRunChains, buyChain, craftUpgrade, ensureChainSlots, grantEssence } from "../src/engine/schemas.js";
-import { generateMap, findSpreadSpawns, isWalkable, edgeClearX, edgeClearY, stepBody } from "../src/engine/mapgen.js"; // isWalkable = the SHARED collision rule (also used by SP game.js + MP prediction); edgeClear* = its slide-safe leading-edge corner guard (TQ-499)
+import { generateMap, findSpreadSpawns, isWalkable, edgeClearX, edgeClearY, stepBody } from "../src/engine/mapgen.js";
 import { getByToken, createProfile, saveProfile, rollStarters, bumpStat, newMonsterId, secureId } from "./store.js";
-import { handleMarketMessage } from "./marketplace.js"; // TQ-113: server-authoritative monster marketplace
-import { processEvolutions } from "./genEvolve.js"; // TQ-551: evolve survivors that hit level 30 at extraction
-import { saveMarketListings, saveEvolvedTypes } from "./db.js"; // TQ-113: durable listings (id 8); TQ-551: evolved types (id 9)
+import { handleMarketMessage } from "./marketplace.js";
+import { processEvolutions } from "./genEvolve.js";
+import { saveMarketListings, saveEvolvedTypes } from "./db.js";
 import { resolveCombatAction, makeEnemy, attacksFor, monSnap, restoreEnergyPartial } from "./combat.js";
-import { aiEnabled } from "./ai.js"; // FGT-T1: combat is AI-only — gate engagement on the judge being configured
+import { aiEnabled } from "./ai.js";
 import { getMonsterType, getSpiritChain, getSpiritChains, getItem, getItems } from "../src/engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../src/engine/stats.js";
 import { grantExtractRewards, defeatGold, healTeam, grantPlayerXp, playerDefeatXp, grantBattlePassXp, battlePassDefeatXp, claimBattlePassTier, isPremiumEntitled } from "../src/engine/progression.js";
 import { canThrow, rollChainDrop, clusterTargets } from "../src/engine/spiritchains.js";
 import { purchaseUpgrade, getUpgradeDef } from "../src/engine/upgrades.js";
 import { addCaughtMonster, applyRoster, equipChain, setChainSlots, releaseMonster, loseRunTeam } from "../src/engine/inventory.js";
-import { itemCombatDescription, rollItemFromPool } from "../src/engine/items.js"; // TQ-64/65: structured item effect + rarity-weighted drops
-import { buySkin } from "../src/engine/cosmetics.js"; // CN-9 cosmetic purchase (pure)
-// Cosmetic catalogs are import-free pure data (skin id/acquire + render params),
-// so the server can read them to validate a purchase price authoritatively.
+import { itemCombatDescription, rollItemFromPool } from "../src/engine/items.js";
+import { buySkin } from "../src/engine/cosmetics.js";
+// Server imports these src/render catalogs: keep them DOM-free and import-free.
 import { CHAIN_SKINS } from "../src/render/chainCosmetics.js";
 import { CHARACTER_SKINS } from "../src/render/characterCosmetics.js";
 import { sprintingNow, tickStamina, sprintMult } from "../src/engine/movement.js";
 import { generateMonster, generateBiome, generateTile } from "./content.js";
-import { allBiomes, BIOME_DEFS } from "../src/engine/mapgen.js"; // TQ-365: the full biome pool for the stable round set (+ built-in defs to identify generated biomes)
-import { getMonsterTypes, getGroundTiles, getEvolvedTypes } from "../src/engine/gamedata.js"; // TQ-368: pool sizes for shortfall; TQ-551: evolved types for persistence
-import { roundComposition, getGenConfig } from "./genConfig.js"; // TQ-364/368: composition knobs + backfill toggle
-import { saveRoundBiomes } from "./db.js"; // TQ-365: persist the rotating round-biome order across restarts
+import { allBiomes, BIOME_DEFS } from "../src/engine/mapgen.js";
+import { getMonsterTypes, getGroundTiles, getEvolvedTypes } from "../src/engine/gamedata.js";
+import { roundComposition, getGenConfig } from "./genConfig.js";
+import { saveRoundBiomes } from "./db.js";
 import { maybeStartPvp, startPvp, handlePvpAction, endPvpFor } from "./pvp.js";
 
-// TQ-475 (RT-NET 1/5): broadcast a snapshot every Nth sim tick. 1 = the full sim rate (15Hz); the old
-// value 2 sent ~7.5Hz, which doubled the effective interpolation delay for rivals/monsters/projectiles.
-// The client already prediction-reconciles its own movement and interpolates/extrapolates remote
-// entities, so it consumes the higher rate with no protocol change. Tunable here (RT-NET 2/5 delta +
-// 3/5 binary keep the higher rate cheap; real-time combat, RT-NET 5/5, wants the freshest positions).
 const SNAPSHOT_EVERY = 1;
-// TQ-519: how long a movement input stays valid after it arrives. The tick loop keeps applying the last
-// input until the next one arrives or this elapses, so the authoritative speed doesn't depend on the
-// client's input send rate (~20Hz) vs the tick rate (30Hz). Measured in SIM time (accumulated dt, not
-// wall-clock) so it's rate-independent AND testable. Sized to cover the ~50ms send interval + a missed
-// packet + jitter; the client also sends an explicit (0,0) stop on key-release, so this only bounds drift
-// if that stop is lost. (At 15Hz dt≈0.067 it expires in ~1 tick — like the old per-tick consume — and at
-// 30Hz dt≈0.033 it persists ~3 ticks, bridging the gaps between the client's inputs.)
 const MOVE_INPUT_TTL_S = 0.12;
 
-// Area-of-interest radii (world px) for snapshot filtering.
-const AOI_RADIUS = 900; // visible monsters within this of a player
-const REVEAL_RADIUS = GAME.REVEAL_RADIUS; // hidden monsters only reveal within this (ambush)
-const HIDDEN_MONSTER_PCT = GAME.HIDDEN_MONSTER_PCT; // ~this % of monsters start hidden (Q2); shared w/ SP
-const ENCOUNTER_RADIUS = 44; // walk within this of a monster to start a fight
-// Squared AoI radii (compared against squared distances). Module-level so the snapshot filter predicates
-// below can be MODULE-LEVEL functions (allocated once) instead of fresh closures rebuilt for every viewer
-// every 15Hz tick — the viewer position is passed in as primitives. Byte-identical filtering.
+const AOI_RADIUS = 900;
+const REVEAL_RADIUS = GAME.REVEAL_RADIUS;
+const HIDDEN_MONSTER_PCT = GAME.HIDDEN_MONSTER_PCT;
+const ENCOUNTER_RADIUS = 44;
 const AOI2 = AOI_RADIUS * AOI_RADIUS, REVEAL2 = REVEAL_RADIUS * REVEAL_RADIUS;
 const monsterInAoi = (mo, px, py) => { const dx = mo.x - px, dy = mo.y - py; return dx * dx + dy * dy <= (mo.hidden ? REVEAL2 : AOI2); };
-const playerInAoi = (entry, px, py, selfId) => entry[0] !== selfId && sqDist(entry[1].x, entry[1].y, px, py) <= AOI2; // entry = [oid, orp]
-const entityInAoi = (e, px, py) => sqDist(e.x, e.y, px, py) <= AOI2; // projectiles + chests
+const playerInAoi = (entry, px, py, selfId) => entry[0] !== selfId && sqDist(entry[1].x, entry[1].y, px, py) <= AOI2;
+const entityInAoi = (e, px, py) => sqDist(e.x, e.y, px, py) <= AOI2;
 
-// TQ-476 (RT-NET 2/5): per-entity signature for delta snapshots — a compact string of the fields that
-// can change in view, so we resend an entity only when its signature differs from the viewer's baseline.
-// (typeName/owner/chainId are static per id, so they ride the first send and don't need to be in the sig.)
 const sigPlayer = (o) => `${o.x},${o.y},${o.name || ""},${o.skinId || ""},${o.charId || ""},${o.chainTier ?? ""}`;
 const sigMon = (o) => `${o.x},${o.y},${o.level ?? ""}`;
 const sigProj = (o) => `${o.x},${o.y},${o.vx},${o.vy}`;
 const sigChest = (o) => `${o.x},${o.y}`;
-// Diff a viewer's current AoI list against their last-acked baseline (Map id→sig). Returns the new/changed
-// entries (`upd`, full objects), the ids that left view (`gone`), and a `commit()` that advances the
-// baseline to exactly this view. commit() is called ONLY after the snapshot actually sends (not shed by
-// backpressure, TQ-482) — so a dropped delta is re-derived cumulatively next tick instead of desyncing.
-// `curScratch` is a caller-owned Map REUSED across viewers/ticks to avoid allocating a fresh working Map
-// per category per viewer per tick (4×16×30Hz). Safe to pool because `cur` NEVER escapes into the snapshot
-// msg — only `upd`/`gone` do (those stay freshly allocated, since a consumer may RETAIN msg). `cur` is
-// cleared at entry, consumed only by this call's commit(), and commit() runs before the next viewer's
-// diffView reuses the same scratch (single-threaded synchronous snapshot loop).
 function diffView(curScratch, baseMap, viewArr, sig) {
   const cur = curScratch; cur.clear();
   const upd = [];
@@ -86,35 +51,21 @@ function diffView(curScratch, baseMap, viewArr, sig) {
   return { upd, gone, commit: () => { baseMap.clear(); for (const [k, s] of cur) baseMap.set(k, s); } };
 }
 
-// TQ-479 (RT-NET 5/5): server lag-compensation. Keep a short ring of recent monster positions so a
-// proximity hit can be tested against where a (laggy) player actually SAW the monster — not its live
-// position. Without this, an APPROACHING monster that rushed in during the player's view-lag would
-// ambush them on the server while still looking far away on their screen.
-// Keep history by TIME, not entry-count, so the rewind window is INDEPENDENT of the tick rate. It must
-// exceed the 400ms view-lag clamp (see viewLagMs at ~L528) so a worst-case-lag player can still be rewound.
-// (Was a fixed 16-entry ring "≈1s at 15Hz"; TQ-504/506 raised the sim rate 15→30→60Hz without resizing it,
-// silently shrinking the window to ~0.27s < 400ms — high-ping players fell back to LIVE positions, the exact
-// ambush bug TQ-479 fixed. 500ms = the 400ms clamp + bracket margin.)
+// Must exceed the 400ms viewLagMs clamp; time-based, not tick-count.
 const POS_HIST_MS = 500;
 export function recordPosHistory(round, nowMs) {
   if (!round.posHist) round.posHist = [];
   round.posHist.push({ t: nowMs, mon: (round.monsters || []).map((mo) => ({ id: mo.id, x: mo.x, y: mo.y })) });
-  // Drop entries older than the window, but keep the one straddling the cutoff (prune hist[0] only while the
-  // NEXT entry is still old enough) so the oldest kept sample stays ≥ POS_HIST_MS old — enough to bracket a
-  // target at (now − 400ms). Always keep ≥2 (rewindMonsters needs a bracketing pair).
   const cutoff = nowMs - POS_HIST_MS;
   while (round.posHist.length > 2 && round.posHist[1].t <= cutoff) round.posHist.shift();
 }
-// Monster positions at (nowMs - lagMs), interpolated between the two bracketing history snapshots.
-// Returns a Map(id -> {x,y}), or null when there's no usable rewind (lag 0, no history, or the target
-// time is at/after the newest sample) → callers then use live positions.
 export function rewindMonsters(round, lagMs, nowMs) {
   const hist = round.posHist;
   if (!lagMs || !hist || hist.length < 2) return null;
   const target = nowMs - lagMs;
   const newest = hist[hist.length - 1];
-  if (target >= newest.t) return null;        // newer than we have → live
-  if (target <= hist[0].t) return null;       // older than we kept → live (don't extrapolate past the buffer)
+  if (target >= newest.t) return null;
+  if (target <= hist[0].t) return null;
   let lo = 0;
   for (let k = hist.length - 1; k >= 1; k--) { if (hist[k - 1].t <= target) { lo = k - 1; break; } }
   const a = hist[lo], b = hist[lo + 1] || a;
@@ -124,15 +75,12 @@ export function rewindMonsters(round, lagMs, nowMs) {
   for (const m of a.mon) { const mb = bById.get(m.id) || m; out.set(m.id, { x: m.x + (mb.x - m.x) * f, y: m.y + (mb.y - m.y) * f }); }
   return out;
 }
-const ITEM_DROP_CHANCE = 0.3; // TQ-65: a loot chest holds one (rarity-weighted) AI item this often
-const EXTRACT_RADIUS = 48; // step within this of a portal to extract
-const STORM_DPS = GAME.STORM_DPS; // (legacy) flat storm HP/s — superseded by the danger meter below
-// Zone DANGER meter (user request 2026-06-11): OUTSIDE the closing safe circle a danger bar fills
-// to full over DANGER_FILL_S seconds → the run is lost ("zone" death); back in SAFETY it drains to
-// empty over DANGER_DRAIN_S seconds (linear). Replaces storm HP-attrition as the zone-death rule.
-const DANGER_FILL_S = 30; // seconds in the zone before you die
-const DANGER_DRAIN_S = 10; // seconds in safety to clear a full bar
-const DISCONNECT_GRACE_MS = 120000; // Q12: keep a dropped in-round player this long to reconnect; else it's a death
+const ITEM_DROP_CHANCE = 0.3;
+const EXTRACT_RADIUS = 48;
+const STORM_DPS = GAME.STORM_DPS;
+const DANGER_FILL_S = 30;
+const DANGER_DRAIN_S = 10;
+const DISCONNECT_GRACE_MS = 120000;
 
 export function createWorld({
   countdownTicks = 75,
@@ -140,26 +88,19 @@ export function createWorld({
   roundDurationS = GAME.ROUND_DURATION_S,
   circleStartS = GAME.CIRCLE_START_S,
   portalIntervalS = GAME.PORTAL_INTERVAL_S,
-  monsterGenRate = 0, // P5: chance per round to generate+add a new AI monster (0 = off)
-  pvpEnabled = false, // P3-T5: FFA PvP on collision (off by default)
-  // Gameplay knobs — admin-tunable (P7); defaults are the long-standing constants.
+  monsterGenRate = 0,
+  pvpEnabled = false,
   baseSpeed = GAME.BASE_SPEED,
   stormDps = STORM_DPS,
-  dangerFillS = DANGER_FILL_S, // zone-death timer: seconds outside the safe zone before you die
-  dangerDrainS = DANGER_DRAIN_S, // seconds in safety to drain a full danger bar (linear)
+  dangerFillS = DANGER_FILL_S,
+  dangerDrainS = DANGER_DRAIN_S,
   encounterRadius = ENCOUNTER_RADIUS,
   hiddenMonsterPct = HIDDEN_MONSTER_PCT,
   energyRestorePct = GAME.ENERGY_RESTORE_PCT,
   pvpRadius = 40,
-  // Wild-monster approach (slow hunt): a deterministic random SUBSET of monsters slowly walk
-  // toward the nearest in-range player until they reach encounterRadius and the fight starts.
-  // The rest stay put. Admin-tunable; the client derives the walk animation + facing from the
-  // resulting motion (no extra snapshot payload).
-  monsterApproachPct = 30, // % of monsters that hunt (0 = none ever move)
-  monsterApproachSpeedFrac = 0.35, // approach speed as a fraction of baseSpeed — deliberately slow
-  monsterApproachRadius = 700, // a hunter notices + chases a player within this range (else idles)
-  // Hub-presence broadcast cadence in TICKS. Default 3 ≈ 5Hz at the old 15Hz tick rate; index.js overrides
-  // it with round(TICK_HZ/5) so the cadence stays ~5Hz regardless of the (now 60Hz) sim rate (TQ-504/506).
+  monsterApproachPct = 30,
+  monsterApproachSpeedFrac = 0.35,
+  monsterApproachRadius = 700,
   hubBroadcastEvery = 3,
 } = {}) {
   return {
@@ -168,20 +109,18 @@ export function createWorld({
       baseSpeed, stormDps, dangerFillS, dangerDrainS, encounterRadius, hiddenMonsterPct, energyRestorePct, pvpRadius,
       monsterApproachPct, monsterApproachSpeedFrac, monsterApproachRadius, hubBroadcastEvery,
     },
-    sessions: new Map(), // playerId -> { profile, ws, state:'idle'|'queued'|'in_round', roundId }
-    marketListings: [], // TQ-113: open monster listings (escrow); loaded durably at boot (db settings id 8)
-    queue: [], // playerIds awaiting a match, in arrival order
-    formingAtTick: null, // tick the next round starts (countdown), or null when queue empty
-    rounds: new Map(), // roundId -> { roundId, seed, phase, startedAtMs, players:Map(id->rp) }
-    combats: new Map(), // combatId -> { combatId, playerId, roundId, team, activeIdx, enemy, ... }
-    pvps: new Map(), // pvpId -> { pvpId, roundId, a, b, resolving } (P3-T5)
+    sessions: new Map(),
+    marketListings: [],
+    queue: [],
+    formingAtTick: null,
+    rounds: new Map(),
+    combats: new Map(),
+    pvps: new Map(),
     tick: 0,
     nextRound: 1,
     nextCombat: 1,
     nextPvp: 1,
-    recentResults: [], // ring buffer of recent run endings (admin live-ops, P7-T4)
-    // TQ-365: the rotating biome ring (names) + whether it's been seeded yet. Persisted across
-    // restarts (settings id=6) so the round set stays STABLE — index.js seeds biomeOrder at boot.
+    recentResults: [],
     biomeOrder: [],
     biomesInitialized: false,
     roundBiomeSet: [],
@@ -196,24 +135,15 @@ export function handleMessage(world, conn, msg, send) {
       break;
 
     case "join": {
-      if (conn.playerId) return; // already authenticated on this connection
-      // Resume by session token, or create a new anonymous profile (decision Q6).
+      if (conn.playerId) return;
       let profile = getByToken(msg.token);
-      const wasFresh = !profile; // freshly minted THIS join → safe to one-time migrate into (SP/MP unify)
+      const wasFresh = !profile;
       if (!profile) profile = createProfile(sanitizeNick(msg.nickname), { isGuest: !!msg.isGuest });
       const existing = world.sessions.get(profile.id);
       conn.playerId = profile.id;
       const welcome = { t: "welcome", you: welcomePayload(profile) };
 
       if (existing) {
-        // Reconnect / TAKEOVER (Q12): the NEWEST socket for a profile wins. A token-bearing rejoin
-        // means the client lost its old socket — but with no app heartbeat the server may not have
-        // seen the old (half-open) socket close yet, so the session can still look "connected". The
-        // old hard "already_connected" reject then turned a routine mid-round drop (a mobile/wifi
-        // handoff) into an UNRECOVERABLE lockout: the round looked frozen until the OS TCP timeout
-        // (minutes — often past the 120s grace) and the player never got back in. Instead: claim the
-        // session for THIS socket, terminate the stale one (its delayed 'close' is then a no-op — see
-        // the index.js close guard), and resume the round in place.
         const oldWs = existing.ws;
         existing.ws = conn.ws;
         existing.disconnected = false;
@@ -226,9 +156,6 @@ export function handleMessage(world, conn, msg, send) {
         const rp = round?.players.get(profile.id);
         if (round && rp) resumeRound(world, existing, round, rp, send);
         else {
-          // Round ended (e.g. during a grace window). Deliver the terminal result (died/extracted)
-          // that endRunForPlayer stashed when it couldn't reach the dead socket, so the client shows
-          // its result card and exits the round instead of freezing on a dead view.
           existing.state = "idle"; existing.roundId = null;
           if (existing.pendingResult) { send(conn.ws, existing.pendingResult); existing.pendingResult = null; }
         }
@@ -240,7 +167,6 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
-    // SP/MP unify migration (user decision: the server profile is the single source of truth).
     case "queue": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "idle") return;
@@ -251,18 +177,13 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
-    // Single-player (SP/MP unify): form a PRIVATE 1-player round IMMEDIATELY — no matchmaking
-    // wait, and no chance of another player joining. It's the same server-authoritative round as
-    // MP, so SP catches/loot/xp are server-resolved (cheat-proof) and persist to the one profile.
     case "queueSolo": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "idle") return;
-      formRound(world, [conn.playerId], send, { adventure: msg.mode === "adventure" }); // TQ-529: mode "adventure" = endless solo
+      formRound(world, [conn.playerId], send, { adventure: msg.mode === "adventure" });
       break;
     }
 
-    // TQ-529: leave an ADVENTURE round on purpose — team + finds kept (not a disconnect/death). Only while
-    // roaming (a fight or duel must finish first).
     case "returnHome": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "in_round") return;
@@ -273,17 +194,13 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
-    // Pause-menu "Leave round": a deliberate exit. An ADVENTURE keeps the team (same as returnHome); a normal
-    // round is forfeited — the run team is lost exactly like a death (the menu asks for a confirm first). Goes
-    // through endRunForPlayer so the terminal message (with the synced profile) reaches the client and it can
-    // return to the village instead of dropping the socket and landing on the title screen.
     case "leaveRun": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "in_round") return;
       const round = world.rounds.get(s.roundId);
       const rp = round?.players.get(conn.playerId);
       if (!round || !rp) return;
-      if (rp.inCombat) dropCombatNoContest(world, round, rp.inCombat); // leaving mid-fight: the monster returns to the map
+      if (rp.inCombat) dropCombatNoContest(world, round, rp.inCombat);
       endRunForPlayer(world, round, conn.playerId, round.adventure ? "returned" : "left", send);
       break;
     }
@@ -305,28 +222,19 @@ export function handleMessage(world, conn, msg, send) {
       if (!rp) return;
       if (typeof msg.seq === "number") rp.lastSeq = msg.seq;
       if (msg.type === "move" && msg.payload) {
-        // TQ-519: stamp the input so the tick loop can KEEP applying it until the next input (or a short
-        // TTL) instead of consuming it once per tick — see the movement loop. Without this, when the tick
-        // rate (30Hz) exceeds the client's input send rate (~20Hz) the player stalls on the input-less
-        // ticks → the authoritative position falls behind the client prediction → rubberband.
         rp.pendingMove = { dx: clampAxis(msg.payload.dx), dy: clampAxis(msg.payload.dy), sprint: !!msg.payload.sprint };
-        rp.pendingMoveAge = 0; // TQ-519: reset the sim-time age; the tick loop expires it after MOVE_INPUT_TTL_S
+        rp.pendingMoveAge = 0;
       } else if (msg.type === "throw" && msg.payload) {
-        // Queue a spirit-chain throw; validated against authoritative state at tick.
         rp.pendingThrow = {
           dx: clampAxis(msg.payload.dx),
           dy: clampAxis(msg.payload.dy),
           chainId: String(msg.payload.chainId || ""),
-          charge: Math.max(0, Math.min(1, Number(msg.payload.charge) || 0)), // TQ-450: hold-to-charge throw (clamped server-side; 0 = a plain tap)
+          charge: Math.max(0, Math.min(1, Number(msg.payload.charge) || 0)),
         };
       }
       break;
     }
 
-    // TQ-258: lobby presence. An idle (in-hub) player reports its village position so the server can
-    // broadcast a roster of co-present players to everyone else in the lobby. Separate from the in-round
-    // "input" channel — never touches round state. Ignored unless the session is idle (stops a queued/
-    // in-round player leaking a stale hub blip). Coords sanitized; broadcastHub does the fan-out.
     case "hubMove": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "idle") return;
@@ -340,15 +248,11 @@ export function handleMessage(world, conn, msg, send) {
     case "setEquippedChain": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
-      // PT2-T11 PARITY-3: shared owned-gate + set (engine/inventory.js). Hot-swaps the
-      // ACTIVE chain among the loadout slots (or slots an owned chain) in a run.
       if (equipChain(s.profile, msg.chainId)) saveProfile(s.profile);
       break;
     }
 
     case "setChainSlots": {
-      // The inventory's 3-slot chain loadout (user 2026-06-10). Untrusted id list →
-      // the shared engine validates ownership / dedupes / caps at CHAIN_SLOTS.
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       if (setChainSlots(s.profile, msg.chainIds)) saveProfile(s.profile);
@@ -356,9 +260,6 @@ export function handleMessage(world, conn, msg, send) {
     }
 
     case "setSkin": {
-      // CN-12: a player's equipped (visual-only) chain-skin id, broadcast in snapshots
-      // so rivals see it. Untrusted string → validate as a short token (the client's
-      // renderer falls back to a default for unknown ids); length-capped vs abuse.
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       const id = String(msg.skinId || "");
@@ -370,10 +271,6 @@ export function handleMessage(world, conn, msg, send) {
     }
 
     case "setCharSkin": {
-      // A player's equipped character body-model skin id, broadcast in snapshots so
-      // rivals render the right figure (knight/mage/automaton/wisp/cloak). Same
-      // untrusted-token validation as setSkin (the client renderer falls back to the
-      // default "cloak" model for unknown ids); length-capped vs abuse.
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       const id = String(msg.charId || "");
@@ -387,7 +284,7 @@ export function handleMessage(world, conn, msg, send) {
     case "buyChain": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
-      if (s.state !== "idle") { // shop only between runs
+      if (s.state !== "idle") {
         send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [] });
         return;
       }
@@ -401,7 +298,7 @@ export function handleMessage(world, conn, msg, send) {
     case "craftChain": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
-      if (s.state !== "idle") { // crafting only between runs
+      if (s.state !== "idle") {
         send(conn.ws, { t: "shop", ok: false, locked: true, gold: s.profile.gold || 0, essence: s.profile.essence || 0, chains: s.profile.chains || [], equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [] });
         return;
       }
@@ -412,9 +309,6 @@ export function handleMessage(world, conn, msg, send) {
     }
 
     case "buyCosmetic": {
-      // CN-9: server-authoritative cosmetic purchase (the MP twin of the SP-only
-      // client buy). Visual-only skins; the price/affordability is validated here
-      // against the server-safe catalog so a client can't forge a cheaper buy.
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       const prof = s.profile;
@@ -422,9 +316,7 @@ export function handleMessage(world, conn, msg, send) {
       const kind = msg.kind === "char" ? "char" : "chain";
       const catalog = kind === "chain" ? CHAIN_SKINS : CHARACTER_SKINS;
       const skin = catalog.find((sk) => sk.id === String(msg.skinId || ""));
-      // Cosmetics are priced in gold (earned) or essence (premium/paid). Both balances are
-      // server-authoritative, so we run buySkin against the STORED profile (never client wallet
-      // math) — this is the only spend path for either currency. TQ-132.
+      // Price/balance from server catalog + stored profile only, never client values.
       const r = buySkin(skin, { gold: prof.gold || 0, essence: prof.essence || 0 }, prof.ownedCosmetics[kind] || []);
       if (r.ok) {
         prof.gold = r.gold; prof.essence = r.essence;
@@ -436,10 +328,6 @@ export function handleMessage(world, conn, msg, send) {
     }
 
     case "claimBpTier": {
-      // TQ-183: server-authoritative + idempotent battle-pass tier claim. Free track claims on any
-      // reached tier; the premium track requires the subscription entitlement (TQ-173). The pure
-      // claimBattlePassTier validates + records the claim; we apply the returned reward via the
-      // existing grant systems (non-pay-to-win: gold / essence / cosmetic / chain only).
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       const prof = s.profile;
@@ -466,7 +354,7 @@ export function handleMessage(world, conn, msg, send) {
     case "buyUpgrade": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
-      if (s.state !== "idle") { // upgrades bought between runs only
+      if (s.state !== "idle") {
         send(conn.ws, { t: "upgrades", ok: false, locked: true, gold: s.profile.gold || 0, upgrades: s.profile.upgrades || {} });
         return;
       }
@@ -479,39 +367,27 @@ export function handleMessage(world, conn, msg, send) {
     case "combatAction": {
       const s = world.sessions.get(conn.playerId);
       if (!s || s.state !== "in_round") return;
-      // Validate the incoming id (task 49): must be a string we issued. A non-string (object/
-      // number from a crafted client) must never reach a Map lookup or downstream logic.
       if (typeof msg.combatId !== "string") return;
-      // PvP duel (P3-T5)? Route there. Else the PvE path below.
       const pvp = world.pvps.get(msg.combatId);
       if (pvp) { handlePvpAction(world, pvp, conn.playerId, msg.action || {}, send).catch((e) => console.error("[pvp] action:", e)); break; }
       const session = world.combats.get(msg.combatId);
-      // NC-11: also assert the combat belongs to the player's CURRENT round — a stale
-      // combatId lingering across rounds must not resolve against the new round's state.
       if (!session || session.playerId !== conn.playerId || session.roundId !== s.roundId || session.resolving) return;
-      // ITEM use (plan "Decide general items"): attach the player's OWNED item to the action so
-      // the judge resolves it; it's consumed below once the turn resolves. Anti-cheat: only an
-      // item the profile actually holds (by id) is honored.
       const action = msg.action || {};
       if (action.kind === "item") {
         const it = (s.profile.items || []).find((i) => i.id === action.itemId);
-        // TQ-64: hand the judge the item's structured effect as an explicit directive so a tagged
-        // consumable resolves consistently. The effect lives on the item (newer grants) or its pool
-        // definition (getItem by name); un-tagged items fall back to plain free text.
         if (it) { const def = it.effect ? it : (getItem(it.name) || it); action.itemDef = { name: it.name, description: itemCombatDescription(def) }; }
       }
-      // Resolution may be async (AI). Guard against double-actions while it runs.
       session.resolving = true;
       resolveCombatAction(session, action, session.rng)
         .then((res) => {
           session.resolving = false;
-          if (!world.combats.has(session.combatId)) return; // torn down meanwhile
-          if (session.usedItem) { // the turn resolved an item use → consume it now
+          if (!world.combats.has(session.combatId)) return;
+          if (session.usedItem) {
             const idx = (s.profile.items || []).findIndex((i) => i.id === action.itemId);
             if (idx >= 0) s.profile.items.splice(idx, 1);
             session.usedItem = null;
             saveProfile(s.profile);
-            res.items = s.profile.items; // reflect the consumed bag to the client
+            res.items = s.profile.items;
           }
           send(conn.ws, { t: "combatUpdate", combatId: session.combatId, ...res });
           if (res.outcome) endCombat(world, session, res, send);
@@ -520,9 +396,6 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
-    // Free lobby Healer (task 50): heal the active team to full. Teams no longer
-    // auto-heal at run start, so this is the (free) between-runs heal. Idle-only — the
-    // team is locked once you queue/enter a round. Echoes the healed roster.
     case "heal": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
@@ -533,8 +406,6 @@ export function handleMessage(world, conn, msg, send) {
       break;
     }
 
-    // Roster / vault management (P8-T2). Only between rounds (idle): the team is
-    // locked once you queue/enter a round.
     case "getRoster": {
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
@@ -556,11 +427,6 @@ export function handleMessage(world, conn, msg, send) {
     }
 
     case "release": {
-      // INV-T7 (MP half): free an owned monster for an Essence + level-scaled-gold
-      // refund via the shared `releaseMonster` rule (same reward + keep-≥1-active
-      // guard as SP). Idle-gated like setRoster — releasing mid-run could drop an
-      // in-combat monster. The reply carries the reward + synced wallet so the
-      // client can toast and update gold/essence.
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       if (s.state !== "idle") {
@@ -581,11 +447,6 @@ export function handleMessage(world, conn, msg, send) {
     case "marketList":
     case "marketCancel":
     case "marketBuy": {
-      // TQ-113: the in-lobby monster marketplace. Pure dispatch lives in marketplace.js; build its ctx from
-      // the live world/store here. Browsing is always allowed; listing/buying are idle-gated (between runs,
-      // like the shop) so you can't trade a monster you're battling with. Escrow/anti-dupe + atomicity are
-      // enforced by the primitives; listings persist durably (settings blob id 8) so a restart can't lose an
-      // escrowed monster.
       const s = world.sessions.get(conn.playerId);
       if (!s) return;
       handleMarketMessage({
@@ -596,8 +457,6 @@ export function handleMessage(world, conn, msg, send) {
         persist: () => { try { saveMarketListings(world.marketListings); } catch (e) { void e; } },
         newId: secureId,
         isIdle: s.state === "idle",
-        // TQ-556: evolved type defs referenced by the listings, so a browsing client can render an evolved
-        // monster (evolved types aren't in /api/monstertypes). Deduped; only the evolved ones.
         collectEvolvedDefs: (listings) => {
           const seen = new Set(), defs = [];
           for (const l of (listings || [])) {
@@ -608,8 +467,6 @@ export function handleMessage(world, conn, msg, send) {
           }
           return defs;
         },
-        // TQ-535: accumulate the marketplace house cut. Essence here is real-money revenue (paid-only currency
-        // pulled out of circulation); gold is a sink. In-memory running total + a log line for the operator.
         recordFee: (g, e) => {
           const f = world.marketFees || (world.marketFees = { gold: 0, essence: 0, sales: 0 });
           f.gold += (g || 0); f.essence += (e || 0); f.sales += 1;
@@ -620,11 +477,10 @@ export function handleMessage(world, conn, msg, send) {
     }
 
     case "ping": {
-      // TQ-479: record the client's reported view-lag on its round player for hit lag-compensation.
       if (typeof msg.lag === "number" && conn.playerId) {
         const ps = world.sessions.get(conn.playerId);
         const pr = ps && ps.roundId ? world.rounds.get(ps.roundId)?.players.get(conn.playerId) : null;
-        if (pr) pr.viewLagMs = Math.max(0, Math.min(400, msg.lag | 0)); // clamp (cap rewind at 400ms)
+        if (pr) pr.viewLagMs = Math.max(0, Math.min(400, msg.lag | 0));
       }
       send(conn.ws, { t: "pong", t0: msg.t0, t1: Date.now() });
       break;
@@ -632,9 +488,6 @@ export function handleMessage(world, conn, msg, send) {
   }
 }
 
-// Roster rearrange now lives in the shared inventory engine (PT2-T11 PARITY-3 —
-// SP + MP apply a roster by one rule); imported above. Re-exported here so the
-// `setRoster` handler + the tests that import it from this module keep working.
 export { applyRoster };
 
 export function removePlayer(world, playerId, send = () => {}) {
@@ -642,19 +495,14 @@ export function removePlayer(world, playerId, send = () => {}) {
   const s = world.sessions.get(playerId);
   if (!s) return;
   if (s.state === "in_round") {
-    // Q12: don't drop them immediately — keep their round slot for a grace window
-    // so they can reconnect and resume. Any active fight is dropped (resume roaming).
     const round = world.rounds.get(s.roundId);
     const rp = round?.players.get(playerId);
-    // No-contest drop on disconnect: return the abandoned monster(s) to the shared map (shared rule
-    // with endRunForPlayer) so a mid-fight disconnect doesn't leak them from the round.
     if (rp?.inCombat) { dropCombatNoContest(world, round, rp.inCombat); rp.inCombat = null; }
-    if (rp?.inPvp) endPvpFor(world, playerId, send); // end any duel (no-contest)
-    // Drop any of this player's in-flight projectiles so they don't orphan.
+    if (rp?.inPvp) endPvpFor(world, playerId, send);
     if (round?.projectiles) round.projectiles = round.projectiles.filter((pr) => pr.owner !== playerId);
     s.disconnected = true;
     s.disconnectedAt = Date.now();
-    return; // session + round membership kept; sweepDisconnected handles expiry
+    return;
   }
   if (s.state === "queued") world.queue = world.queue.filter((id) => id !== playerId);
   world.sessions.delete(playerId);
@@ -669,23 +517,12 @@ export function tickWorld(world, dt, send) {
   broadcastHub(world, send);
 }
 
-// TQ-258: lobby presence. Broadcast the roster of co-present idle players (those in the hub, with a
-// fresh hubMove report) to each other, so the village shows other tamers walking around. ~5Hz (cadence
-// in cfg.hubBroadcastEvery ticks, rate-scaled) to keep it cheap; each recipient gets the list MINUS
-// themselves. A session is "in the hub" only while idle with a hub report newer than HUB_STALE_MS — so
-// entering a run / going AFK / leaving the hub scene (stops reporting) drops them within the staleness window.
 const HUB_STALE_MS = 4000;
-const HUB_MAX_PRESENT = 24; // bound the payload (MAX_PLAYERS is 16; idle pool is usually tiny)
+const HUB_MAX_PRESENT = 24;
 function broadcastHub(world, send) {
-  // ~5Hz, rate-INDEPENDENT: was a hardcoded `tick % 3` (5Hz at 15Hz) that became 20Hz when TQ-504/506 raised
-  // the sim to 60Hz — 4× the hub-presence bandwidth/CPU for idle players. cfg.hubBroadcastEvery = round(TICK_HZ/5).
   if (world.tick % world.cfg.hubBroadcastEvery !== 0) return;
   const now = Date.now();
   const inHub = (s) => s.state === "idle" && !s.disconnected && s.hub && now - s.hub.at <= HUB_STALE_MS;
-  // TQ-417: collect the present players AND their sockets in ONE pass — the recipients are exactly the
-  // present players. The old second loop re-scanned EVERY session (including in-round/disconnected ones)
-  // and re-ran inHub() on each just to find the same set we already had. `sockets` is index-aligned with
-  // `present`, so the per-recipient "minus self" below still slices by index without another scan.
   const present = [], sockets = [];
   for (const [id, s] of world.sessions) {
     if (!inHub(s)) continue;
@@ -694,57 +531,48 @@ function broadcastHub(world, send) {
     sockets.push(s.ws);
     if (present.length >= HUB_MAX_PRESENT) break;
   }
-  if (!present.length) return; // a lone present player still gets an empty roster (below) so stale blips clear
+  if (!present.length) return;
   for (let i = 0; i < present.length; i++) {
-    // exclude this recipient's own entry — one array, no per-recipient filter-closure allocation
     const others = [];
     for (let j = 0; j < present.length; j++) if (j !== i) others.push(present[j]);
     send(sockets[i], { t: "hubSnapshot", players: others });
   }
 }
 
-// Q12: a disconnected in-round player who doesn't reconnect within the grace
-// window is treated as a death (loses the active team, per Q10), then dropped.
 function sweepDisconnected(world, send) {
   for (const [id, s] of world.sessions) {
     if (!s.disconnected || Date.now() - s.disconnectedAt <= DISCONNECT_GRACE_MS) continue;
     const round = s.roundId ? world.rounds.get(s.roundId) : null;
-    if (round && round.players.get(id)) endRunForPlayer(world, round, id, round.adventure ? "returned" : "disconnect", send); // TQ-529: adventure has no stakes → a dropped link just sends you home
+    if (round && round.players.get(id)) endRunForPlayer(world, round, id, round.adventure ? "returned" : "disconnect", send);
     world.sessions.delete(id);
   }
 }
 
-// Resume a reconnected player into their in-progress round at their current
-// position (reuses the client's roundStart path; the next snapshot syncs time/zone).
 function resumeRound(world, s, round, rp, send) {
-  s.snapResync = true; // TQ-476: the resumed client clears its delta view store on roundStart → force a full keyframe next snapshot
+  s.snapResync = true; // Client clears its delta store on roundStart: force a full keyframe.
   const ids = [...round.players.keys()];
   send(s.ws, {
     t: "roundStart",
     roundId: round.roundId,
     seed: round.seed,
-    biomes: round.biomeSet || null, // TQ-365: same biome set so the resumed client regenerates the identical map
-    comp: round.comp || null, // TQ-367: same per-biome tile composition for the resumed client
+    biomes: round.biomeSet || null,
+    comp: round.comp || null,
     mapSize: round.mapSize,
     spawn: { x: Math.round(rp.x), y: Math.round(rp.y) },
     you: { id: s.profile.id, nickname: s.profile.name },
     players: ids.filter((o) => o !== s.profile.id).map((o) => ({ id: o, name: world.sessions.get(o)?.profile.name })),
     durationS: GAME.ROUND_DURATION_S,
-    // NC-10: include the live round state so a resumed player renders the correct
-    // zone / timer / portals / chests immediately, instead of flashing the fresh-round
-    // defaults until the first snapshot (~133ms). Matters on every redeploy reconnect.
     time: Math.ceil(round.remaining ?? 0),
     circle: round.circle || null,
     portals: round.portals || [],
     chests: (round.chests || [])
       .filter((c) => sqDist(c.x, c.y, rp.x, rp.y) <= AOI_RADIUS * AOI_RADIUS)
       .map((c) => ({ id: c.id, x: c.x, y: c.y })),
-    atRisk: runAtRisk(s), // the resumed HUD shows the same stakes
+    atRisk: runAtRisk(s),
     resumed: true,
   });
 }
 
-// Form a round when the queue is full, or the countdown elapsed with ≥ minPlayers.
 function matchmake(world, send) {
   const full = world.queue.length >= GAME.MAX_PLAYERS;
   const countdownDone =
@@ -758,14 +586,6 @@ function matchmake(world, send) {
   formRound(world, ids, send);
 }
 
-// TQ-365 (pure, unit-tested): advance the rotating biome ORDER and slice out this round's set.
-// `prevOrder` is the persisted ring of biome NAMES; `poolNames` is the live pool (built-ins +
-// generated). We (1) drop names no longer in the pool and append newly-generated ones to the BACK
-// (the bench), (2) on every round after the first, rotate the ring left by `fresh` — moving the
-// oldest `fresh` names to the bench and pulling `fresh` benched names into the set — and (3) return
-// the first `total` names as the round set. Result: `total - fresh` biomes carry over (reused) and
-// `fresh` are new vs the previous round, cycling through the whole pool over time. With no bench
-// (pool <= total) the set can't change — novelty then depends on biome generation (TQ-368).
 export function rotateBiomeOrder(prevOrder, poolNames, { total, fresh, initialized }) {
   const poolSet = new Set(poolNames);
   const order = (prevOrder || []).filter((n) => poolSet.has(n));
@@ -774,19 +594,11 @@ export function rotateBiomeOrder(prevOrder, poolNames, { total, fresh, initializ
   if (initialized && t > 0) {
     const bench = Math.max(0, order.length - t);
     const f = Math.max(0, Math.min(fresh, bench));
-    for (let i = 0; i < f; i++) order.push(order.shift()); // oldest out → bench; bench-front in → set
+    for (let i = 0; i < f; i++) order.push(order.shift());
   }
   return { order, set: order.slice(0, t) };
 }
 
-// Guarantee the rendered round SET includes at least `minGen` GENERATED biomes when the pool has them,
-// so AI-generated tiles (which live mostly on generated biomes) reliably appear EVERY round — instead of
-// only after many rotations (the ring seeds all built-ins first, benching every generated biome, so a
-// fresh / low-traffic / frequently-restarted server otherwise shows almost no generated content). PURE +
-// unit-tested. It only changes what THIS round renders — the persisted rotation ring (reuse/new cadence)
-// is untouched. Deterministic: pulls benched generated biomes (in ring order) in for the surplus BUILT-IN
-// biomes at the TAIL of the set, so the server + every client compute the identical set (MP-safe).
-// `generated` = Set of generated biome names; `total` = biomesPerRound; default floor = a third of the set.
 export function ensureGeneratedShare(set, order, generated, { total, minGen } = {}) {
   const isGen = (n) => generated.has(n);
   const availGen = order.filter(isGen).length;
@@ -794,17 +606,14 @@ export function ensureGeneratedShare(set, order, generated, { total, minGen } = 
   let have = set.filter(isGen).length;
   if (have >= want) return set.slice();
   const inSet = new Set(set);
-  const benched = order.filter((n) => isGen(n) && !inSet.has(n)); // generated, not already shown (ring order)
+  const benched = order.filter((n) => isGen(n) && !inSet.has(n));
   const out = set.slice();
   for (let i = out.length - 1; i >= 0 && have < want && benched.length; i--) {
-    if (!isGen(out[i])) { out[i] = benched.shift(); have++; } // swap a tail built-in for a benched generated biome
+    if (!isGen(out[i])) { out[i] = benched.shift(); have++; }
   }
   return out;
 }
 
-// Compute this round's biome SET (array of biome DEFS) from the live pool + the admin knobs, advance
-// + persist the rotation, and nudge biome generation when the pool is too small to supply a fresh
-// biome (so future rounds get real novelty — TQ-368 hardens this into a budgeted shortfall fill).
 function buildRoundBiomeSet(world) {
   const comp = roundComposition();
   const pool = allBiomes();
@@ -816,24 +625,15 @@ function buildRoundBiomeSet(world) {
   });
   world.biomeOrder = order;
   world.biomesInitialized = true;
-  // Bias the rendered set toward generated biomes so AI-generated tiles reliably appear each round
-  // (the ring benches all generated biomes behind the built-ins). Ring/order is untouched — only what
-  // this round shows. Built-ins = names in BIOME_DEFS; everything else in the pool is generated.
   const builtin = new Set(BIOME_DEFS.map((b) => b.name));
   const genNames = new Set(poolNames.filter((n) => !builtin.has(n)));
   const shownSet = ensureGeneratedShare(set, order, genNames, { total: comp.biomesPerRound });
   world.roundBiomeSet = shownSet;
-  saveRoundBiomes({ order }).catch(() => {}); // best-effort durability; no-op without a DB
+  saveRoundBiomes({ order }).catch(() => {});
   const byName = new Map(pool.map((b) => [b.name, b]));
   return shownSet.map((n) => byName.get(n)).filter(Boolean);
 }
 
-// TQ-368 (pure, unit-tested): how much new material a round is short of its composition targets.
-// `counts` = { biomes: pool size, monsters: pool size, tileSplit: { biomeName: {collidable, walk} } }
-// for the round's biomes. Biome target carries a small bench (+newBiomesPerRound) so the TQ-365
-// rotation always has a fresh biome to bring in. Monster floor is monstersPerBiome (the minimum to
-// fill one biome's pool; the per-biome pools backfill from the shared pool). Tiles are per round
-// biome. All shortfalls floor at 0 → returns {} sub-objects only where something is actually missing.
 export function computeGenShortfall(comp, counts) {
   const biomeTarget = comp.biomesPerRound + comp.newBiomesPerRound;
   const biomes = Math.max(0, biomeTarget - (counts.biomes || 0));
@@ -847,15 +647,8 @@ export function computeGenShortfall(comp, counts) {
   return { biomes, monsters, tiles };
 }
 
-let backfilling = false; // single-flight: only one round-material backfill runs at a time
+let backfilling = false;
 
-// TQ-368: on round start, trigger AI generation to fill shortfalls vs the composition targets so a
-// round always trends toward sufficient material — biomes → biomesPerRound(+bench), each round biome
-// → 4 collidable + 8 non-collidable tiles, monster pool → monstersPerBiome. NON-BLOCKING (fire-and-
-// forget; never blocks the round), SEQUENTIAL (respects content.js single-flight), SHORTFALL-DRIVEN
-// (stops once targets are met → bounded lifetime cost), and CAPPED per round (monsters at
-// maxNewMonstersPerRound; biomes/tiles at small constants) to bound burst cost. generate* self-gate on
-// AI being enabled (return null with no network call), so this no-ops cleanly when AI is off.
 const MAX_BIOME_GEN_PER_ROUND = 2, MAX_TILE_GEN_PER_ROUND = 4;
 async function backfillRoundMaterial(world) {
   if (backfilling || !getGenConfig("roundGenBackfill")) return;
@@ -870,13 +663,9 @@ async function backfillRoundMaterial(world) {
     }
     const need = computeGenShortfall(comp, { biomes: allBiomes().length, monsters: getMonsterTypes().length, tileSplit });
 
-    // 1) Biomes (gives the rotation a fresh biome + reaches the round's biome count).
     for (let i = 0; i < Math.min(need.biomes, MAX_BIOME_GEN_PER_ROUND); i++) {
       if (!(await generateBiome().catch(() => null))) break;
     }
-    // 2) Tiles for the round's biomes that lack the collidable/non-collidable split. The tile model
-    //    decides collidability, so this is best-effort (grows the biome's pool toward the split over
-    //    rounds); capped hard per round, most-deficient biomes first.
     const tileNeeds = Object.entries(need.tiles)
       .map(([biome, s]) => ({ biome, n: s.collidable + s.walk }))
       .sort((a, b) => b.n - a.n);
@@ -886,7 +675,6 @@ async function backfillRoundMaterial(world) {
       if (!(await generateTile({ biome }).catch(() => null))) break;
       tilesMade++;
     }
-    // 3) Monsters up to the pool floor, capped at maxNewMonstersPerRound.
     for (let i = 0; i < Math.min(need.monsters, comp.maxNewMonstersPerRound); i++) {
       if (!(await generateMonster().catch(() => null))) break;
     }
@@ -897,20 +685,14 @@ async function backfillRoundMaterial(world) {
   }
 }
 
-// Create a round for a specific set of player ids and kick off async map gen. Shared by the
-// matchmaker (MP) and the instant solo path (SP) — both run the SAME server-authoritative round,
-// so single-player progression (catches/loot/xp) is server-resolved + cheat-proof.
 function formRound(world, ids, send, opts = {}) {
   const round = {
     roundId: "r" + world.nextRound++,
     seed: randomSeed(),
-    phase: "loading", // becomes "active" once the map is generated
+    phase: "loading",
     startedAtMs: Date.now(),
     players: new Map(),
     map: null,
-    // TQ-529 ADVENTURE mode: an endless solo journey — no round timer, no storm, no portals. Walking off
-    // any map edge travels to a freshly generated region (depth+1); the player leaves via "returnHome"
-    // (team + finds kept) and a team wipe sends them home fainted instead of losing the team.
     adventure: !!opts.adventure,
     depth: 1,
   };
@@ -925,21 +707,12 @@ function formRound(world, ids, send, opts = {}) {
     send(s.ws, { t: "matchFound", roundId: round.roundId, players: round.players.size });
   }
 
-  // Generate the round's map from its seed off the tick loop, then spawn players.
-  // Fire-and-forget, but never let a rejection escape (it would otherwise become
-  // an unhandled rejection); generateRound also try/catches the gen itself.
   generateRound(world, round, send).catch((e) => console.error("[tamers-quest] generateRound:", e));
   return round;
 }
 
-// Async map generation + spawn assignment. The round stays "loading" (unticked)
-// until the map is ready, then each player gets a real walkable spawn + roundStart.
 async function generateRound(world, round, send) {
   let map = null;
-  // TQ-365: compose the round from the stable, rotating 12-biome set (11 reused + 1 new). The set
-  // travels to every client in roundStart so their regenerated map matches this one exactly.
-  // TQ-367: `comp` carries the per-biome tile split (4 collidable + 8 non-collidable) so map gen
-  // composes the same tile pools on the server + every client.
   const biomeSet = buildRoundBiomeSet(world);
   const comp = roundComposition();
   round.biomeSet = biomeSet;
@@ -949,18 +722,15 @@ async function generateRound(world, round, send) {
   } catch (e) {
     console.error(`[tamers-quest] map gen failed for ${round.roundId}:`, e);
   }
-  if (!world.rounds.has(round.roundId)) return; // everyone left during generation
+  if (!world.rounds.has(round.roundId)) return;
 
   round.map = map;
-  const spawnRng = makeRng((round.seed ^ 0x9e3779b9) >>> 0); // distinct stream from map gen
+  const spawnRng = makeRng((round.seed ^ 0x9e3779b9) >>> 0);
   const E = GAME.EFFECTIVE_TILE;
 
-  // Round monsters in world space + a deterministic visible/hidden split
-  // (decision Q2: "some invisible, some not"). Hidden ones only reveal up close.
   round.monsters = monstersFromMap(world, map);
 
   const ids = [...round.players.keys()];
-  // GP-5: spread player spawns so 16 players don't all start on the same cluster.
   const spawnTiles = map ? findSpreadSpawns(map.voidMap, spawnRng, ids.length, undefined, map.tileMap, map.reachMap) : null;
 
   for (const [idx, id] of ids.entries()) {
@@ -968,89 +738,62 @@ async function generateRound(world, round, send) {
     const s = world.sessions.get(id);
     if (!rp || !s) continue;
     const tile = spawnTiles ? spawnTiles[idx] : { x: 200, y: 200 };
-    // TQ-557: spawn at the tile's CENTRE. `tile.x * E` is the cell's top-left corner, so the body
-    // (radius R) straddled four cells — when any of the three neighbours was a wall the leading-edge
-    // collider was already embedded in it and every move was rejected (the "spawned stuck" report).
     rp.x = tile.x * E + E / 2;
     rp.y = tile.y * E + E / 2;
     rp.stamina = GAME.SPRINT.STAMINA_MAX;
     rp.spawned = true;
-    clearSpawnArea(round, rp); // no monster on / beside the spawn, and a short grace before hunters can engage
-    // Task 50: teams NO LONGER auto-heal at run start — heal at the lobby Healer (free,
-    // the `heal` message) between runs. Entering with an injured team is a real decision.
-    // (SP game.js stopped run-start healing too.) resumeRound (reconnect) never healed.
-    bumpStat(s.profile, "runs"); // P8-T1 (initial entry only; resumeRound doesn't bump)
-    s.runStart = runStartSnapshot(s.profile); // P8-T3: baseline for the round-end gains summary
-    // Which monsters were ALREADY in the vault when the run began. A catch made with a full team lands in the
-    // vault immediately; without this it survived a death (and the death refill even promoted it into the
-    // new team). Everything found in a run is at risk until extraction, like run-found chains.
+    clearSpawnArea(round, rp);
+    bumpStat(s.profile, "runs");
+    s.runStart = runStartSnapshot(s.profile);
     s.runVaultIds = (s.profile.vaultMonsters || []).map((m) => m.id);
-    s.runItemIds = (s.profile.items || []).map((i) => i.id); // same rule for chest items found this run
-    s.runCatchCount = 0; // catches kept this run (team or vault): all lost on death
+    s.runItemIds = (s.profile.items || []).map((i) => i.id);
+    s.runCatchCount = 0;
     send(s.ws, {
       t: "roundStart",
       roundId: round.roundId,
-      seed: round.seed, // clients regenerate the identical map from this
-      biomes: biomeSet, // TQ-365: the round's exact biome set — clients pass it to generateMap to match
-      comp, // TQ-367: per-biome tile composition (collidable/non-collidable counts) for the same map
+      seed: round.seed, // Clients regenerate the map from seed + biomes + comp; all must match exactly.
+      biomes: biomeSet,
+      comp,
       mapSize: map ? map.mapSize : 400,
-      spawn: { x: rp.x, y: rp.y }, // world px
+      spawn: { x: rp.x, y: rp.y },
       you: { id, nickname: s.profile.name },
       players: ids
         .filter((o) => o !== id)
         .map((o) => ({ id: o, name: world.sessions.get(o)?.profile.name })),
       durationS: GAME.ROUND_DURATION_S,
-      adventure: !!round.adventure, depth: round.depth || 1, // TQ-529
+      adventure: !!round.adventure, depth: round.depth || 1,
     });
   }
   round.mapSize = map ? map.mapSize : 400;
   round.portals = [];
-  if (round.adventure) { // TQ-529: the travel rift, farthest reachable tile from the (solo) player's spawn
+  if (round.adventure) {
     const first = [...round.players.values()][0];
     const rift = first ? spawnTravelRift(map, first.x, first.y) : null;
     if (rift) round.portals = [rift];
   }
-  round.projectiles = []; // in-flight spirit chains (server-authoritative)
+  round.projectiles = [];
   round.nextProjectile = 1;
-  round.chests = spawnChests(round, map); // loot chests against walls (chain loot)
-  round.startedAtMs = Date.now(); // in-round clock starts after map generation
+  round.chests = spawnChests(round, map);
+  round.startedAtMs = Date.now();
   round.phase = "active";
 
-  // P5: occasionally grow the pool with a new AI monster (gated by config; costs
-  // an OpenAI call). Fire-and-forget — it joins the pool for FUTURE rounds and
-  // never blocks this round's start.
   if (world.cfg.monsterGenRate > 0 && Math.random() < world.cfg.monsterGenRate) {
     generateMonster().catch((e) => console.error("[content] generateMonster:", e.message));
   }
-  // TQ-368: trigger shortfall-driven AI generation so the round has sufficient material (biomes /
-  // per-biome tiles / monster pool). Fire-and-forget — never blocks the round; self-limits once
-  // targets are met. Toggle: genConfig.roundGenBackfill.
   backfillRoundMaterial(world).catch((e) => console.error("[content] backfill:", e.message));
 }
 
-// Round monsters in world space + a deterministic visible/hidden split (decision Q2: "some invisible,
-// some not"). Hidden ones only reveal up close. Shared by the round start and TQ-529 region travel.
 function monstersFromMap(world, map) {
   const E = GAME.EFFECTIVE_TILE;
   return (map?.monsters || []).map((m) => ({
     id: m.id, typeName: m.typeName, level: m.level,
     x: m.tileX * E, y: m.tileY * E,
     hidden: hashString(String(m.id)) % 100 < world.cfg.hiddenMonsterPct,
-    // Wild-monster approach: a deterministic subset are "hunters" that slowly walk toward a nearby
-    // player (tickMonsterApproach). Distinct hash stream from `hidden` so the two are independent;
-    // only VISIBLE hunters move (hidden ones stay ambushers).
     approacher: hashString("hunt:" + String(m.id)) % 100 < world.cfg.monsterApproachPct,
   }));
 }
 
-// TQ-529: ADVENTURE region travel. The player walked off a map edge → generate a fresh region (new seed,
-// biome set), place them on the OPPOSITE side (nearest walkable spawn to the mirrored exit point), rebuild
-// the round's monsters/chests, bump the depth and send a new roundStart (the client regenerates the map
-// from the seed exactly like a fresh round). The round sits in "loading" while the map generates (the tick
-// skips loading rounds), so nothing moves or fights mid-travel.
 const TRAVEL_EDGE_TILES = 1.5;
-// The travel rift: the effectively-walkable, reachable tile farthest from (fromX, fromY) in world px, sampled on
-// a coarse grid for speed. Returns a portal-shaped { x, y } (world px, tile centre) or null.
 function spawnTravelRift(map, fromX, fromY) {
   if (!map || !map.voidMap) return null;
   const E = GAME.EFFECTIVE_TILE, N = map.mapSize;
@@ -1080,12 +823,10 @@ async function travelRegion(world, round, exitId, send) {
   let map = null;
   try { map = await generateMap(null, round.seed, round.biomeSet, round.comp); }
   catch (e) { console.error(`[tamers-quest] region gen failed for ${round.roundId}:`, e); }
-  if (!world.rounds.has(round.roundId)) return; // the player left during generation
+  if (!world.rounds.has(round.roundId)) return;
   round.map = map;
   round.mapSize = map ? map.mapSize : 400;
   round.depth = (round.depth || 1) + 1;
-  // Difficulty ramps with depth: every region past the first adds a level to its wild monsters (capped), so
-  // the journey keeps up with a team that levels as it goes.
   round.monsters = monstersFromMap(world, map).map((m) => ({ ...m, level: Math.min(50, m.level + (round.depth - 1)) }));
   round.portals = [];
   round.projectiles = [];
@@ -1095,11 +836,10 @@ async function travelRegion(world, round, exitId, send) {
   for (const [id, rp] of round.players) {
     const s = world.sessions.get(id);
     if (!s) continue;
-    // Nearest candidate to the mirrored exit → you arrive on the side you were walking toward.
     let best = cands[0];
     if (mirror) { let bd = Infinity; for (const c of cands) { const d = (c.x * E + E / 2 - mirror.x) ** 2 + (c.y * E + E / 2 - mirror.y) ** 2; if (d < bd) { bd = d; best = c; } } }
     rp.x = best.x * E + E / 2; rp.y = best.y * E + E / 2;
-    clearSpawnArea(round, rp); // arriving in a new region: same spawn protection as a fresh round
+    clearSpawnArea(round, rp);
     rp.pendingMove = null; rp.pendingThrow = null; rp.danger = 0;
     send(s.ws, {
       t: "roundStart",
@@ -1119,125 +859,80 @@ async function travelRegion(world, round, exitId, send) {
   round.phase = "active";
 }
 
-// Wild-monster approach: a deterministic SUBSET of monsters (`approacher`, visible only) slowly
-// walks toward the NEAREST non-fighting player within aggro range, sliding along walls exactly
-// like the player (isWalkable, per-axis). Most monsters stay put. No extra snapshot payload — the
-// client derives the walk animation + facing from the resulting position deltas (monsterRender),
-// just like it does for rival players. A hunter that reaches encounterRadius is engaged by the
-// caller's encounter check, which removes it from round.monsters (so it stops being moved).
 function tickMonsterApproach(world, round, dt) {
   const monsters = round.monsters || [];
   if (!monsters.length || world.cfg.monsterApproachPct <= 0) return;
   const targets = [], nowApp0 = Date.now();
   for (const rp of round.players.values()) if (rp.spawned && !rp.inCombat && !rp.inPvp && !(rp.encounterGraceUntil && rp.encounterGraceUntil > nowApp0)) targets.push(rp);
-  if (!targets.length) return; // nobody to hunt → everyone idles
+  if (!targets.length) return;
   const aggro2 = world.cfg.monsterApproachRadius * world.cfg.monsterApproachRadius;
-  const v = world.cfg.baseSpeed * world.cfg.monsterApproachSpeedFrac; // deliberately slow
+  const v = world.cfg.baseSpeed * world.cfg.monsterApproachSpeedFrac;
   const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE);
   const R = GAME.PLAYER_RADIUS;
   const nowApp = Date.now();
   for (const mo of monsters) {
-    if (!mo.approacher || mo.hidden) continue; // only flagged, visible hunters move
-    if (mo.fleeUntil && mo.fleeUntil > nowApp) continue; // just fled from a player — don't immediately chase back
-    // nearest non-fighting player
+    if (!mo.approacher || mo.hidden) continue;
+    if (mo.fleeUntil && mo.fleeUntil > nowApp) continue;
     let best = null, bd2 = Infinity;
     for (const rp of targets) { const dx = rp.x - mo.x, dy = rp.y - mo.y, d2 = dx * dx + dy * dy; if (d2 < bd2) { bd2 = d2; best = rp; } }
-    if (!best || bd2 > aggro2) continue; // none in range → stays put (client renders idle)
+    if (!best || bd2 > aggro2) continue;
     const len = Math.sqrt(bd2) || 1;
     const ux = (best.x - mo.x) / len, uy = (best.y - mo.y) / len;
-    // Server-authoritative step, clamped to the map; per-axis wall collision so a hunter slides
-    // along walls instead of passing through them (same rule as player movement).
     const nx = Math.min(maxXY, Math.max(0, mo.x + ux * v * dt));
     const ny = Math.min(maxXY, Math.max(0, mo.y + uy * v * dt));
-    if (edgeClearX(round.map, nx + Math.sign(ux) * R, mo.y, R)) mo.x = nx; // TQ-499: leading-edge corner guard (same rule as the player)
+    if (edgeClearX(round.map, nx + Math.sign(ux) * R, mo.y, R)) mo.x = nx;
     if (edgeClearY(round.map, mo.x, ny + Math.sign(uy) * R, R)) mo.y = ny;
   }
 }
 
 function tickRound(world, round, dt, send) {
-  if (round.phase !== "active") return; // still generating the map
+  if (round.phase !== "active") return;
   const speed = world.cfg.baseSpeed;
-  const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE); // play-area bound
+  const maxXY = Math.max(0, (round.mapSize - 1) * GAME.EFFECTIVE_TILE);
   for (const rp of round.players.values()) {
     const locked = rp.inCombat || rp.inPvp;
-    // GP-15: drop any queued move while locked (in combat/PvP), so a move pending when the fight started
-    // can't lurch on the first tick after it ends. (The TTL below also expires stale moves, but clearing
-    // here is explicit + immediate.)
     if (locked) rp.pendingMove = null;
-    // TQ-519: keep applying the last input until the next arrives or it expires (MOVE_INPUT_TTL_S) — so
-    // movement is INPUT-RATE-INDEPENDENT and a tick rate above the client's send rate no longer starves
-    // it (the rubberband). Age accumulates in SIM time (dt); (0,0) is the client's explicit stop on
-    // key-release, and an expired input is also treated as stopped.
     const pm = rp.pendingMove;
     if (pm) rp.pendingMoveAge = (rp.pendingMoveAge || 0) + dt;
     const moving = !locked && !!pm && rp.pendingMoveAge <= MOVE_INPUT_TTL_S && (pm.dx !== 0 || pm.dy !== 0);
-    // Sprint + stamina (server-authoritative). Stamina ticks every frame for
-    // every player (regen even while idle/fighting), drains while sprinting.
     if (rp.stamina == null) rp.stamina = GAME.SPRINT.STAMINA_MAX;
     const sprinting = moving && sprintingNow({ sprint: pm.sprint, moving, stamina: rp.stamina, wasSprinting: rp.wasSprinting }, GAME);
     rp.stamina = tickStamina(rp.stamina, sprinting, dt, GAME);
     rp.wasSprinting = sprinting;
-    if (!moving) continue; // locked / stopped / no fresh input this tick
+    if (!moving) continue;
     let { dx, dy } = pm;
     if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
-    const v = speed * sprintMult(sprinting, GAME); // uniform speed: per-biome terrain modifier removed 2026-06-09
-    // Server-authoritative position, clamped to the map (anti-cheat: no walking
-    // infinitely off-map; speed/direction already clamped at input). Per-axis tile
-    // collision so you slide along walls instead of passing through them.
-    // PT2-T06: collide the player's leading body EDGE, not their center, so a wall
-    // stops you where your sprite meets it (collider matches the visual) instead of
-    // letting the body overlap ~a radius into the wall. Per-axis (slide along walls);
-    // only the moving axis is offset, so the perpendicular footprint stays a point
-    // and narrow corridors don't get blocked.
+    const v = speed * sprintMult(sprinting, GAME);
     const R = GAME.PLAYER_RADIUS;
-    // TQ-499: collide the full leading EDGE (midpoint + both ±R perpendicular ends), not just its
-    // midpoint, so a body corner can't poke into a wall adjacent to the path (the "glitching into
-    // walls" report). Slide-safe — a flat wall keeps the leading coord inside the walkable column, so
-    // only a real protrusion stops you. edgeClear* is shared, so the MP client prediction matches.
-    // stepBody (shared with the client prediction) = this per-axis edge guard + corner forgiveness (CORNER_SLIP).
     const st = stepBody(round.map, rp.x, rp.y, dx, dy, v * dt, R, maxXY);
     rp.x = st.x; rp.y = st.y;
-    // TQ-529: adventure — reaching a map edge travels to the next region (async; the round goes "loading").
     if (round.adventure) {
       const edge = TRAVEL_EDGE_TILES * GAME.EFFECTIVE_TILE;
       if (rp.x <= edge || rp.y <= edge || rp.x >= maxXY - edge || rp.y >= maxXY - edge) {
         const exitId = [...round.players.entries()].find(([, v]) => v === rp)?.[0];
         travelRegion(world, round, exitId, send).catch((e) => console.error("[tamers-quest] travelRegion:", e));
-        return; // the round is loading now — skip the rest of this tick
+        return;
       }
     }
-    // TQ-519: do NOT clear pendingMove here — it persists (until the next input or the TTL) so the player
-    // keeps moving on ticks between the client's inputs. Stop is driven by the (0,0) input / TTL expiry.
+    // Don't clear pendingMove: it persists until next input/TTL (else rubberband).
   }
 
-  // Loot chests: open any chest a roaming player has reached.
   processChests(world, round, send);
 
-  // Spirit-chain throws: spawn queued projectiles, then advance + resolve hits.
   processThrows(world, round);
   stepProjectiles(world, round, dt, send);
 
-  // Wild monsters slowly hunt nearby players (moves the "approacher" subset); a hunter that
-  // reaches encounterRadius this tick is then picked up by the encounter check just below.
   tickMonsterApproach(world, round, dt);
 
-  // Encounter detection (instanced duel — others keep moving). Hidden monsters
-  // ambush too, since they stay in round.monsters until engaged.
   const ER2 = world.cfg.encounterRadius * world.cfg.encounterRadius, nowEnc = Date.now();
-  recordPosHistory(round, nowEnc); // TQ-479: snapshot this tick's monster positions for lag-comp rewind
+  recordPosHistory(round, nowEnc);
   for (const [id, rp] of round.players) {
     if (rp.inCombat || rp.inPvp) continue;
-    // Post-fight GRACE: for a few seconds after a fight ends no wild monster auto-engages this player, so
-    // the end-of-fight overview is readable and the player chooses the next move (a thrown chain still
-    // starts a fight at once — that path doesn't go through here).
     if (rp.encounterGraceUntil && rp.encounterGraceUntil > nowEnc) continue;
-    // TQ-479: lag-compensate — test against where THIS player saw each monster (rewound by their
-    // view-lag), so an approaching monster engages when it looked close on their screen, not earlier.
-    const rew = rewindMonsters(round, rp.viewLagMs, nowEnc); // null → use live positions
-    // NOTE: re-read round.monsters each iteration — startCombat() below removes the engaged monster
-    // from it, so a monster A just engaged must not also be encounterable by B in the same tick.
+    const rew = rewindMonsters(round, rp.viewLagMs, nowEnc);
+    // Re-read round.monsters each iteration: startCombat removes engaged monsters.
     const entry = (round.monsters || []).find((mo) => {
-      if (mo.fleeUntil && mo.fleeUntil > nowEnc) return false; // recently fled this/another player — give room to walk off
+      if (mo.fleeUntil && mo.fleeUntil > nowEnc) return false;
       const p = (rew && rew.get(mo.id)) || mo;
       const dx = p.x - rp.x, dy = p.y - rp.y;
       return dx * dx + dy * dy <= ER2;
@@ -1245,56 +940,38 @@ function tickRound(world, round, dt, send) {
     if (entry) startCombat(world, round, id, entry, send);
   }
 
-  // FFA PvP on collision (P3-T5) — gated until the client UI ships.
   if (world.cfg.pvpEnabled) maybeStartPvp(world, round, send);
 
-  // Extraction loop: timer, shrinking safe zone, portals, extract/zone/timeout.
   updateExtraction(world, round, dt, send);
 
-  if (world.tick % SNAPSHOT_EVERY !== 0) return; // TQ-475: full sim-rate snapshots (was every 2nd tick); AoI-filtered below
-  // Reusable per-category working Maps for diffView (see its doc) — one set per world, reused across every
-  // viewer + tick instead of allocating a fresh Map per category per viewer per tick. Only the internal
-  // `cur` Map is pooled (it never escapes the msg); `upd`/`gone` stay freshly allocated.
+  if (world.tick % SNAPSHOT_EVERY !== 0) return;
   const scr = world._snapCur || (world._snapCur = { players: new Map(), monsters: new Map(), projectiles: new Map(), chests: new Map() });
-  // Reusable per-category AoI-view arrays (the filterRefs output): each is consumed synchronously by
-  // diffView in this viewer's iteration and never escapes the msg (only its ELEMENTS do, via upd, and
-  // those are the per-tick shared view objects — untouched here). So the CONTAINER array is poolable
-  // across viewers/ticks. The 4 categories use 4 DISTINCT arrays so they coexist within one viewer.
   const sv = world._snapView || (world._snapView = { players: [], monsters: [], projectiles: [], chests: [] });
   const all = [...round.players.entries()];
   const monsters = round.monsters || [];
   const projectiles = round.projectiles || [];
   const chests = round.chests || [];
-  // Precompute each entity's viewer-INDEPENDENT snapshot object ONCE per tick, then share the
-  // reference across every viewer's AoI list (see filterRefs). The rival projection also folds its
-  // per-rival session lookup in here, so it's done O(players) times per tick rather than O(players²).
   const monstersView = monsters.map((mo) => ({ id: mo.id, typeName: mo.typeName, level: mo.level, x: Math.round(mo.x), y: Math.round(mo.y) }));
   const playersView = all.map(([oid, orp]) => {
-    const op = world.sessions.get(oid)?.profile; // one session lookup per player per tick, not per viewer
-    return { id: oid, name: op?.name, x: Math.round(orp.x), y: Math.round(orp.y), skinId: op?.equippedSkinId || null, charId: op?.equippedCharId || null, chainTier: getSpiritChain(op?.equippedChainId)?.tier || null }; // SC-tier: each rival's ACTIVE chain tier so its core shows on their model (symmetric with skinId)
+    const op = world.sessions.get(oid)?.profile;
+    return { id: oid, name: op?.name, x: Math.round(orp.x), y: Math.round(orp.y), skinId: op?.equippedSkinId || null, charId: op?.equippedCharId || null, chainTier: getSpiritChain(op?.equippedChainId)?.tier || null };
   });
   const projectilesView = projectiles.map((pr) => ({ id: pr.id, owner: pr.owner, x: Math.round(pr.x), y: Math.round(pr.y), vx: pr.vx, vy: pr.vy, chainId: pr.chainId }));
   const chestsView = chests.map((c) => ({ id: c.id, x: c.x, y: c.y }));
   for (const [id, rp] of all) {
     const s = world.sessions.get(id);
     if (!s) continue;
-    // TQ-476: per-viewer delta baseline. Reset on a new round (roundId change) or an explicit resync
-    // (set on reconnect/resume, where the client cleared its view) → the next snapshot is a full keyframe.
     if (!s.snapBase || s.snapBaseRound !== round.roundId || s.snapResync) {
       s.snapBase = { players: new Map(), monsters: new Map(), projectiles: new Map(), chests: new Map() };
       s.snapBaseRound = round.roundId;
       s.snapResync = false;
-      s.snapYouSig = null; // TQ-493: force the rarely-changing `you` meta to resend on a fresh round / resync
+      s.snapYouSig = null;
     }
     const base = s.snapBase;
-    // AoI: visible monsters within AOI_RADIUS, hidden ones only within REVEAL_RADIUS. Rivals + projectiles
-    // + chests are AoI-filtered the same way; the per-entity view objects were precomputed above.
     const viewP = filterRefs(sv.players, all, playersView, playerInAoi, rp.x, rp.y, id);
     const viewM = filterRefs(sv.monsters, monsters, monstersView, monsterInAoi, rp.x, rp.y);
     const viewPr = filterRefs(sv.projectiles, projectiles, projectilesView, entityInAoi, rp.x, rp.y);
     const viewCh = filterRefs(sv.chests, chests, chestsView, entityInAoi, rp.x, rp.y);
-    // TQ-476: send only what changed since this viewer's baseline. `full` (baseline empty → nothing acked
-    // yet, e.g. fresh round / resync / shed-not-yet-committed) tells the client to RESET its view store.
     const full = base.players.size === 0 && base.monsters.size === 0 && base.projectiles.size === 0 && base.chests.size === 0;
     const dP = diffView(scr.players, base.players, viewP, sigPlayer);
     const dM = diffView(scr.monsters, base.monsters, viewM, sigMon);
@@ -1305,42 +982,34 @@ function tickRound(world, round, dt, send) {
       tick: world.tick,
       roundId: round.roundId,
       full,
-      // TQ-493: `you` carries ONLY the per-tick scalars. The rarely-changing meta (team HP, chains,
-      // equipped loadout, wallet, upgrades) rides in `youMeta`, sent only on change (below).
       you: { id, x: Math.round(rp.x), y: Math.round(rp.y), ack: rp.lastSeq, stamina: Math.round(rp.stamina ?? GAME.SPRINT.STAMINA_MAX), danger: Math.round((rp.danger || 0) * 1000) / 1000 },
       time: Math.ceil(round.remaining ?? 0),
       circle: round.circle || null,
       portals: round.portals || [],
     };
-    // Omit empty entity fields entirely — the client treats an absent category as "no change". (owner on
-    // projectiles: TQ-180 throw-gate; chests stay hidden until opened — clients only learn position.)
     if (dP.upd.length) msg.players = dP.upd; if (dP.gone.length) msg.pGone = dP.gone;
     if (dM.upd.length) msg.monsters = dM.upd; if (dM.gone.length) msg.mGone = dM.gone;
     if (dPr.upd.length) msg.projectiles = dPr.upd; if (dPr.gone.length) msg.prGone = dPr.gone;
     if (dCh.upd.length) msg.chests = dCh.upd; if (dCh.gone.length) msg.chGone = dCh.gone;
-    // TQ-493: attach the rarely-changing `you` meta only when its signature changed since last sent.
     const youMeta = { team: teamHp(s.profile), chains: chainsView(s.profile), equippedChainId: s.profile.equippedChainId || null, equippedChainIds: s.profile.equippedChainIds || [], gold: s.profile.gold || 0, essence: s.profile.essence || 0, upgrades: s.profile.upgrades || {} };
     const youSig = JSON.stringify(youMeta);
     const youChanged = youSig !== s.snapYouSig;
     if (youChanged) msg.youMeta = youMeta;
-    // Advance the baselines ONLY if the frame was actually sent — a shed snapshot (backpressure) leaves the
-    // baseline untouched so the next tick re-derives the full accumulated delta (no lost updates).
+    // Commit baselines only if the frame was sent (shed frames must re-diff).
     if (send(s.ws, msg) !== false) { dP.commit(); dM.commit(); dPr.commit(); dCh.commit(); if (youChanged) s.snapYouSig = youSig; }
   }
 }
 
-// Round timer, shrinking safe zone, portals, and extract/zone/timeout handling.
 function updateExtraction(world, round, dt, send) {
   const cfg = world.cfg;
   const E = GAME.EFFECTIVE_TILE;
-  // TQ-529: adventure rounds have no clock, no storm and no portals — nothing here applies.
   if (round.adventure) {
     round.remaining = 0; round.circleRadius = 0; round.circle = null;
     for (const [id, rp] of round.players) {
       if (rp.inCombat || rp.inPvp) continue;
       if (round.portals.some((pt) => sqDist(pt.x, pt.y, rp.x, rp.y) <= EXTRACT_RADIUS * EXTRACT_RADIUS)) {
         travelRegion(world, round, id, send).catch((e) => console.error("[tamers-quest] travelRegion:", e));
-        return; // the round is loading now
+        return;
       }
     }
     return;
@@ -1348,18 +1017,11 @@ function updateExtraction(world, round, dt, send) {
   const elapsed = (Date.now() - round.startedAtMs) / 1000;
   round.remaining = Math.max(0, cfg.roundDurationS - elapsed);
 
-  // TQ-462/464: a per-round, RANDOMIZED safe-zone CENTER (fixed for the round, derived from the
-  // round seed so it's deterministic/replayable and identical on every client — the zone is
-  // server-authoritative anyway). Kept within an inner margin so the endgame circle isn't jammed
-  // against a map edge. The START radius fully ENCLOSES the map from that off-center point (the
-  // farthest map-corner distance), so when the zone first appears the WHOLE map is inside it — it
-  // begins fully OUTSIDE the map (everywhere safe) and then shrinks inward to 0 at that center.
-  // (Was always the geometric centre, starting at exactly the map half-size.)
   const mapExtent = round.mapSize * E;
   if (round.zoneCx === undefined) {
-    const zr = makeRng((round.seed ^ 0x5a4f4e45) >>> 0); // distinct seeded stream ("ZONE")
+    const zr = makeRng((round.seed ^ 0x5a4f4e45) >>> 0);
     const half = mapExtent / 2;
-    const margin = half * 0.5; // center stays within the central 50% of the map
+    const margin = half * 0.5;
     round.zoneCx = half + (zr.next() * 2 - 1) * margin;
     round.zoneCy = half + (zr.next() * 2 - 1) * margin;
     round.zoneStartR = Math.max(
@@ -1370,8 +1032,6 @@ function updateExtraction(world, round, dt, send) {
     );
   }
   const cx = round.zoneCx, cy = round.zoneCy;
-  // TQ-461: the zone does NOT exist before circleStartS — no circle is sent (client draws nothing)
-  // and no danger accrues. Once it starts it shrinks linearly from zoneStartR (whole map inside) to 0.
   if (elapsed >= cfg.circleStartS) {
     const span = Math.max(1, cfg.roundDurationS - cfg.circleStartS);
     round.circleRadius = Math.max(0, (round.remaining / span) * round.zoneStartR);
@@ -1381,7 +1041,6 @@ function updateExtraction(world, round, dt, send) {
     round.circle = null;
   }
 
-  // Portals appear once the circle starts closing.
   if (elapsed >= cfg.circleStartS && round.map) {
     const want = Math.floor((elapsed - cfg.circleStartS) / cfg.portalIntervalS) + 1;
     while (round.portals.length < want) {
@@ -1392,16 +1051,11 @@ function updateExtraction(world, round, dt, send) {
   for (const [id, rp] of [...round.players]) {
     const s = world.sessions.get(id);
     if (!s) continue;
-    // Extraction: step onto a portal → survive with your gains.
     if (round.portals.some((p) => sqDist(p.x, p.y, rp.x, rp.y) <= EXTRACT_RADIUS * EXTRACT_RADIUS)) {
       endRunForPlayer(world, round, id, "extracted", send);
       continue;
     }
-    // Timeout: failed to escape in time.
     if (round.remaining <= 0) { endRunForPlayer(world, round, id, "timeout", send); continue; }
-    // Zone DANGER meter (not while in an instanced fight or duel — you can't reposition). OUTSIDE
-    // the closing circle the bar fills to full over dangerFillS → death; back in SAFETY it drains
-    // to empty over dangerDrainS (linear). Replaces flat storm HP-attrition as the zone-death rule.
     if (elapsed >= cfg.circleStartS && !rp.inCombat && !rp.inPvp) {
       const outside = sqDist(cx, cy, rp.x, rp.y) > round.circleRadius * round.circleRadius;
       if (outside) {
@@ -1418,21 +1072,11 @@ export function spawnPortal(round, cx, cy) {
   const E = GAME.EFFECTIVE_TILE;
   const map = round.map;
   if (!map) return false;
-  // GP-8: portals were placed with Math.random() → non-reproducible, breaking the
-  // seeded/replayable-round design (every other placement uses the round seed). Use
-  // a persistent per-round seeded stream (lazy-init; distinct constant from the
-  // map-gen and spawn streams) so a given seed always yields the same portals.
   const rng = round.portalRng || (round.portalRng = makeRng((round.seed ^ 0x50525400) >>> 0));
-  // GP-7: spread portals so far-edge players always have a reachable exit. Assign each
-  // new portal to the next quadrant in rotation (the first 4 cover all 4 quadrants),
-  // placed out in that quadrant (min distance from center) rather than clustered. Fall
-  // back to a full-circle search if the assigned quadrant has no walkable tile in range.
   const quad = round.portals.length % 4;
   for (let i = 0; i < 200; i++) {
-    const inQuad = i < 150; // first 150 tries respect the quadrant, then fall back
+    const inQuad = i < 150;
     const ang = inQuad ? quad * (Math.PI / 2) + rng.next() * (Math.PI / 2) : rng.next() * Math.PI * 2;
-    // TQ-464: the zone now starts larger than the map (covers the corners), so cap the portal
-    // spread to the map half-size — otherwise most candidates would land off-map and get rejected.
     const spawnR = Math.min(round.circleRadius, (round.mapSize / 2) * E);
     const dist = (inQuad ? 0.3 + rng.next() * 0.55 : rng.next() * 0.85) * spawnR;
     const tx = Math.floor((cx + Math.cos(ang) * dist) / E);
@@ -1445,9 +1089,6 @@ export function spawnPortal(round, cx, cy) {
   return false;
 }
 
-// ── Round-end gains summary (P8-T3) ──
-// Per-run deltas shown on the extracted/died screen. Baselined at run start
-// (generateRound) on the session, diffed at endRun before the team is mutated.
 const teamXpSum = (team) => (team || []).reduce((n, m) => n + (m.xp || 0), 0);
 const teamLevelSum = (team) => (team || []).reduce((n, m) => n + (m.level || 0), 0);
 export function runStartSnapshot(profile) {
@@ -1471,9 +1112,6 @@ export function computeRunGains(s) {
   };
 }
 
-// Append a compact record of a finished run to the profile's match history (newest first,
-// capped). Powers the profile page's "match history" — the per-run detail the lifetime stat
-// counters (extractions/deaths/caught) can't show. `result` is "extracted" | "died".
 const MATCH_HISTORY_MAX = 20;
 export function logRun(profile, result, reason, gains) {
   if (!profile) return;
@@ -1486,11 +1124,6 @@ export function logRun(profile, result, reason, gains) {
   if (profile.matchHistory.length > MATCH_HISTORY_MAX) profile.matchHistory.length = MATCH_HISTORY_MAX;
 }
 
-// No-contest teardown of an in-progress PvE fight: return the engaged wild monster (+ any
-// multi/area cluster) to the shared map BEFORE deleting the combat, so abandoning a fight
-// (disconnect / extract-while-engaged / round end) doesn't permanently leak it from the round
-// for every other player. startCombat removed them from round.monsters; only a win/catch should
-// keep them gone. Single source for the rule — used by removePlayer and endRunForPlayer.
 function dropCombatNoContest(world, round, combatId) {
   const cs = combatId && world.combats.get(combatId);
   if (cs && round?.monsters) {
@@ -1500,8 +1133,6 @@ function dropCombatNoContest(world, round, combatId) {
   if (combatId) world.combats.delete(combatId);
 }
 
-// Remove the monsters that entered the vault DURING the run (catches with a full team), given the vault ids
-// captured at run start. Returns how many were dropped. No snapshot (an older session) → no-op, never a loss.
 export function dropRunVaultCatches(prof, runVaultIds) {
   if (!Array.isArray(runVaultIds) || !Array.isArray(prof.vaultMonsters)) return 0;
   const keep = new Set(runVaultIds);
@@ -1510,8 +1141,6 @@ export function dropRunVaultCatches(prof, runVaultIds) {
   return before - prof.vaultMonsters.length;
 }
 
-// Remove items picked up DURING the run (chest loot), given the bag ids captured at run start. Items brought
-// into the run stay (items used in combat are already gone). Returns how many were dropped; no snapshot → no-op.
 export function dropRunItems(prof, runItemIds) {
   if (!Array.isArray(runItemIds) || !Array.isArray(prof.items)) return 0;
   const keep = new Set(runItemIds);
@@ -1520,9 +1149,6 @@ export function dropRunItems(prof, runItemIds) {
   return before - prof.items.length;
 }
 
-// What a death would cost from THIS run's finds (beyond the team): monsters caught and chest items picked up
-// since the run started. Sent as a small `atRisk` message whenever it changes, and on resume, so the HUD can
-// show the stakes (run-found chains are already flagged in the chains view).
 export function runAtRisk(s) {
   const keep = new Set(s.runItemIds || []);
   return { catches: s.runCatchCount || 0, items: s.runItemIds ? (s.profile.items || []).filter((i) => !keep.has(i.id)).length : 0 };
@@ -1532,90 +1158,65 @@ function sendAtRisk(s, send) { if (s && s.ws && !s.disconnected) send(s.ws, { t:
 function endRunForPlayer(world, round, id, reason, send) {
   const s = world.sessions.get(id);
   const rp = round.players.get(id);
-  // A player on a portal who is engaged the same tick (hunters now chase onto portals) starts a
-  // combat, then extracts in updateExtraction — return that monster instead of leaking it. (Defeat
-  // already cleared rp.inCombat upstream → no-op; on a timeout the round is ending anyway.)
   if (rp?.inCombat) dropCombatNoContest(world, round, rp.inCombat);
-  if (rp?.inPvp) endPvpFor(world, id, send); // end any duel (no-contest) before leaving
+  if (rp?.inPvp) endPvpFor(world, id, send);
   round.players.delete(id);
-  // Record for the admin live-ops view (P7-T4); keep the last ~30.
   world.recentResults.push({ name: s?.profile?.name || "?", reason, at: Date.now() });
   if (world.recentResults.length > 30) world.recentResults.shift();
-  // Kill feed (P8-T5): tell the players still in the round who just left and why
-  // (`reason` is "extracted" | "timeout" | "zone" | "disconnect"). The leaver is
-  // already removed above, so this reaches the survivors only.
   broadcastToRound(world, round, { t: "killfeed", victim: s?.profile?.name || "?", cause: reason, at: Date.now() }, send);
   if (s) {
     s.state = "idle";
     s.roundId = null;
-    const gains = computeRunGains(s); // P8-T3: compute before death replaces the team
+    const gains = computeRunGains(s); // Must run before loseRunTeam replaces the team.
     s.runStart = null;
     let term;
     if (reason === "returned") {
-      // TQ-529: adventure exit — keep the team as-is (no extract bonus), bank run-found chains, log it.
       finalizeRunChains(s.profile, true, getSpiritChain);
       logRun(s.profile, "returned", reason, gains);
       saveProfile(s.profile);
       term = { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains, profile: welcomePayload(s.profile) };
     } else if (reason === "fainted") {
-      // TQ-529: adventure team wipe — no team loss (relaxed mode); the fainted team heals at the lobby Healer.
       const prof = s.profile;
       finalizeRunChains(prof, true, getSpiritChain);
       logRun(prof, "fainted", reason, gains);
       saveProfile(prof);
       term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains, profile: welcomePayload(prof) };
     } else if (reason === "extracted") {
-      grantExtractRewards(s.profile); // extract gold + XP bonus (shared engine helper — P10-T3). TQ-203/TQ-207: survivors are NOT auto-healed — they keep injured HP; restore at the lobby Healer.
-      finalizeRunChains(s.profile, true, getSpiritChain); // run-found chains banked
-      bumpStat(s.profile, "extractions"); // P8-T1
-      logRun(s.profile, "extracted", reason, gains); // profile-page match history
+      grantExtractRewards(s.profile);
+      finalizeRunChains(s.profile, true, getSpiritChain);
+      bumpStat(s.profile, "extractions");
+      logRun(s.profile, "extracted", reason, gains);
       saveProfile(s.profile);
       term = { t: "extracted", reason, team: s.profile.activeMonsters, stats: s.profile.stats, gains, profile: welcomePayload(s.profile) };
     } else {
-      // Q10: death loses the active run team (vault kept per Q9). Refill from the
-      // vault, else roll fresh starters so a player is never left with nothing.
       const prof = s.profile;
-      bumpStat(prof, "deaths"); // P8-T1
-      logRun(prof, "died", reason, gains); // profile-page match history (before the team is replaced)
-      const lostCatches = dropRunVaultCatches(prof, s.runVaultIds); // monsters caught THIS run (vault side) are lost too
-      const lostItems = dropRunItems(prof, s.runItemIds);            // and items looted from chests this run (like run-found chains)
-      loseRunTeam(prof, rollStarters); // Q10: lose the run team → refill from vault / starters (shared SP↔MP rule)
-      finalizeRunChains(prof, false, getSpiritChain); // run-found chains lost on death
+      bumpStat(prof, "deaths");
+      logRun(prof, "died", reason, gains);
+      const lostCatches = dropRunVaultCatches(prof, s.runVaultIds);
+      const lostItems = dropRunItems(prof, s.runItemIds);
+      loseRunTeam(prof, rollStarters);
+      finalizeRunChains(prof, false, getSpiritChain);
       saveProfile(prof);
       term = { t: "died", reason, team: prof.activeMonsters, stats: prof.stats, gains, lostCatches, lostItems, profile: welcomePayload(prof) };
     }
     s.runVaultIds = null; s.runItemIds = null; s.runCatchCount = 0;
-    // Q12: if the run ended while the player was DISCONNECTED (their round timed out or the storm
-    // killed their team during the grace window), the socket is dead so this terminal message is
-    // lost — and a bare `welcome` on reconnect would leave them frozen on a dead round view. Stash
-    // it and replay on reconnect (the join handler delivers it) so they always get their result.
     if (s.disconnected) s.pendingResult = term; else send(s.ws, term);
-    // TQ-551: a survivor that reached level 30 this run evolves on extraction (off the hot path — the AI call
-    // runs after the result is sent, then pushes an "evolved" moment). Connected extractors only; a
-    // disconnected one's level-30 monsters evolve on their next extraction (the scan is retroactive).
     if (reason === "extracted" && !s.disconnected) triggerEvolutions(s, send).catch(() => {});
   }
   if (round.players.size === 0) world.rounds.delete(round.roundId);
 }
 
-// Evolve any survivors that hit a fixed evolution level (TQ-551). Mutates the profile (repoints the evolved
-// instances to their newly-minted derived types), persists the profile + the evolved-type registry, then
-// pushes an "evolved" message so the client can show the moment + refresh the roster. AI-gated inside
-// processEvolutions/evolveMonster; a no-op when nothing is due. Never throws (fire-and-forget).
 async function triggerEvolutions(s, send) {
   try {
     const events = await processEvolutions(s.profile.activeMonsters, { newId: secureId });
     if (!events.length) return;
     saveProfile(s.profile);
     try { await saveEvolvedTypes(getEvolvedTypes()); } catch (e) { void e; }
-    // Ship the new evolved TYPE defs alongside so the client can resolve + render the evolved form immediately.
     const types = events.map((e) => getMonsterType(e.typeName)).filter(Boolean);
     if (!s.disconnected) send(s.ws, { t: "evolved", events, types, team: s.profile.activeMonsters });
   } catch (e) { void e; }
 }
 
-// Broadcast a message to every connected player currently in a round — kill feed
-// (P8-T5) and any future round-wide notices. Exported for tests.
 export function broadcastToRound(world, round, msg, send) {
   if (!round) return;
   for (const pid of round.players.keys()) {
@@ -1624,8 +1225,6 @@ export function broadcastToRound(world, round, msg, send) {
   }
 }
 
-// Compact per-monster HP for the client HUD (reflects storm/combat damage live).
-// Defensive on type lookup — this runs in the tick loop for every player.
 function teamHp(profile) {
   return (profile.activeMonsters || []).map((m) => {
     const mt = getMonsterType(m.typeName);
@@ -1634,13 +1233,9 @@ function teamHp(profile) {
   });
 }
 
-// Compact mirror of a profile's chain inventory for the snapshot, so the client
-// HUD reflects throwCount/durability the moment the server mutates them.
 function chainsView(profile) {
   return (profile.chains || []).map((c) => {
     const v = { chainId: c.chainId, throwCount: c.throwCount, durability: c.durability };
-    // Surface the provisional (run-found) flag so the client HUD can show what's "at
-    // risk" on death (parity with SP). Only sent when true → negligible bandwidth.
     if (c.runFound) v.runFound = true;
     return v;
   });
@@ -1649,43 +1244,21 @@ function chainsView(profile) {
 
 function sqDist(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
 
-// Single-pass filter+select where the projected value for each kept element is taken from a PARALLEL
-// `view` array (view[i] is the precomputed, viewer-independent snapshot object for src[i]). Lets the
-// per-tick snapshot build each entity's view object ONCE and share the reference across every
-// viewer's AoI list — the objects are read-only (serialized, never mutated). Turns the per-viewer
-// object rebuilds (and, for players, the per-viewer session lookup) into O(entities) instead of
-// O(players × seen) on the dominant outbound path.
-// Select the viewer-independent view[] objects whose src[] entry passes `pred` for this viewer. `pred` is
-// a MODULE-LEVEL function (monsterInAoi/playerInAoi/entityInAoi) given the viewer's position as primitives
-// — so no per-viewer closure is allocated on the 15Hz snapshot tick (TQ-435).
 function filterRefs(out, src, view, pred, px, py, selfId) {
-  out.length = 0; // caller-owned reused scratch (see _snapView) — cleared, then refilled for this viewer
+  out.length = 0;
   for (let i = 0; i < src.length; i++) if (pred(src[i], px, py, selfId)) out.push(view[i]);
   return out;
 }
 
-// Begin an instanced PvE fight between a player and a wild monster entry.
-// `opts.initiator` ("player" when engaged by a thrown chain) grants first-turn
-// initiative; `opts.chainId` is the chain used (tier modifies capture).
 function startCombat(world, round, playerId, entry, send, opts = {}) {
   const s = world.sessions.get(playerId);
   if (!s) return;
   const team = s.profile.activeMonsters || [];
   const activeIdx = team.findIndex((m) => m.currentHealth > 0);
-  if (activeIdx < 0) return; // no usable monster — ignore the encounter
+  if (activeIdx < 0) return;
   const rp = round.players.get(playerId);
-  // Skip if the player is already engaged — in a PvE fight OR a PvP duel. The inPvp
-  // check matters for the thrown-chain path: a player can throw while roaming, then
-  // get pulled into a duel before the in-flight projectile lands on a wild monster;
-  // without this guard that hit would start a PvE fight on top of the duel (the player
-  // ends up in two fights). Every other engagement gate (throw, roam-collision,
-  // maybeStartPvp) already checks both flags — this completes the set.
   if (!rp || rp.inCombat || rp.inPvp) return;
 
-  // FGT-T1: combat is AI-only. With no judge configured (no OPENAI_API_KEY) don't
-  // start a silent deterministic fight — skip the engagement and tell the player
-  // (throttled so a stand-on-a-monster tick loop can't spam). Prod always has the
-  // key, so this is effectively a local-dev guard.
   if (!aiEnabled()) {
     const now = Date.now();
     if (!rp._aiWarnAt || now - rp._aiWarnAt > 8000) {
@@ -1695,22 +1268,19 @@ function startCombat(world, round, playerId, entry, send, opts = {}) {
     return;
   }
 
-  // Q8: partial energy restore per encounter so a depleted team can still fight.
   for (const m of team) if (m.currentHealth > 0) restoreEnergyPartial(m, world.cfg.energyRestorePct);
 
-  // Engaged monsters leave the map. The primary + any multi/area `queue` are
-  // removed together HERE (after the early-return guards) so a failed start never
-  // strands clustered monsters off the map.
+  // Remove from map only after the guards above, or a failed start strands them.
   const queue = opts.queue || [];
   round.monsters = round.monsters.filter((m) => m !== entry && !queue.includes(m));
   const enemy = makeEnemy(entry);
-  const combatId = secureId("c"); world.nextCombat++; // unguessable id (task 49); counter kept for metrics
+  const combatId = secureId("c"); world.nextCombat++;
   world.combats.set(combatId, {
     combatId, playerId, roundId: round.roundId,
     team, activeIdx, enemy, monsterEntry: entry, rng: makeRng(randomSeed()),
     initiator: opts.initiator === "player" ? "player" : "enemy",
     chainId: opts.chainId || s.profile.equippedChainId || null,
-    queue, // remaining monsters in a multi/area capture
+    queue,
   });
   rp.inCombat = combatId;
 
@@ -1723,8 +1293,6 @@ function startCombat(world, round, playerId, entry, send, opts = {}) {
   });
 }
 
-// Finish a combat: unlock movement, apply outcome (catch adds to roster, flee
-// returns the monster to the map), persist, and notify the client.
 function endCombat(world, session, res, send) {
   const s = world.sessions.get(session.playerId);
   if (!s) { world.combats.delete(session.combatId); return; }
@@ -1732,11 +1300,9 @@ function endCombat(world, session, res, send) {
   const rp = round?.players.get(session.playerId);
   if (rp) rp.inCombat = null;
 
-  let caughtPlacement = null; // "team" | "vault" | "released" | null — surfaced to the client
+  let caughtPlacement = null;
   if (res.outcome === "caught") {
     const e = session.enemy;
-    // CB-9: stabilize the catch — it was joining at its near-death combat HP (e.g.
-    // 3/300), useless for the rest of the run. Heal to a usable fraction of max.
     const cs = getMonsterStats(getMonsterType(e.typeName), e.level);
     const caught = {
       id: newMonsterId(),
@@ -1745,26 +1311,15 @@ function endCombat(world, session, res, send) {
       currentEnergy: Math.round(cs.energy * GAME.CATCH_HEAL_FRACTION), status: null,
     };
     const prof = s.profile;
-    // PT2-T11 PARITY-3: team-or-vault placement (capped) is the shared engine rule
-    // now (engine/inventory.js), so SP + MP can't drift on the vault cap.
     caughtPlacement = addCaughtMonster(prof, caught);
-    // Only count a catch the player actually KEEPS. A full team+vault drops the monster
-    // ("released"); counting it would inflate both the lifetime "caught" stat AND the
-    // run-gains summary (computeRunGains reads the same counter as a delta), telling the
-    // player they kept a monster that vanished. The chain charge is still spent below —
-    // the capture itself succeeded; there was just nowhere to store the result.
-    if (caughtPlacement !== "released") { bumpStat(prof, "caught"); s.runCatchCount = (s.runCatchCount || 0) + 1; sendAtRisk(s, send); } // P8-T1
-    consumeChainCharge(prof, session.chainId); // spend one capture charge
+    if (caughtPlacement !== "released") { bumpStat(prof, "caught"); s.runCatchCount = (s.runCatchCount || 0) + 1; sendAtRisk(s, send); }
+    consumeChainCharge(prof, session.chainId);
   } else if (res.outcome === "won") {
     s.profile.gold = (s.profile.gold || 0) + defeatGold(s.profile, session.enemy?.level || 1);
-    grantPlayerXp(s.profile, playerDefeatXp(session.enemy?.level || 1)); // TQ-186: account-XP prestige track per wild defeat
-    grantBattlePassXp(s.profile, battlePassDefeatXp(session.enemy?.level || 1)); // TQ-182: battle-pass XP per wild defeat
-    // TQ-132: no essence reward — essence is premium/paid, not earned in runs.
+    grantPlayerXp(s.profile, playerDefeatXp(session.enemy?.level || 1));
+    grantBattlePassXp(s.profile, battlePassDefeatXp(session.enemy?.level || 1));
   } else if (res.outcome === "fled" && round && session.monsterEntry) {
     const me = session.monsterEntry;
-    // Don't drop the fled monster on top of the player (they'd be re-engaged the same instant — flee
-    // felt broken). Nudge it to a nearby WALKABLE spot away from the player, and give it a brief
-    // cooldown so the encounter check + hunter approach leave it alone while the player walks off.
     if (rp && round.map) {
       const push = world.cfg.encounterRadius * 2.6;
       for (let i = 0; i < 10; i++) {
@@ -1773,33 +1328,19 @@ function endCombat(world, session, res, send) {
       }
     }
     me.fleeUntil = Date.now() + 4000;
-    round.monsters.push(me); // monster returns to the map (displaced + on a short post-flee cooldown)
+    round.monsters.push(me);
   }
-  // won: monster stays removed. lost: handled just below (it ENDS the run).
 
-  // Multi/area chain: flee/lose abandons the cluster (queued monsters go back to
-  // the map so they're not lost); win/catch continues to the next queued monster.
   const cont = res.outcome === "won" || res.outcome === "caught";
   const queue = session.queue || [];
   if (!cont && round) for (const e of queue) round.monsters.push(e);
 
-  // Q10: a combat WIPE is a DEFEAT — end the run with the team-loss penalty, exactly like
-  // storm / timeout / disconnect (wiki §Outcomes: "Defeat (combat wipe, storm, timeout, or
-  // disconnect) → lose the active run team"). Previously a wipe only sent a `combatEnd` and
-  // dropped the player back into the overworld with a fainted team — who could then walk onto
-  // an extraction portal and EXTRACT for a free full heal + gains, dodging the Q10 penalty
-  // entirely (updateExtraction has no living-team check). endRunForPlayer applies loseRunTeam,
-  // drops run-found chains, removes them from the round, and sends the "died" terminal — which
-  // net.js handles by clearing the client combat overlay (state.combat = null). This mirrors
-  // the existing timeout-DURING-combat path (updateExtraction times out without an inCombat guard).
   if (res.outcome === "lost") {
-    world.combats.delete(session.combatId); // rp.inCombat was already cleared above, so endRun won't
-    if (round) endRunForPlayer(world, round, session.playerId, round.adventure ? "fainted" : "defeat", send); // TQ-529: adventure wipe = carried home, team kept
+    world.combats.delete(session.combatId);
+    if (round) endRunForPlayer(world, round, session.playerId, round.adventure ? "fainted" : "defeat", send);
     return;
   }
 
-  // Task 46 / monster-gen spec: status effects are PER-FIGHT — the AI judge sets them
-  // during a fight; clear the team's status once the fight ends (HP/energy persist).
   for (const m of s.profile.activeMonsters || []) m.status = null;
   saveProfile(s.profile);
   world.combats.delete(session.combatId);
@@ -1807,26 +1348,21 @@ function endCombat(world, session, res, send) {
     t: "combatEnd",
     combatId: session.combatId,
     outcome: res.outcome,
-    caughtPlacement, // where a catch landed ("team"/"vault"/"released") so the client can tell the truth
-    gains: res.gains || null,   // TQ-554: { monster, xp, levelFrom, levelTo, xpNow, xpNeed } on a win → end-of-fight overview
-    caught: res.caught || null, // TQ-554: the caught monster's snapshot (name/level) for the overview
+    caughtPlacement,
+    gains: res.gains || null,
+    caught: res.caught || null,
     team: s.profile.activeMonsters,
-    queued: cont && queue.length > 0, // hint: another multi/area fight follows
+    queued: cont && queue.length > 0,
   });
 
-  // Continue a multi/area capture: immediately engage the next queued monster
-  // (thrower keeps initiative; the same chain keeps applying + consuming charges).
   if (cont && rp && queue.length && (s.profile.activeMonsters || []).some((m) => m.currentHealth > 0)) {
     const next = queue.shift();
     startCombat(world, round, session.playerId, next, send, { initiator: "player", chainId: session.chainId, queue });
   } else if (rp) {
-    rp.encounterGraceUntil = Date.now() + ENCOUNTER_GRACE_MS; // let the overview land before the next ambush
+    rp.encounterGraceUntil = Date.now() + ENCOUNTER_GRACE_MS;
   }
 }
 const ENCOUNTER_GRACE_MS = 3000;
-// Spawn protection: no wild monster within SPAWN_CLEAR_TILES of a fresh spawn (they are removed from the round —
-// mapgen scatters monsters anywhere walkable, including the spawn tile, which started a fight on frame one), and
-// the same post-fight grace applies on arrival so an approaching hunter can't engage before the player has moved.
 const SPAWN_CLEAR_TILES = 4;
 export function clearSpawnArea(round, rp, now = Date.now()) {
   const R = SPAWN_CLEAR_TILES * GAME.EFFECTIVE_TILE, R2 = R * R;
@@ -1834,8 +1370,6 @@ export function clearSpawnArea(round, rp, now = Date.now()) {
   rp.encounterGraceUntil = now + ENCOUNTER_GRACE_MS;
 }
 
-// Spend one capture charge on the chain used; remove it when depleted and
-// re-point the equipped id at a remaining chain. Caller persists via saveProfile.
 function consumeChainCharge(profile, chainId) {
   if (!chainId) return;
   const chains = profile.chains || [];
@@ -1844,22 +1378,17 @@ function consumeChainCharge(profile, chainId) {
   cs.durability -= 1;
   if (cs.durability <= 0) {
     chains.splice(chains.indexOf(cs), 1);
-    // Drop the spent chain from the 3-slot loadout, then backfill the freed slot from
-    // the remaining inventory and re-point the active chain (CHAIN_SLOTS, 2026-06-10).
     profile.equippedChainIds = (profile.equippedChainIds || []).filter((id) => id !== chainId);
     ensureChainSlots(profile);
   }
 }
 
-// Place loot chests against walls, deterministically from the round seed.
-// Each chest sits on a walkable tile adjacent to a wall/void and holds 1–2
-// randomized chains (weighted by dropWeight via rollChainDrop).
 function spawnChests(round, map) {
   const out = [];
   if (!map?.voidMap) return out;
   const E = GAME.EFFECTIVE_TILE, N = round.mapSize;
   const defs = getSpiritChains();
-  const rng = makeRng((round.seed ^ 0x517cc1b7) >>> 0); // distinct stream from map/spawn gen
+  const rng = makeRng((round.seed ^ 0x517cc1b7) >>> 0);
   const wall = (x, y) => x < 0 || x >= N || y < 0 || y >= N || !map.voidMap[x]?.[y] || map.tileMap?.[x]?.[y]?.collidable;
   const againstWall = (x, y) => wall(x - 1, y) || wall(x + 1, y) || wall(x, y - 1) || wall(x, y + 1);
   for (let i = 0; i < GAME.SPIRIT_CHAIN.CHESTS_PER_RUN; i++) {
@@ -1869,9 +1398,6 @@ function spawnChests(round, map) {
       const count = rng.next() < 0.35 ? 2 : 1;
       const loot = [];
       for (let n = 0; n < count; n++) { const d = rollChainDrop(defs, rng); if (d) loot.push(d.id); }
-      // Item drop (plan "Decide general items"): ITEM_DROP_CHANCE per chest to hold one AI item; the
-      // WHICH-item pick is RARITY-WEIGHTED (TQ-65) so rarer items drop less often. Both rolls use the
-      // SEEDED rng so loot is reproducible. Empty pool → no item (graceful).
       const pool = getItems();
       const item = pool.length && rng.next() < ITEM_DROP_CHANCE ? rollItemFromPool(pool, rng.next()).name : null;
       if (loot.length || item) out.push({ id: `ch${i}`, x: tx * E + E / 2, y: ty * E + E / 2, loot, item });
@@ -1881,8 +1407,6 @@ function spawnChests(round, map) {
   return out;
 }
 
-// Open a chest when a roaming player reaches it (server-authoritative grant).
-// Granted chains are flagged run-found (provisional until extraction).
 function processChests(world, round, send) {
   if (!round.chests || round.chests.length === 0) return;
   const r2 = GAME.SPIRIT_CHAIN.PICKUP_RADIUS * GAME.SPIRIT_CHAIN.PICKUP_RADIUS;
@@ -1897,41 +1421,30 @@ function processChests(world, round, send) {
         const def = getSpiritChain(chainId);
         if (def) grantChain(s.profile, chainId, def, true);
       }
-      // Item loot (plan "Decide general items"): grant the chest's item into the profile's
-      // item bag, capped so repeated runs can't grow it unbounded (twin of the chain/vault caps).
       if (chest.item) {
         const def = getItem(chest.item);
         if (def) {
           s.profile.items = (s.profile.items || []);
           if (s.profile.items.length < GAME.ITEM_BAG_SIZE) {
-            // TQ-64: carry the item's structured category/rarity/effect onto the bag entry so combat
-            // can apply a consistent effect and the Items tab can show rarity (older items default).
-            s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description, category: def.category, rarity: def.rarity, effect: def.effect, ...(def.html ? { html: def.html } : {}) }); // carry the authored html icon (TQ-393) so a looted GENERATED item shows its real icon in the bag instead of text-only
+            s.profile.items.push({ id: newMonsterId(), name: def.name, description: def.description, category: def.category, rarity: def.rarity, effect: def.effect, ...(def.html ? { html: def.html } : {}) });
           } else if (s.ws) {
-            // TQ-66: bag full (ITEM_BAG_SIZE). The item is left behind rather than silently
-            // lost — tell the player so a full bag is well-defined behaviour, mirroring the
-            // full-vault "released" catch rule. They can free a slot in the Items tab to loot more.
             send(s.ws, { t: "lootNotice", text: `Bag full — left ${def.name} behind` });
           }
         }
       }
-      if (chest.item) sendAtRisk(s, send); // the bag changed: refresh the HUD's at-risk count
-      saveProfile(s.profile); // TQ-132: chests no longer grant essence (premium/paid, not earned)
+      if (chest.item) sendAtRisk(s, send);
+      saveProfile(s.profile);
     }
     round.chests.splice(idx, 1);
   }
 }
 
-// Spawn queued spirit-chain throws (validated against authoritative state).
 function processThrows(world, round) {
   for (const [id, rp] of round.players) {
     if (!rp.pendingThrow) continue;
     const pt = rp.pendingThrow;
     rp.pendingThrow = null;
     if (rp.inCombat || rp.inPvp) continue;
-    // TQ-180: return-gated throw cooldown — at most one in-flight chain per player. Block a new
-    // throw while this player's previous chain is still out (the boomerang hasn't returned yet); it
-    // re-enables the moment the chain returns / is cleaned up (PROJECTILE_TTL_S frees a lost one).
     if (round.projectiles.some((pr) => pr.owner === id)) continue;
     const s = world.sessions.get(id);
     if (!s) continue;
@@ -1940,8 +1453,6 @@ function processThrows(world, round) {
     const def = cs && getSpiritChain(cs.chainId);
     if (!def || !canThrow(cs)) continue;
     const len = Math.hypot(pt.dx, pt.dy) || 1;
-    // TQ-450: a charged throw (held key/button) flies farther + faster; the TTL scales with range so the
-    // longer boomerang arc still has time to return. charge 0 (a tap) reproduces the original throw exactly.
     const SC = GAME.SPIRIT_CHAIN, charge = Math.max(0, Math.min(1, pt.charge || 0));
     const rangeMult = 1 + SC.CHARGE_RANGE_BONUS * charge;
     const speed = def.throwSpeed * (1 + SC.CHARGE_SPEED_BONUS * charge);
@@ -1954,14 +1465,9 @@ function processThrows(world, round) {
       dist: 0, maxDist: def.throwRange * rangeMult, ttl: SC.PROJECTILE_TTL_S * rangeMult,
       chainId: def.id, speed,
     });
-    // Boomerang (user 2026-06-10): an overworld throw is FREE — the chain returns to the
-    // tamer (stepProjectiles homes it back). No throwCount is spent; a chain is only
-    // consumed (a durability charge) when it captures a monster in battle. So no profile
-    // mutation here → nothing to persist.
   }
 }
 
-// Advance projectiles; resolve hits vs monsters (and players when PvP is on).
 function stepProjectiles(world, round, dt, send) {
   if (!round.projectiles || round.projectiles.length === 0) return;
   const HR2 = GAME.SPIRIT_CHAIN.HIT_RADIUS * GAME.SPIRIT_CHAIN.HIT_RADIUS;
@@ -1970,15 +1476,11 @@ function stepProjectiles(world, round, dt, send) {
     pr.x += pr.vx * dt; pr.y += pr.vy * dt;
     pr.dist += pr.speed * dt; pr.ttl -= dt;
 
-    // vs monsters
     const mon = (round.monsters || []).find((mo) => sqDist(mo.x, mo.y, pr.x, pr.y) <= HR2);
     if (mon) {
       const def = getSpiritChain(pr.chainId);
       let queue = [];
       if (def?.special === "multi") {
-        // Hydra Lash: pull the nearest cluster into a sequential multi-capture.
-        // startCombat removes the cluster from the map (after its start guards),
-        // so a failed engage doesn't strand them.
         queue = clusterTargets(mon, (round.monsters || []).filter((m) => m !== mon),
           GAME.SPIRIT_CHAIN.MULTI_CHAIN_RADIUS, GAME.SPIRIT_CHAIN.MULTI_MAX_TARGETS - 1);
       }
@@ -1986,7 +1488,6 @@ function stepProjectiles(world, round, dt, send) {
       continue;
     }
 
-    // vs other players (PvP engage — thrower gets initiative)
     if (world.cfg.pvpEnabled) {
       let hitPid = null;
       for (const [oid, orp] of round.players) {
@@ -1996,39 +1497,24 @@ function stepProjectiles(world, round, dt, send) {
       if (hitPid) { startPvp(world, round, pr.owner, hitPid, send, pr.owner); continue; }
     }
 
-    // expiry / boomerang: overworld throws are FREE (user 2026-06-10) — a chain that
-    // reaches its range or a wall turns around and homes back to the tamer, then despawns
-    // when it returns (or on the ttl safety cap). It can still snag a monster/rival on the
-    // way back (the hit checks above run every step). No throwCount is spent; only a battle
-    // capture costs a durability charge.
-    if (pr.ttl <= 0) continue; // safety cap reached → despawn
+    if (pr.ttl <= 0) continue;
     const owner = round.players.get(pr.owner);
     if (!pr.returning && (pr.dist >= pr.maxDist || !isWalkable(round.map, pr.x, pr.y))) {
       pr.returning = true;
-      pr.x -= pr.vx * dt; pr.y -= pr.vy * dt; // back off the range edge / wall before homing
+      pr.x -= pr.vx * dt; pr.y -= pr.vy * dt;
     }
     if (pr.returning) {
-      if (!owner) continue; // thrower left the round → nothing to return to; despawn
+      if (!owner) continue;
       const dx = owner.x - pr.x, dy = owner.y - pr.y, d = Math.hypot(dx, dy) || 1;
-      if (d <= GAME.SPIRIT_CHAIN.PICKUP_RADIUS) continue; // returned to the tamer → despawn
-      pr.vx = (dx / d) * pr.speed; pr.vy = (dy / d) * pr.speed; // home back in
+      if (d <= GAME.SPIRIT_CHAIN.PICKUP_RADIUS) continue;
+      pr.vx = (dx / d) * pr.speed; pr.vy = (dy / d) * pr.speed;
     }
     keep.push(pr);
   }
   round.projectiles = keep;
 }
 
-// Tile collision: voidMap truthy = walkable floor (DLA-carved). World coord /
-// EFFECTIVE_TILE = tile index. No map yet (still loading) → permissive.
-// (isWalkable now imported from engine/mapgen.js — single shared collision rule for
-// the server, SP game.js, and MP movement prediction; no duplicate copies to drift.)
-
-// The `welcome` payload (the authoritative profile snapshot the client renders). Factored so every
-// sender (the join handler, etc.) emits an identical, current view.
-// TQ-551: the evolved TYPE definitions a profile's monsters reference. Evolved types are excluded from
-// /api/monstertypes (the client's boot type source), so without this the client can't resolve an evolved
-// monster's typeName → it would render with fallback stats/visual. Sent in the welcome payload (reload-safe)
-// and the live "evolved" message so the client registers them (addEvolvedType) before rendering the monster.
+// /api/monstertypes excludes evolved types: client needs these defs to render.
 function ownedEvolvedTypes(profile) {
   const seen = new Set(), out = [];
   for (const m of [...(profile.activeMonsters || []), ...(profile.vaultMonsters || [])]) {
@@ -2043,30 +1529,23 @@ function welcomePayload(profile) {
   return {
     id: profile.id, nickname: profile.name, isGuest: !!profile.isGuest, token: profile.token,
     team: profile.activeMonsters, vault: profile.vaultMonsters || [], stats: profile.stats || {},
-    evolvedTypes: ownedEvolvedTypes(profile), // TQ-551: defs for the client to render evolved monsters
+    evolvedTypes: ownedEvolvedTypes(profile),
     chains: profile.chains || [], equippedChainId: profile.equippedChainId || null,
-    equippedChainIds: profile.equippedChainIds || [], // CHAIN_SLOTS: the 3-slot loadout
+    equippedChainIds: profile.equippedChainIds || [],
     gold: profile.gold || 0, essence: profile.essence || 0, upgrades: profile.upgrades || {},
-    level: profile.level || 1, xp: profile.xp || 0, // TQ-186: account prestige level + carry-over XP
+    level: profile.level || 1, xp: profile.xp || 0,
     ownedCosmetics: profile.ownedCosmetics || { chain: [], char: [] }, items: profile.items || [],
-    bpSeasonId: profile.bpSeasonId || null, bpXp: profile.bpXp || 0, bpClaimed: profile.bpClaimed || [], // TQ-182: battle-pass progress
-    adFree: !!profile.adFree, // TQ-174: ad-free entitlement (server-authoritative; ad rendering reads isAdFree)
-    subscribed: !!profile.subscribed, // TQ-267: legacy/perpetual subscription flag (back-compat)
-    subscribedUntil: profile.subscribedUntil || 0, // TQ-270: recurring-subscription expiry (epoch ms; 0 = none). Active while now < this — premium battle-pass track + status read this
+    bpSeasonId: profile.bpSeasonId || null, bpXp: profile.bpXp || 0, bpClaimed: profile.bpClaimed || [],
+    adFree: !!profile.adFree,
+    subscribed: !!profile.subscribed,
+    subscribedUntil: profile.subscribedUntil || 0,
   };
 }
 
-// (TQ-38 / TQ-91 Option C: the local→server import path was removed — everyone starts on the server
-// profile, nothing client-supplied is merged. This also closed the TQ-80 import cheat.)
-
 function sanitizeNick(n) {
-  // SEC-A4 defense-in-depth: strip control chars + HTML angle brackets at the source.
-  // A display name has no need for < or >, and nicks are attacker-controlled and render
-  // in several HTML spots (leaderboard, admin live-ops) as well as the canvas. The render
-  // sites escape today, but stripping here means a future un-escaped HTML render site
-  // can't be turned into a stored-XSS vector (defense at the source, like the prompt sanitizer).
+  // Strip <> and control chars: nicks render in HTML (stored-XSS defense).
   const s = (typeof n === "string" ? n : "")
-    .replace(/[\u0000-\u001f\u007f<>]/g, "") // C0 control chars, DEL, and the < > tag delimiters
+    .replace(/[\u0000-\u001f\u007f<>]/g, "")
     .trim()
     .replace(/\s+/g, " ");
   return (s || "Tamer").slice(0, 20);

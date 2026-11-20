@@ -8,9 +8,6 @@ import {
   subscriptionActive, grantSubscription, clearSubscription,
 } from "./schemas.js";
 
-// The chain economy + extraction stakes are pure, shared SP↔MP, and were untested —
-// a silent regression here would corrupt the core risk/reward loot loop. `getChain`
-// stub resolves any id to a minimal def (finalizeRunChains' chainless-safety fallback).
 const getChain = () => ({ throwCount: 3, durability: 1 });
 
 test("TQ-174: ad-free entitlement — fresh profiles start ad-supported; grantAdFree is permanent + idempotent", () => {
@@ -20,7 +17,7 @@ test("TQ-174: ad-free entitlement — fresh profiles start ad-supported; grantAd
   grantAdFree(p);
   assert.equal(p.adFree, true);
   assert.equal(isAdFree(p), true);
-  grantAdFree(p); // idempotent (a flag)
+  grantAdFree(p);
   assert.equal(p.adFree, true);
 });
 
@@ -48,19 +45,15 @@ test("TQ-267: subscriptionActive — fresh profile inactive; expiry-based active
 test("TQ-267: grant/clear subscription drive the entitlement; lapse keeps earned content (isAdFree + isPremium follow)", () => {
   const now = 5_000_000;
   const p = createPlayerProfile({ id: "u2", name: "Sub" });
-  // Grant to a future period end → ad-free + premium entitlement both active.
   grantSubscription(p, now + 10_000);
   assert.equal(p.subscribedUntil, now + 10_000);
   assert.equal(subscriptionActive(p, now), true);
   assert.equal(isAdFree(p, now), true, "an active subscription grants ad-free");
-  // An out-of-order/earlier webhook must NOT shorten an active sub (keeps the latest period end).
   grantSubscription(p, now + 5_000);
   assert.equal(p.subscribedUntil, now + 10_000, "keeps the latest period end");
-  // Past the period end → lapsed: ad-free returns to false, but already-set adFree flag / data survive.
   assert.equal(isAdFree(p, now + 20_000), false, "lapsed subscription no longer grants ad-free");
-  p.adFree = true; // a separate standalone remove-ads purchase persists across a lapse
+  p.adFree = true;
   assert.equal(isAdFree(p, now + 20_000), true, "standalone adFree still ad-free after the sub lapses");
-  // Explicit clear (cancel) zeroes the expiry but leaves adFree untouched (TQ-76 lapse policy).
   clearSubscription(p);
   assert.equal(p.subscribedUntil, 0);
   assert.equal(subscriptionActive(p, now), false);
@@ -106,7 +99,7 @@ test("grantChain: adds a new instance, flags run-found loot, auto-equips when em
 
 test("grantChain: a banked (shop/craft) grant of an owned chain refills counters + clears run-found", () => {
   const profile = { chains: [{ chainId: "iron", throwCount: 1, durability: 0, runFound: true }], equippedChainId: "iron" };
-  grantChain(profile, "iron", { throwCount: null, durability: 3 }, false); // runFound=false → bank grant
+  grantChain(profile, "iron", { throwCount: null, durability: 3 }, false);
   assert.equal(profile.chains.length, 1, "tops up the existing instance, no duplicate");
   assert.equal(profile.chains[0].durability, 3, "counters refilled to the def maxima");
   assert.equal(profile.chains[0].runFound, undefined, "a paid refill can't be forfeited on death");
@@ -175,7 +168,7 @@ test("createPlayerProfile: fresh profile defaults + isGuest coercion", () => {
   assert.equal(p.isGuest, false);
   assert.deepEqual(p.activeMonsters, []);
   assert.deepEqual(p.vaultMonsters, []);
-  assert.deepEqual(p.items, []); // combat-item bag must be a canonical field, not a defensive `|| []`
+  assert.deepEqual(p.items, []);
   assert.deepEqual(p.chains, []);
   assert.equal(p.equippedChainId, null);
   assert.equal(createPlayerProfile({ id: 2, name: "G", isGuest: 1 }).isGuest, true, "isGuest coerced to boolean");
@@ -188,6 +181,6 @@ test("grantStarterInventory: grants the starter chain set, idempotent, auto-equi
   const n = p.chains.length;
   assert.equal(n, GAME.SPIRIT_CHAIN.STARTER_CHAIN_IDS.length, "grants the full starter set");
   assert.equal(p.equippedChainId, p.chains[0].chainId, "auto-equipped the first starter");
-  grantStarterInventory(p, getChain); // re-run
+  grantStarterInventory(p, getChain);
   assert.equal(p.chains.length, n, "idempotent — no duplicate grants");
 });

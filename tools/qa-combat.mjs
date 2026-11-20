@@ -1,6 +1,4 @@
-// Combat QA against the local MOCK judge: enter a solo run, walk into a wild monster (ENCOUNTER_RADIUS=600 on
-// the server makes that quick), attack until the fight ends, screenshot the end-of-fight overview; then
-// fight again and CATCH. Prints the combatEnd payload (outcome / gains / caught / placement).
+// Combat + catch QA. Needs: npx vite, node tools/mock-llm.mjs, server with OPENAI_API_KEY=test OPENAI_BASE_URL=http://localhost:8099/v1 ENCOUNTER_RADIUS=600.
 import { chromium, devices } from "playwright";
 import { mkdirSync } from "node:fs";
 const URL = process.env.GAME_URL || "http://localhost:5173";
@@ -23,7 +21,7 @@ await p.fill('input[placeholder="Character name"]', "Scout").catch(() => {}); aw
 await p.evaluate(() => window.__openStation && window.__openStation("portal")); await sleep(1200);
 if (MOBILE) await p.touchscreen.tap(vp.width / 2, 140); else await p.mouse.click(640, 208);
 await sleep(8000);
-await p.keyboard.press("KeyD"); await sleep(800); // dismiss onboarding
+await p.keyboard.press("KeyD"); await sleep(800);
 const walkUntilCombat = async () => {
   const dirs = ["KeyD", "KeyS", "KeyA", "KeyW"];
   for (let i = 0; i < 40; i++) {
@@ -37,12 +35,11 @@ const walkUntilCombat = async () => {
 const fight = async (mode, tag) => {
   if (!(await walkUntilCombat())) { console.log("no combat reached"); return; }
   await sleep(1500); await shot(`${tag}-0-start`);
-  // PRE_COMBAT: optional JS to stage the open fight (e.g. a long attack name), then a second shot.
   if (process.env.PRE_COMBAT) { await p.evaluate((code) => { try { (0, eval)(code); } catch (e) { console.log("PRE failed", e.message); } }, process.env.PRE_COMBAT); await sleep(400); await shot(`${tag}-0-staged`); if (process.env.STAGED_WAIT) { await sleep(Number(process.env.STAGED_WAIT)); await shot(`${tag}-0-staged-later`); } }
   for (let turn = 0; turn < (Number(process.env.MAXT) || 10); turn++) {
     const before = await st(); if (before.outcome) break;
     await p.keyboard.press(mode === "catch" ? "KeyC" : "Digit1");
-    if (process.env.CPUPROF && turn === 0) { // CPU profile across the first action: top self-time functions
+    if (process.env.CPUPROF && turn === 0) {
       const cdp = await p.context().newCDPSession(p);
       await cdp.send("Profiler.enable"); await cdp.send("Profiler.setSamplingInterval", { interval: 500 }); await cdp.send("Profiler.start");
       await sleep(Number(process.env.CPUPROF) || 6000);
@@ -51,20 +48,19 @@ const fight = async (mode, tag) => {
       const dt = profile.timeDeltas || []; const tick = new Map();
       (profile.samples || []).forEach((id, i) => tick.set(id, (tick.get(id) || 0) + (dt[i] || 0)));
       for (const [id, us] of tick) { const n = byId.get(id); const cf = n.callFrame; const key = `${cf.functionName || "(anon)"} ${cf.url.split("/").pop()}:${cf.lineNumber + 1}`; self.set(key, (self.get(key) || 0) + us); }
-      // Caller chains of the hottest native call (e.g. getImageData): walk parents of its sample nodes.
       const parent = new Map(); for (const n of profile.nodes) for (const c of n.children || []) parent.set(c, n.id);
       const hot = [...tick.entries()].sort((a, b) => b[1] - a[1])[0];
       if (hot) { const chains = new Map(); for (const [id, us] of tick) { if (byId.get(id).callFrame.functionName !== byId.get(hot[0]).callFrame.functionName) continue; let cur = parent.get(id), chain = []; while (cur && chain.length < 7) { const cf = byId.get(cur).callFrame; chain.push(`${cf.functionName || "(anon)"}:${cf.url.split("/").pop().split("?")[0]}:${cf.lineNumber + 1}`); cur = parent.get(cur); } const key2 = chain.join(" < "); chains.set(key2, (chains.get(key2) || 0) + us); }
         console.log("callers of", byId.get(hot[0]).callFrame.functionName); [...chains.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).forEach(([c, us]) => console.log("  ", Math.round(us / 1000) + "ms", c)); }
       console.log("CPU top:"); [...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).forEach(([k2, us]) => console.log("  ", Math.round(us / 1000) + "ms", k2));
     }
-    if (process.env.FRAMEPROBE && turn === 0) { // rAF gap probe over the first action (a long gap = a frozen page)
+    if (process.env.FRAMEPROBE && turn === 0) {
       await p.evaluate(() => { window.__gaps = []; let last = performance.now(); const t0 = last; const f = () => { const n = performance.now(); const c = globalThis.__net?.state?.combat; window.__gaps.push([Math.round(n - last), Math.round(n - t0), c ? `${c.outcome || "-"}/${(c.log || []).length}` : "none"]); last = n; if (n - t0 < 4000) requestAnimationFrame(f); }; requestAnimationFrame(f); });
       await sleep(4500);
       const g = await p.evaluate(() => window.__gaps); const sorted = [...g].sort((a, b) => b[0] - a[0]);
       console.log("frames", g.length, "worst gaps [ms, at ms, outcome/log]", sorted.slice(0, 5).map((x) => x.join("@")).join("  "));
     }
-    if (process.env.MIDSHOTS && turn === 0) { for (const ms of [350, 900, 1600]) { await sleep(ms === 350 ? 350 : ms === 900 ? 550 : 700); await shot(`${tag}-mid-${ms}`); } } // the throw / hold / resolve frames of the first action
+    if (process.env.MIDSHOTS && turn === 0) { for (const ms of [350, 900, 1600]) { await sleep(ms === 350 ? 350 : ms === 900 ? 550 : 700); await shot(`${tag}-mid-${ms}`); } }
     for (let w = 0; w < 30; w++) { await sleep(300); const s = await st(); if (s.outcome || s.logLen > before.logLen) break; }
   }
   await sleep(800);

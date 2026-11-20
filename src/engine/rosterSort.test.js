@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { sortMonsters, sortChainsByTier, nextSortMode, SORT_MODES, searchMonsters } from "./rosterSort.js";
 
-// typeName → {rarity}
 const TYPES = {
   Ember: { rarity: 5 },
   Wave: { rarity: 2 },
@@ -25,7 +24,6 @@ test("level mode sorts highest level first", () => {
 });
 
 test("rarity mode sorts highest type-rarity first (stable within a rarity)", () => {
-  // Ember=5, Gale=4, Wave=2; the two Embers keep input order (Ember1 before Ember9).
   assert.deepEqual(ids(sortMonsters(list, "rarity", typeOf)), ["Ember1", "Ember9", "Gale7", "Wave3"]);
 });
 
@@ -37,7 +35,7 @@ test("does not mutate the input list", () => {
 
 test("missing type data sorts last, never throws", () => {
   const l = [mk("Unknown", 1), mk("Ember", 1)];
-  const out = sortMonsters(l, "rarity", typeOf); // Unknown has no type → rarity 0 sorts last
+  const out = sortMonsters(l, "rarity", typeOf);
   assert.deepEqual(ids(out), ["Ember1", "Unknown1"]);
 });
 
@@ -66,8 +64,8 @@ test("searchMonsters: matches type name, is case-insensitive, returns same objec
 });
 
 test("searchMonsters: matches type name + custom display name; substring; no match → []", () => {
-  assert.deepEqual(ids(searchMonsters(list, "wav", typeOf)), ["Wave3"]); // substring of type name
+  assert.deepEqual(ids(searchMonsters(list, "wav", typeOf)), ["Wave3"]);
   const named = [{ id: "x", typeName: "Wave", name: "Bubbles" }];
-  assert.deepEqual(ids(searchMonsters(named, "bubb", typeOf)), ["x"]); // by display name
+  assert.deepEqual(ids(searchMonsters(named, "bubb", typeOf)), ["x"]);
   assert.deepEqual(ids(searchMonsters(list, "zzz", typeOf)), []);
 });

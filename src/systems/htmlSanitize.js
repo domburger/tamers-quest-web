@@ -1,37 +1,20 @@
-// TQ-261 — SECURITY-CRITICAL sanitizer for untrusted LLM-authored monster HTML/CSS (the HTML-swap
-// visual builder, TQ-255). Unlike the SVG path (svgModel.js), HTML monsters render as LIVE DOM with
-// no rasterize <img> escape hatch — so this sanitizer is the ONLY thing between injected markup and
-// code execution in the page. Design: DEFAULT-DENY. Only the htmlModel.js allow-lists survive; every
-// other tag/attribute/CSS-property/URL is stripped. Pure string transform (runs on the server during
-// gen validation AND on the client before DOM insertion), mirroring sanitizeSvg(); when a DOM is
-// available it adds a second, parser-normalising pass to defeat regex parser-differential / mXSS
-// bypasses. The render path (TQ-262) MUST call sanitizeHtmlModel() before inserting any markup.
+// Security-critical default-deny XSS barrier (also runs server-side). Served raw at /admin/: import only ./htmlModel.js.
 import { HTML_CANVAS, HTML_STATES, HTML_ALLOWED_TAGS, HTML_ALLOWED_ATTRS, HTML_ALLOWED_CSS_PROPS, HTML_FORBIDDEN } from "./htmlModel.js";
 
 const ALLOWED_TAGS = new Set(HTML_ALLOWED_TAGS.map((t) => t.toLowerCase()));
 const ALLOWED_ATTRS = new Set(HTML_ALLOWED_ATTRS.map((a) => a.toLowerCase()));
-// Canonical (case-sensitive) names: SVG is XML, so linearGradient / viewBox / gradientUnits must keep their case.
-// The live-DOM path forgave lowercase (the HTML parser re-cases SVG names), but the icon raster (SVG
-// <foreignObject>, parsed as XML) did not, which broke gradients and view boxes in every icon.
+// Keep SVG name case: icons parse this markup as XML (linearGradient, viewBox).
 const CANON_TAG = new Map(HTML_ALLOWED_TAGS.map((t) => [t.toLowerCase(), t]));
 const CANON_ATTR = new Map(HTML_ALLOWED_ATTRS.map((a) => [a.toLowerCase(), a]));
 const ALLOWED_CSS = new Set(HTML_ALLOWED_CSS_PROPS.map((p) => p.toLowerCase()));
 const FORBIDDEN = new Set(HTML_FORBIDDEN.map((t) => t.toLowerCase()));
-// Containers whose CONTENT (not just the tag) must be dropped — anything that can carry script/CSS
-// or re-parse its text as markup. Removed wholesale before the per-tag allow-list walk.
-// `style` is NOT dropped wholesale here — it is conditionally allowed for @keyframes only and is
-// handled by cleanStyleBlocks() below (parse → keep only valid @keyframes → rebuild) BEFORE the walk.
 const RAW_CONTENT_TAGS = ["script", "iframe", "object", "embed", "noscript", "template", "title", "textarea", "xmp"];
-// A CSS value carrying any execution / external-fetch / breakout vector → drop that declaration.
 const CSS_VALUE_BLOCK = /expression\s*\(|javascript:|vbscript:|data:|@import|behavior\s*:|-moz-binding|[<>]|\\/i;
-// A non-style attribute value carrying a script/navigation/fetch vector. url(#localRef) is allowed
-// (SVG gradient refs); url( anything-else is not.
 const ATTR_VALUE_BLOCK = /[<>]|javascript:|vbscript:|data:|expression\s*\(|url\s*\(\s*(?!#)/i;
 
-// Sanitize an inline `style` value: keep only allow-listed properties with safe values; drop the rest.
 export function sanitizeCss(style, { maxLen = 4000 } = {}) {
   const s = typeof style === "string" ? style : "";
-  if (!s || s.length > maxLen) return ""; // empty or absurdly long → drop wholesale
+  if (!s || s.length > maxLen) return "";
   const out = [];
   for (const decl of s.split(";")) {
     const i = decl.indexOf(":");
@@ -39,54 +22,35 @@ export function sanitizeCss(style, { maxLen = 4000 } = {}) {
     const prop = decl.slice(0, i).trim().toLowerCase();
     const value = decl.slice(i + 1).trim();
     if (!prop || !value) continue;
-    if (!ALLOWED_CSS.has(prop)) continue;                 // property allow-list (default-deny)
-    if (CSS_VALUE_BLOCK.test(value)) continue;            // no expression()/url()/@import/javascript:/…
-    if (/url\s*\(/i.test(value)) continue;                // no url() at all in CSS (no external assets)
-    if (prop === "position" && /\bfixed\b/i.test(value)) continue; // fixed escapes the canvas box
+    if (!ALLOWED_CSS.has(prop)) continue;
+    if (CSS_VALUE_BLOCK.test(value)) continue;
+    if (/url\s*\(/i.test(value)) continue; // Never allow url() in CSS: the CSS prop allow-list is only safe because of this.
+    if (prop === "position" && /\bfixed\b/i.test(value)) continue;
     out.push(`${prop}: ${value}`);
   }
   return out.join("; ");
 }
 
-// ── CSS @keyframes (TQ-305) ───────────────────────────────────────────────
-// `<style>` is allowed ONLY as a carrier for CSS @keyframes so a builder-authored creature can
-// self-animate (no JS, no selectors, no fetches). We PARSE each <style> block, keep ONLY valid
-// @keyframes whose step declarations pass the same CSS allow-list as inline styles, and REBUILD it
-// clean — never passing raw style text through (defeats </style> breakout / mXSS). Keyframe names are
-// then SCOPED per-fragment (scopeKeyframeNames) so two monsters' animations can't collide in the
-// global keyframe namespace. A <style> that yields no valid @keyframes is removed entirely.
+// <style> may only carry rebuilt, allow-listed @keyframes; never pass raw style text through (mXSS).
 
-const KF_STEP = /^(?:from|to|-?\d+(?:\.\d+)?%)$/i; // a single keyframe step selector
+const KF_STEP = /^(?:from|to|-?\d+(?:\.\d+)?%)$/i;
 
-// Rebuild ONE @keyframes body ("0%{…} 50%{…}"), keeping only valid steps + allow-listed declarations.
 function cleanKeyframeBody(body) {
   const out = [];
   const re = /([^{}]+)\{([^{}]*)\}/g;
   let m;
   while ((m = re.exec(body))) {
     const sels = m[1].split(",").map((x) => x.trim()).filter((x) => KF_STEP.test(x));
-    if (!sels.length) continue;                  // not a from/to/% step → drop
-    const decls = sanitizeCss(m[2]);             // same default-deny CSS allow-list as inline styles
+    if (!sels.length) continue;
+    const decls = sanitizeCss(m[2]);
     if (decls) out.push(`${sels.join(",")}{${decls}}`);
   }
   return out.join("");
 }
 
-// TQ-310: a builder MAY also author OPTIONAL action-state reactions — CSS rules scoped to the two
-// semantic classes the trusted engine toggles on the node (tq-moving / tq-attacking, set by
-// htmlMonsterLayer). The selector is STRICTLY limited: it must START with .tq-moving or .tq-attacking
-// and may only be followed by simple DESCENDANT compounds (element / .class / #id / *) — NO combinators
-// (>,+,~), pseudos (:), attribute selectors ([]), selector lists (,), parens, quotes, @, or any breakout
-// char. So a builder can react to an action ("animate a limb when attacking") but cannot author global
-// always-on rules or anything that escapes the CSS context. Declarations still go through the same
-// default-deny sanitizeCss; the rule is rebuilt clean (never raw passthrough).
+// Don't loosen: no combinators, pseudos, lists or attr selectors (global CSS escape).
 const SCOPED_SELECTOR = /^\.tq-(?:moving|attacking)(?:\s+[A-Za-z*.#][\w-]*(?:[.#][\w-]+)*)*$/;
 
-// Reduce a <style> block's CONTENT to ONLY (a) valid @keyframes and (b) action-class-scoped rules (TQ-310)
-// whose selector matches SCOPED_SELECTOR; everything else (other selectors, @import, @media, stray text)
-// is dropped. Each kept block is REBUILT clean from re-validated parts — raw style text is never passed
-// through (defeats </style> breakout / mXSS). Returns "" when nothing valid survives. A single top-level
-// brace-walk handles both (depth-tracking absorbs @keyframes' nested step braces).
 function cleanStyleContent(css, maxLen = 8000) {
   const s = typeof css === "string" ? css.slice(0, maxLen) : "";
   const out = [];
@@ -101,55 +65,43 @@ function cleanStyleContent(css, maxLen = 8000) {
       if (c === "{") depth++;
       else if (c === "}" && --depth === 0) { end = j; break; }
     }
-    if (end < 0) break;                          // unbalanced braces → stop (conservative)
+    if (end < 0) break;
     const body = s.slice(open + 1, end);
     i = end + 1;
     const kf = selector.match(/^@(?:-webkit-)?keyframes\s+([A-Za-z_][\w-]*)$/);
     if (kf) {
-      const steps = cleanKeyframeBody(body);     // nested step rules, re-validated against the allow-list
+      const steps = cleanKeyframeBody(body);
       if (steps) out.push(`@keyframes ${kf[1]}{${steps}}`);
     } else if (SCOPED_SELECTOR.test(selector)) {
-      const decls = sanitizeCss(body);           // same default-deny CSS allow-list as inline styles
+      const decls = sanitizeCss(body);
       if (decls) out.push(`${selector}{${decls}}`);
     }
-    // else: disallowed selector / at-rule / stray text → drop
   }
   return out.join("");
 }
 
-// Replace every <style …>…</style> with a cleaned @keyframes-only block (or remove it when nothing
-// valid survives); drop an unclosed <style to end. Runs BEFORE the tag allow-list walk so only inert
-// CSS text (no '<') ever remains between the kept <style> markers.
 function cleanStyleBlocks(s) {
   const NUL = String.fromCharCode(0);
   const blocks = [];
-  s = s.split(NUL).join(""); // strip NULs so an injected sentinel can't be forged
-  // 1) clean each CLOSED <style>...</style> and stash it behind a NUL sentinel, so the unclosed-drop
-  //    in (2) can't greedily swallow the freshly-rebuilt block.
+  s = s.split(NUL).join(""); // Strip NULs first so injected markup can't forge the block sentinel.
   s = s.replace(/<style\b[^>]*>([\s\S]*?)<\/style\s*>/gi, (_full, body) => {
     const kf = cleanStyleContent(body);
     if (!kf) return "";
     blocks.push(`<style>${kf}</style>`);
     return NUL + (blocks.length - 1) + NUL;
   });
-  // 2) any remaining <style ...> is necessarily UNCLOSED -> drop it to end (conservative).
   s = s.replace(/<style\b[^>]*>[\s\S]*$/gi, "");
-  // 3) restore the cleaned blocks.
   return s.replace(new RegExp(NUL + "([0-9]+)" + NUL, "g"), (_f, i) => blocks[Number(i)] || "");
 }
 
-// djb2 → a short, stable, alphanumeric hash for per-fragment keyframe-name scoping.
 function hash36(str) {
   let h = 5381;
   for (let i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
   return h.toString(36);
 }
 
-const KF_SCOPED = /^kf[0-9a-z]+_/; // already-scoped name marker → keeps scoping idempotent
+const KF_SCOPED = /^kf[0-9a-z]+_/;
 
-// Prefix every UNSCOPED @keyframes NAME with a per-fragment salt, and rewrite the matching name inside
-// inline animation/animation-name values — so identical keyframe names in two different monsters do not
-// collide in the global @keyframes namespace. Idempotent (a re-run finds no unscoped names). Pure.
 function scopeKeyframeNames(markup) {
   const names = [];
   const defRe = /@(?:-webkit-)?keyframes\s+([A-Za-z_][\w-]*)/g;
@@ -160,7 +112,6 @@ function scopeKeyframeNames(markup) {
   const esc = (n) => n.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
   let out = markup;
   for (const n of names) out = out.replace(new RegExp(`(@(?:-webkit-)?keyframes\\s+)${esc(n)}\\b`, "g"), `$1${salt}${n}`);
-  // rewrite references ONLY inside animation / animation-name values (never unrelated text/attributes)
   out = out.replace(/(animation(?:-name)?\s*:\s*)([^;"'}]*)/gi, (_f, pre, val) => {
     let v = val;
     for (const n of names) v = v.replace(new RegExp(`\\b${esc(n)}\\b`, "g"), `${salt}${n}`);
@@ -169,7 +120,6 @@ function scopeKeyframeNames(markup) {
   return out;
 }
 
-// Sanitize the raw attribute text of ONE allow-listed tag.
 function sanitizeAttrs(attrStr) {
   const out = [];
   const re = /([a-zA-Z_:][\w:.-]*)(?:\s*=\s*("([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
@@ -177,84 +127,63 @@ function sanitizeAttrs(attrStr) {
   while ((m = re.exec(attrStr))) {
     const name = m[1].toLowerCase();
     const val = m[3] ?? m[4] ?? m[5] ?? "";
-    if (name.startsWith("on")) continue;                  // never any event handler
-    if (!ALLOWED_ATTRS.has(name)) continue;               // attribute allow-list
+    if (name.startsWith("on")) continue;
+    if (!ALLOWED_ATTRS.has(name)) continue;
     if (name === "style") {
       const css = sanitizeCss(val);
       if (css) out.push(`style="${css}"`);
       continue;
     }
-    if (ATTR_VALUE_BLOCK.test(val)) continue;             // script/nav/fetch vector in a value
+    if (ATTR_VALUE_BLOCK.test(val)) continue;
     out.push(`${CANON_ATTR.get(name) || name}="${String(val).replace(/"/g, "&quot;")}"`);
   }
   return out.length ? " " + out.join(" ") : "";
 }
 
-// The core string pass: comments/PI/CDATA out → raw-content containers out → per-tag allow-list →
-// backstop scrub. Default-DENY; conservative — when in doubt, strip.
 function stringSanitize(markup, maxLen) {
   let s = typeof markup === "string" ? markup : "";
   if (s.length > maxLen) s = s.slice(0, maxLen);
-  s = s.replace(/<!--[\s\S]*?-->/g, "")                   // comments (can hide reforming tags)
+  s = s.replace(/<!--[\s\S]*?-->/g, "")
     .replace(/<!\[CDATA\[[\s\S]*?\]\]>/gi, "")
     .replace(/<!DOCTYPE[\s\S]*?>/gi, "")
     .replace(/<\?[\s\S]*?\?>/g, "");
-  s = cleanStyleBlocks(s);                                // <style> → ONLY validated @keyframes (TQ-305)
-  for (const tag of RAW_CONTENT_TAGS) {                   // drop script/iframe/etc. + their content
+  s = cleanStyleBlocks(s); // Must run before the tag walk so only inert CSS stays inside <style>.
+  for (const tag of RAW_CONTENT_TAGS) {
     s = s.replace(new RegExp(`<${tag}\\b[\\s\\S]*?<\\/${tag}\\s*>`, "gi"), "");
-    s = s.replace(new RegExp(`<${tag}\\b[\\s\\S]*$`, "gi"), ""); // unclosed → drop to end (conservative)
+    s = s.replace(new RegExp(`<${tag}\\b[\\s\\S]*$`, "gi"), "");
   }
-  // Per-tag allow-list walk (quote-aware so a '>' inside an attr value doesn't end the tag early).
   s = s.replace(/<(\/?)\s*([a-zA-Z][a-zA-Z0-9]*)((?:[^>"']|"[^"]*"|'[^']*')*)>/g, (_full, slash, name, attrs) => {
     const tag = name.toLowerCase();
-    if (!ALLOWED_TAGS.has(tag) || FORBIDDEN.has(tag)) return ""; // strip disallowed tag markers (keep text)
+    if (!ALLOWED_TAGS.has(tag) || FORBIDDEN.has(tag)) return "";
     const canon = CANON_TAG.get(tag) || tag;
-    // Keep a self-closing slash (<path …/>). Dropping it made every following SVG shape a CHILD of the
-    // previous one, and children of a <path> never render: most of each generated monster vanished.
+    // Keep self-closing slash, else later SVG shapes nest inside <path> and vanish.
     const selfClose = !slash && /\/\s*$/.test(attrs);
     return slash ? `</${canon}>` : `<${canon}${sanitizeAttrs(attrs.replace(/\/\s*$/, ""))}${selfClose ? " /" : ""}>`;
   });
-  // Backstop: nuke any on*= / javascript:/vbscript: that survived in malformed leftovers, and any
-  // remaining stray '<' that isn't an allow-listed tag open/close (defeats reforming-tag tricks).
   s = s.replace(/\son[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
     .replace(/javascript:/gi, "").replace(/vbscript:/gi, "");
   return s;
 }
 
-// Sanitize ONE authored HTML state. String-sanitises always; when a DOM is available (client,
-// pre-insertion) it then re-parses through an INERT DOMParser document (no script execution) and
-// re-sanitises the browser-normalised markup — so a regex parser-differential / mutation-XSS bypass
-// can't survive the round-trip. Idempotent.
+// Keep the DOMParser re-sanitize pass: it defeats parser-differential/mXSS bypasses.
 export function sanitizeHtml(markup, { maxLen = 20000 } = {}) {
   let s = stringSanitize(markup, maxLen);
   if (typeof DOMParser !== "undefined") {
     try {
       const doc = new DOMParser().parseFromString(s, "text/html");
-      // include <head> too: a body-level <style> can be relocated to <head> by the HTML parser, and we
-      // must re-sanitise (not lose) it. Everything else in head is stripped by stringSanitize anyway.
+      // Include <head>: the parser may move a body <style> there.
       const inner = (doc.head ? doc.head.innerHTML : "") + (doc.body ? doc.body.innerHTML : "");
       s = stringSanitize(inner, maxLen);
-    } catch { /* keep the string-sanitised version */ }
+    } catch {}
   }
-  s = scopeKeyframeNames(s); // run ONCE on the final markup so @keyframes names are collision-scoped
+  s = scopeKeyframeNames(s);
   return s.trim();
 }
 
-// True when sanitised markup still has at least one allow-listed element (vs. stripped to bare text).
 export function isSafeHtml(markup) {
   return /<[a-z]/i.test(sanitizeHtml(markup));
 }
 
-// Sanitize a stored HTML model (coerceHtmlModel output) before DOM insertion: clean base + each present
-// state; drop a state that sanitises to nothing (falls back to base at render); clamp the canvas.
-// Returns null when the base sanitises to no usable element (→ archetype fallback). Mirrors
-// coerceSvgModel — this is what the render path (TQ-262) calls before touching the DOM.
-// TQ-332: the ROOT element of an authored fragment must be TRANSPARENT — only the creature's own shapes
-// paint. Builders sometimes put a background on the root <div> (the schema allows `background`), which
-// renders as an opaque dark SQUARE box behind the monster in-world. Strip background declarations from
-// the ROOT element's inline style ONLY (the first style="…" in the fragment, which belongs to the root
-// element); inner shapes keep their backgrounds. Defensive — also fixes already-stored models; the
-// builder brief (htmlModel.js) additionally instructs the model not to author a root background.
 export function stripRootBackground(html) {
   if (typeof html !== "string") return html;
   return html.replace(/style\s*=\s*(["'])([\s\S]*?)\1/, (_m, q, css) => {
@@ -265,7 +194,7 @@ export function stripRootBackground(html) {
 
 export function sanitizeHtmlModel(model) {
   if (!model || typeof model !== "object") return null;
-  const base = stripRootBackground(sanitizeHtml(model.base)); // TQ-332: no opaque box behind the creature
+  const base = stripRootBackground(sanitizeHtml(model.base));
   if (!/<[a-z]/i.test(base)) return null;
   const out = { canvas: HTML_CANVAS, base };
   for (const st of HTML_STATES) {

@@ -2,9 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { THEME, accentColor, hpColor, addHeader, inRect, lighten, drawButton, drawPanel, drawHeader, drawScrollbar, drawToast, drawGlass, drawTabs, drawCard, drawSwitch, drawChip, drawEyebrow } from "./theme.js";
 
-// accentColor is the shared monster/attack/card accent — ONE neutral accent (TQ-349 removed
-// the "element" concept, so there was never a taxonomy to colour-code). It takes no args and
-// must always return a valid, stable RGB triple (never crash / never return undefined).
 const isRgb = (c) => Array.isArray(c) && c.length === 3 && c.every((n) => Number.isFinite(n) && n >= 0 && n <= 255);
 
 test("accentColor: returns ONE stable neutral RGB accent", () => {
@@ -13,10 +10,6 @@ test("accentColor: returns ONE stable neutral RGB accent", () => {
   assert.deepEqual(accentColor(), a, "stable across calls (shared instance)");
 });
 
-// addHeader's portrait-aware auto-shrink (WIN-T5) is real logic, not just a k-builder:
-// it shrinks the centred title to fit narrow widths (reserving top-corner button room)
-// and floors at 12px so a long title on a tiny screen stays legible. A stub k records
-// the size passed to k.text (the first text is the title).
 function mockHeaderK(width) {
   const texts = [];
   const k = {
@@ -41,8 +34,6 @@ test("addHeader: title auto-shrinks to fit narrow/portrait widths, floors at 12,
   assert.equal(headerSize(300, "", 34), 34, "empty text → shrink guard skipped, size unchanged");
 });
 
-// ── Immediate-mode primitives (the onDraw twins used by shops/roster/bestiary/HUD) ──
-
 test("inRect: hit-test on an [x,y,w,h] rect (inclusive edges)", () => {
   const r = [10, 20, 100, 40];
   assert.ok(inRect({ x: 10, y: 20 }, r), "top-left corner is inside");
@@ -64,8 +55,6 @@ test("lighten: adds toward white per channel, clamped at 255", () => {
   assert.deepEqual(lighten([250, 100, 0], 16), [255, 116, 16], "channel clamps at 255");
 });
 
-// A mock k that records every immediate-mode draw call, so we can assert the helpers
-// paint the standardized layers (shadow + fill + sheen + label) without a real canvas.
 function mockDrawK() {
   const calls = { rect: [], text: [], circle: [] };
   const k = {
@@ -82,16 +71,12 @@ function mockDrawK() {
 test("drawButton: FILLED = one flat shadow + gradient body + catch-light + label; glow is opt-in (TQ-139); GLASS for ghost/disabled", () => {
   const base = mockDrawK();
   drawButton(base.k, { rect: [0, 0, 120, 40], text: "Buy" });
-  // UI v3: a filled accent at rest = 1 cheap offset shadow (no ctx blur — list screens draw dozens) +
-  // gradient body + inner top catch-light = 3 rects (TQ-139: no glow).
   assert.equal(base.calls.rect.length, 3, "no glow by default; shadow + gradient body + catch-light");
   assert.ok(!base.calls.rect[0].shadow, "button shadow is a flat offset (blur reserved for big panels)");
   assert.ok(base.calls.rect[1].gradient && base.calls.rect[1].gradient.stops.length === 3, "body is a 3-stop vertical gradient");
   assert.equal(base.calls.text.length, 1, "one label");
   assert.equal(base.calls.text[0].text, "Buy");
 
-  // Opt-in glow (glowOn:true) adds the 2-layer soft glow (outer bloom + inner edge-hug) → 5 rects,
-  // and hover intensifies the outer bloom (rect[0]).
   const glow = mockDrawK();
   drawButton(glow.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true });
   assert.equal(glow.calls.rect.length, 5, "glowOn adds the 2 glow layers");
@@ -99,8 +84,6 @@ test("drawButton: FILLED = one flat shadow + gradient body + catch-light + label
   drawButton(glowHov.k, { rect: [0, 0, 120, 40], text: "Buy", glowOn: true, hover: true });
   assert.ok(glowHov.calls.rect[0].opacity > glow.calls.rect[0].opacity, "hover intensifies the opt-in outer glow");
 
-  // GLASS family: a ghost (surface-token fill) or disabled button is a white wash + a white hairline — no
-  // shadow, no bevel — so it reads as part of the frosted sheet.
   const ghost = mockDrawK();
   drawButton(ghost.k, { rect: [0, 0, 120, 40], text: "Cancel", fill: THEME.surfaceAlt });
   assert.equal(ghost.calls.rect.length, 2, "ghost = wash + hairline");
@@ -113,7 +96,6 @@ test("drawButton: FILLED = one flat shadow + gradient body + catch-light + label
 });
 
 test("drawButton: the catch-light tucks inside the body (no corner squares) for pill + rounded-rect radii; pressed sinks the body", () => {
-  // Body spans [0,120] horizontally; rects = [0]=shadow, [1]=body, [2]=top catch-light.
   const bevel = (radius) => {
     const { k, calls } = mockDrawK();
     drawButton(k, { rect: [0, 0, 120, 54], text: "Buy", radius });
@@ -128,9 +110,7 @@ test("drawButton: the catch-light tucks inside the body (no corner squares) for 
       assert.ok(b.pos.y >= 1 && b.pos.y + b.height <= 54, `line stays within the body (radius ${radius})`);
     }
   }
-  // A pill's corners curve in further, so it must inset the line MORE than a 14px radius does.
   assert.ok(bevel(27)[0].pos.x > bevel(14)[0].pos.x, "pill radius insets the catch-light further than a 14px radius");
-  // Pressed: the body sits 1px lower on its shadow (tactile sink).
   const rest = mockDrawK(), pressed = mockDrawK();
   drawButton(rest.k, { rect: [0, 0, 120, 40], text: "Buy" });
   drawButton(pressed.k, { rect: [0, 0, 120, 40], text: "Buy", pressed: true });
@@ -199,7 +179,6 @@ test("drawScrollbar: track + thumb when scrollable; no-op when nothing to scroll
   const a = { ...k }; const aRects = []; a.drawRect = (o) => aRects.push(o);
   drawScrollbar(a, { top: 100, trackH: 400, contentH: 1200, scrollY: 0, maxScroll: 800 });
   assert.equal(aRects.length, 2, "faint track + thumb");
-  // thumb height = max(30, trackH^2/contentH) = max(30, 160000/1200=133.3) = 133.3
   assert.ok(Math.abs(aRects[1].height - (400 * 400) / 1200) < 0.001, "thumb height matches the prior per-scene math");
   const b = { ...k }; const bRects = []; b.drawRect = (o) => bRects.push(o);
   drawScrollbar(b, { top: 100, trackH: 400, contentH: 1200, scrollY: 0, maxScroll: 0 });

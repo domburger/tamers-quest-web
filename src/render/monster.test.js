@@ -2,10 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert";
 import { drawMonster, drawMonsterIcon, iconTint } from "./monster.js";
 
-// drawMonster is node-testable: it only touches the engine via k.* (vec2/drawSprite),
-// and monsterAnimTransform is pure. We mock k to capture the sprite key it draws — the
-// key is the slug derived (and now memoized) from typeName.
-
 function mockK() {
   const calls = { sprite: [] };
   const k = {
@@ -27,7 +23,7 @@ test("drawMonster derives the sprite key as a slug of typeName (lowercase, white
 
 test("memoized slug is stable across calls and collapses whitespace runs", () => {
   const { k, calls } = mockK();
-  drawMonster(k, { typeName: "Ember  Drake", x: 0, y: 0, size: 64 }); // two spaces
+  drawMonster(k, { typeName: "Ember  Drake", x: 0, y: 0, size: 64 });
   drawMonster(k, { typeName: "Ember  Drake", x: 0, y: 0, size: 64 });
   assert.equal(calls.sprite[0].sprite, "ember_drake");
   assert.equal(calls.sprite[1].sprite, calls.sprite[0].sprite, "same slug each call");
@@ -39,7 +35,6 @@ test("an explicit sprite key bypasses the typeName slug", () => {
   assert.equal(calls.sprite[0].sprite, "custom_key");
 });
 
-// TQ-373: the ICON path must never leave a blank card for an html-model (sprite-less) monster.
 function mockIconK(withTexture) {
   const calls = { sprite: 0, circle: 0 };
   const fakeImg = { width: 128, height: 128, getContext: () => ({ getImageData: () => ({ data: new Uint8ClampedArray(128 * 128 * 4) }) }) };

@@ -8,8 +8,6 @@
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-400.woff2") format("woff2"); font-weight:400; font-display:swap; }
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-500.woff2") format("woff2"); font-weight:500; font-display:swap; }
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-600.woff2") format("woff2"); font-weight:600; font-display:swap; }
-  /* TQ-383: palette synced to the in-game brand (src/ui/theme.js PAL) — neutral charcoal base +
-     EMBER accent (the game flipped off the old teal-green). Keep these in step with theme.js. */
   :root {
     --bg: #0C0C0D; --panel: #18181A; --panel2: #26262A; --border: #3A3937;
     --text: #EFEEEC; --muted: #928D89; --accent: #F0533D; --accent2: #B58BE6;
@@ -43,12 +41,10 @@
   .pack { color: var(--muted); font-size: 14px; letter-spacing: 1px; margin-bottom: 12px; }
   .gems { font-size: 34px; font-weight: 600; color: var(--gem); }
   .gems small { font-size: 15px; color: var(--muted); font-weight: 400; }
-  /* TQ-152: essence-gem icon next to currency amounts (matches the in-game currencyIcon gem motif). */
   .cur-icon { width: .8em; height: .8em; vertical-align: -.04em; margin-right: 7px; }
   .bonus { color: var(--accent); font-size: 13px; min-height: 18px; margin: 4px 0 14px; }
   .price { font-size: 22px; font-weight: 600; }
   .price small { font-size: 13px; color: var(--muted); font-weight: 400; display: block; margin-top: 2px; }
-  /* TQ-68: Buy button → opens the Paddle checkout overlay. Disabled until checkout config loads. */
   .buy {
     margin-top: 16px; width: 100%; padding: 11px 14px; border: 0; border-radius: 10px;
     background: var(--accent); color: #2A0B05; font-family: inherit; font-weight: 600;
@@ -68,8 +64,6 @@
 </style>
 </head>
 <body>
-<!-- TQ-152: reusable essence-gem icon (faceted diamond — table facet + crown facets), inherits the
-     .gems colour via currentColor. Mirrors the in-game src/render/currencyIcon.js gem motif. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="ico-essence" viewBox="0 0 24 24">
   <path d="M12 2 20 9 12 22 4 9Z" fill="currentColor"/>
   <path d="M4 9H20M12 2 8 9 12 22M12 2 16 9 12 22" fill="none" stroke="#fff" stroke-opacity=".45" stroke-width=".8"/>
@@ -119,9 +113,6 @@
 
   <p id="buymsg"></p>
 
-  <!-- TQ-174: standalone remove-ads one-time purchase (separate from cosmetic Essence). Hidden until
-       the live product + price ID are provisioned — /api/paddle/config returns `adFree` only when
-       sales are on AND PADDLE_ADFREE_PRICE_ID is set, so this stays inert before launch. -->
   <div class="panel" id="adfree-panel" style="text-align:center; display:none;">
     <h2 style="color:var(--accent)">Remove ads</h2>
     <p>Buy once, play ad-free forever — a permanent ad-free entitlement on your account
@@ -130,9 +121,6 @@
     <button class="buy" id="adfree-buy" style="max-width:240px; margin:16px auto 0;" disabled>Buy</button>
   </div>
 
-  <!-- TQ-270: recurring subscription (premium battle pass + ad-free). Hidden until the live recurring
-       product + price ID are provisioned — /api/paddle/config returns `sub` only when sales are on AND
-       PADDLE_SUB_PRICE_ID is set, so this stays inert before launch (TQ-271). -->
   <div class="panel" id="sub-panel" style="text-align:center; display:none;">
     <h2 style="color:var(--accent)">Subscription</h2>
     <p>Unlock the <strong>premium battle pass</strong> track and play <strong>ad-free</strong>,
@@ -162,11 +150,6 @@
   </footer>
 </div>
 
-<!-- TQ-68: Paddle checkout. The buttons stay disabled until /api/paddle/config returns a client
-     token (PADDLE_CLIENT_TOKEN) — so this page is safe/inert before the live credentials land. The
-     player's session token (set by the game in localStorage) rides along as custom_data so the
-     signature-verified webhook credits the right profile; the credited amount is resolved server-side
-     by price ID, never from anything this page sends. -->
 <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
 <script>
 (async function () {
@@ -176,11 +159,11 @@
   var token = (function () { try { return localStorage.getItem("tq_session_token"); } catch (e) { return null; } })();
 
   var cfg = null;
-  try { cfg = await (await fetch("/api/paddle/config")).json(); } catch (e) { /* offline / not configured */ }
+  try { cfg = await (await fetch("/api/paddle/config")).json(); } catch (e) { }
 
   if (!cfg || !cfg.clientToken || !window.Paddle) {
     setMsg("Checkout is being set up — purchasing isn’t available just yet. Please check back soon.");
-    return; // buttons stay disabled
+    return;
   }
   try {
     if (cfg.environment === "sandbox" && window.Paddle.Environment) Paddle.Environment.set("sandbox");
@@ -194,7 +177,7 @@
 
   buttons.forEach(function (b) {
     var p = byPack[b.dataset.pack];
-    if (!p) return;            // pack not in the live config → leave disabled
+    if (!p) return;
     b.disabled = false;
     b.addEventListener("click", function () {
       if (!token) { setMsg("Sign in inside the game first, then reopen this page to buy."); return; }
@@ -206,9 +189,6 @@
     });
   });
 
-  // TQ-174: standalone remove-ads purchase (a separate one-time product). The panel appears only when
-  // the live price ID is provisioned (cfg.adFree); a verified purchase grants a permanent ad-free
-  // entitlement server-side (profile.adFree), resolved by price ID — never trusting this page.
   var adPanel = document.getElementById("adfree-panel");
   var adBuy = document.getElementById("adfree-buy");
   var adPrice = document.getElementById("adfree-price");
@@ -226,9 +206,6 @@
     });
   }
 
-  // TQ-270: recurring subscription (premium battle pass + ad-free). The panel appears only when the live
-  // recurring price ID is provisioned (cfg.sub); a verified subscription webhook (TQ-269) stamps the
-  // server-authoritative entitlement (profile.subscribedUntil), resolved by price ID — never this page.
   var subPanel = document.getElementById("sub-panel");
   var subBuy = document.getElementById("sub-buy");
   var subPrice = document.getElementById("sub-price");

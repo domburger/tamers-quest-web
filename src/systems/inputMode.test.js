@@ -2,8 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { hasTouch, touchPrimary } from "./inputMode.js";
 
-// Helper: stand up a fake browser env (window + navigator) for one assertion, then restore.
-// `navigator` is a read-only getter on the Node global, so swap it via defineProperty.
 function setNavigator(value) {
   const prev = Object.getOwnPropertyDescriptor(globalThis, "navigator");
   Object.defineProperty(globalThis, "navigator", { value, configurable: true, writable: true });
@@ -12,7 +10,7 @@ function setNavigator(value) {
 function withEnv({ ontouchstart = false, maxTouchPoints = 0, media = {}, noMatchMedia = false } = {}, fn) {
   const prevWin = global.window;
   const win = {};
-  if (ontouchstart) win.ontouchstart = null; // presence is what's tested ("ontouchstart" in window)
+  if (ontouchstart) win.ontouchstart = null;
   if (!noMatchMedia) win.matchMedia = (q) => ({ matches: !!media[q] });
   global.window = win;
   const restoreNav = setNavigator({ maxTouchPoints });
@@ -37,14 +35,11 @@ test("touchPrimary: TRUE on a phone/tablet (touchscreen, NO precise pointer)", (
 });
 
 test("touchPrimary: FALSE on a touchscreen laptop (touchscreen + a trackpad/mouse present)", () => {
-  // The bug this guards: a Windows 2-in-1 / touch laptop reports touch AND a coarse primary,
-  // but it has a trackpad → (any-pointer: fine) is true → no virtual stick.
   withEnv({ ontouchstart: true, maxTouchPoints: 10, media: { "(any-pointer: coarse)": true, "(any-pointer: fine)": true } },
     () => assert.equal(touchPrimary(), false));
 });
 
 test("touchPrimary: FALSE on a touch desktop reporting a coarse PRIMARY but with a mouse", () => {
-  // Exactly the reported case: touch present, (pointer: coarse) matches as primary, yet a mouse exists.
   withEnv({ ontouchstart: true, maxTouchPoints: 10, media: { "(pointer: coarse)": true, "(any-pointer: coarse)": true, "(any-pointer: fine)": true } },
     () => assert.equal(touchPrimary(), false));
 });

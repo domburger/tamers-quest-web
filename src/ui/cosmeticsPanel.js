@@ -1,10 +1,3 @@
-// TQ-120: Cosmetics CONTENT for the in-lobby station popup. A browse + equip + buy view on the SHARED
-// cosmetics helpers — deliberately a SEPARATE module (does NOT touch the cosmetics.js scene, which is
-// 00005's actively-evolving lane): two tabs (Spirit Chains / Player Character), a scrollable grid of
-// skin cards with LIVE animated previews (drawChainSkin / drawCharacter), tap to equip an owned skin or
-// buy an unowned one (server-authoritative net.buyCosmetic; the host toasts the "cosmetic" reply), and
-// a wallet pill. All draws are fixed so the shell's k.pushClip masks them. The full cosmetics.js scene
-// (big TQ-100 preview + TQ-169 essence store) stays the out-of-lobby route + the deep-feature home.
 import { net } from "../netClient.js";
 import { CHAIN_SKINS, RARITY_COLOR, drawChainSkin, getEquippedSkinId, setEquippedSkinId } from "../render/chainCosmetics.js";
 import { CHARACTER_SKINS, getEquippedCharacterSkinId, setEquippedCharacterSkinId } from "../render/characterCosmetics.js";
@@ -12,10 +5,8 @@ import { drawCharacter } from "../render/character.js";
 import { isSkinOwned, acquireLabel, skinAcquire } from "../engine/cosmetics.js";
 import { THEME, FONT_BOLD, drawCard, drawChip, drawWalletPill, drawTabs, inRect } from "./theme.js";
 import { sfx, haptic } from "../systems/audio.js";
-import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
+import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js";
 
-// TQ-335: STRIP is two rows — tabs (full width) on row 1, wallet pill on row 2. One row crammed the
-// 142px "Player Character" tab under the right-anchored wallet pill (and overflowed the narrow popup).
 const CW = 150, CH = 170, G = 14, STRIP_H = 80;
 const tabs = (state) => state.tab === "chain" ? CHAIN_SKINS : CHARACTER_SKINS;
 const ownedIds = (state) => (net.state.ownedCosmetics && net.state.ownedCosmetics[state.tab]) || [];
@@ -31,7 +22,7 @@ function layout(rect, state) {
   return { cols, x0: rx + (rw - gridW) / 2, top: rect[1] + STRIP_H + 8 - state.scrollY };
 }
 const TAB_GAP = 6;
-const tabW = (rect) => (rect[2] - 12 - TAB_GAP) / 2; // two tabs share row 1, sized to the popup width
+const tabW = (rect) => (rect[2] - 12 - TAB_GAP) / 2;
 const tabRect = (rect, i) => { const w = tabW(rect); return [rect[0] + 6 + i * (w + TAB_GAP), rect[1] + 6, w, 30]; };
 
 export function drawCosmeticsPanel(k, rect, state) {
@@ -43,51 +34,43 @@ export function drawCosmeticsPanel(k, rect, state) {
   const mp = k.mousePos();
   for (let i = 0; i < list.length; i++) {
     const s = list[i], cx = x0 + (i % cols) * (CW + G), cy = top + Math.floor(i / cols) * (CH + G);
-    if (cy + CH < ry + STRIP_H || cy > ry + rh) continue; // cull (and never under the pinned strip)
+    if (cy + CH < ry + STRIP_H || cy > ry + rh) continue;
     const isEq = s.id === eq, own = isSkinOwned(s, owned);
     const rc = RARITY_COLOR[s.rarity] || THEME.neutral;
     const edy = sheetEntrance(k, i, { step: 0.02 });
     drawCard(k, { rect: [cx, cy + edy, CW, CH], accent: rc, hover: inRect(mp, [cx, cy, CW, CH]) && mp.y >= ry + STRIP_H, selected: isEq, radius: 16, glowY: 0.34, fixed: true });
-    const cyE = cy + edy; // content rides the card's entrance slide (it used to stay put while the frame moved)
-    // UI v4: the chain's glow halo is 2x its ring radius, wider than the card; clip the art to the card so it
-    // can't spill over the card edges and its neighbours.
+    const cyE = cy + edy;
     k.pushClip(cx + 1, cyE + 1, CW - 2, CH - 2);
     try {
       if (state.tab === "chain") drawChainSkin(k, { x: cx + CW / 2, y: cyE + 58, r: 36, t, skin: s, fixed: true });
-    // Character previews face the camera so the accent eyes/rim read. drawCharacter takes the
-    // skin's palette/silhouette as color/cloak/model (NOT a `skin` object — that param is the
-    // equipped CHAIN cosmetic glow, a different thing). Parity with cosmetics.js drawCharacterCard.
       else drawCharacter(k, { x: cx + CW / 2, y: cyE + 78, t, moving: false, color: s.accent, cloak: s.cloak, model: s.model, dir: { x: 0, y: 1 }, fixed: true });
     } finally { k.popClip(); }
     k.drawText({ text: s.name, pos: k.vec2(cx + CW / 2, cyE + CH - 52), size: 13, font: FONT_BOLD, anchor: "center", width: CW - 12, color: T("text"), fixed: true });
     const lab = isEq ? "Equipped" : own ? "Equip" : acquireLabel(s);
     const labC = isEq ? THEME.primary : own ? THEME.textBody : (skinAcquire(s).kind === "free" ? THEME.success : THEME.amber);
     drawChip(k, { x: cx + CW / 2, y: cyE + CH - 30, text: lab, color: labC, size: 10, h: 20, padX: 9, anchor: "center", solid: isEq, fixed: true });
-    if (!own && !isEq) { /* locked tint */ k.drawRect({ pos: k.vec2(cx, cyE), width: CW, height: CH, radius: 16, color: T("bg"), opacity: 0.28, fixed: true }); }
+    if (!own && !isEq) { k.drawRect({ pos: k.vec2(cx, cyE), width: CW, height: CH, radius: 16, color: T("bg"), opacity: 0.28, fixed: true }); }
   }
   state._maxScroll = Math.max(0, Math.ceil(list.length / cols) * (CH + G) + STRIP_H + 12 - rh);
-  // Pinned top strip (over the scrolled grid): tabs (left) + wallet pill (right).
   drawSheetMask(k, [rx, ry - 2, rw, STRIP_H + 2]);
-  // Segmented control spanning both tabRect()s (the tap hit-test still uses tabRect per half).
   const t0 = tabRect(rect, 0), t1 = tabRect(rect, 1);
   drawTabs(k, { rect: [t0[0], t0[1] - 3, t1[0] + t1[2] - t0[0], t0[3] + 6], tabs: [["chain", "Spirit Chains", "chain"], ["char", "Player Character", "person"]], active: state.tab, pointer: mp, size: 14, accent: sheetAccent(), animKey: "cosmetics-tabs", fixed: true });
-  drawWalletPill(k, { x: rx + rw - 6, y: ry + 56, anchor: "right", size: 14, // row 2 (below the tabs)
+  drawWalletPill(k, { x: rx + rw - 6, y: ry + 56, anchor: "right", size: 14,
     items: [{ kind: "gold", value: net.state.gold }, { kind: "essence", value: net.state.essence }] });
 }
 
-// Tap → switch tab, or equip (owned) / buy (unowned). Returns true if consumed.
 export function cosmeticsPanelTap(k, rect, state, p, showToast) {
   for (let i = 0; i < 2; i++) if (inRect(p, tabRect(rect, i))) { const id = i === 0 ? "chain" : "char"; if (state.tab !== id) { sfx("click"); state.tab = id; state.scrollY = 0; } return true; }
-  if (p.y < rect[1] + STRIP_H) return true; // the pinned strip swallows taps
+  if (p.y < rect[1] + STRIP_H) return true;
   const list = tabs(state), owned = ownedIds(state), { cols, x0, top } = layout(rect, state);
   for (let i = 0; i < list.length; i++) {
     const s = list[i], cx = x0 + (i % cols) * (CW + G), cy = top + Math.floor(i / cols) * (CH + G);
     if (p.x >= cx && p.x <= cx + CW && p.y >= cy && p.y <= cy + CH) {
-      if (isSkinOwned(s, owned)) { // equip (per-client + server sync)
+      if (isSkinOwned(s, owned)) {
         haptic(6); sfx("click");
         if (state.tab === "chain") { setEquippedSkinId(s.id); try { net.setSkin && net.setSkin(s.id); } catch {} }
         else { setEquippedCharacterSkinId(s.id); try { net.setCharSkin && net.setCharSkin(s.id); } catch {} }
-      } else { // buy (server-authoritative; reply toasted by the host)
+      } else {
         haptic(8); sfx("click"); try { net.buyCosmetic(state.tab, s.id); showToast && showToast("Purchasing…"); } catch {}
       }
       return true;
@@ -98,9 +81,6 @@ export function cosmeticsPanelTap(k, rect, state, p, showToast) {
 
 export function cosmeticsPanelScroll(state, dy) { state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy)); }
 
-// TQ-527: focus targets for controller nav — the two tabs, then every skin card of the active tab (A on a
-// tab switches it; A on a card equips/buys it, exactly like a tap). Reuses tabRect + the grid layout so the
-// focus rects match the hitboxes; the hub handles d-pad movement, scroll-to-focus, the ring, and activation.
 export function cosmeticsPanelFocusables(rect, state) {
   const out = [{ rect: tabRect(rect, 0) }, { rect: tabRect(rect, 1) }];
   const list = tabs(state), { cols, x0, top } = layout(rect, state);

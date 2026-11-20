@@ -1,17 +1,3 @@
-// TQ-388 (epic TQ-99 lobby station-popup work): VAULT content for the in-lobby station popup.
-// Re-implements roster.js's team / spirit-chain / items management in the shell's immediate-mode
-// draw(k,rect,state)+tap+scroll contract, so the Vault opens as a popup OVER the dimmed village
-// instead of switching to a full scene (the player never leaves the lobby). The old full-screen roster
-// scene was removed on 2026-11-08; this popup is the only Vault UI.
-//
-// Parity note: roster.js's hold-to-drag-and-drop (INV-T8) needs press/hold/move pointer granularity
-// the popup shell doesn't expose (it routes tap-on-release + scroll-on-move only). The CANONICAL
-// management path — tap a card to inspect, then Field / Store / Release — is fully ported here, so
-// functional parity holds (you can do everything you can in the scene); drag is a scene-only
-// convenience. All draws are fixed:true (screen-space) because the hub's camera tracks the player;
-// a world-space draw would render off-popup. The shared monster-detail (with the action footer) is a
-// MODAL drawn outside the shell's content clip — state.modalCapturesInput tells the host to route all
-// taps here while it's open (mirrors profilePanel's rename modal).
 import { net } from "../netClient.js";
 import { getMonsterType, getSpiritChain } from "../engine/gamedata.js";
 import { getMonsterStats, getMonsterMaxHp } from "../engine/stats.js";
@@ -23,10 +9,10 @@ import { itemRarity } from "../engine/items.js";
 import { drawChainGlyph } from "../render/chainCosmetics.js";
 import { xpForLevel } from "../engine/progression.js";
 import { drawMonsterDetail, monsterDetailRect } from "./monsterDetail.js";
-import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js"; // UI v3: pinned bands re-cover the frosted sheet instead of painting a grey slab
-import { drawTabs, drawCard as drawStageCard, drawCardPlate, drawEyebrow, drawGlass, drawEmptyState, drawChip, drawMeter } from "./theme.js"; // design upgrade: segmented tabs + lit stage cards (aliased: this module has its own drawCard)
+import { drawSheetMask, sheetEntrance, sheetAccent } from "./stationPopup.js";
+import { drawTabs, drawCard as drawStageCard, drawCardPlate, drawEyebrow, drawGlass, drawEmptyState, drawChip, drawMeter } from "./theme.js";
 import { drawMonsterIcon, slugOf } from "../render/monster.js";
-import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js"; // TQ-393: free HTML/CSS item icon (the only item-icon path now)
+import { rasterizeHtmlModel, hasHtmlVisual } from "../render/htmlRaster.js";
 import { sfx } from "../systems/audio.js";
 
 const TEAM_MAX = 4;
@@ -46,7 +32,7 @@ export function rosterPanelState() {
     scrollY: 0, _maxScroll: 0,
     sortMode: "recent", searchQ: "", searchInput: null,
     inspect: null, releaseArm: false,
-    modalCapturesInput: false, // host routes all taps to tap() while an inspect modal is open
+    modalCapturesInput: false,
     _hit: null,
     _itemIcon: { loaded: new Set(), pending: new Set() },
     _vv: { view: null, vault: null, sort: null, search: null },
@@ -57,7 +43,6 @@ export function rosterPanelState() {
       state._vv.view = null;
       state.scrollY = Math.min(state.scrollY, state._maxScroll);
     },
-    // Esc handler the host calls: close the inspect / search first, only then the popup.
     onEsc() {
       if (state.inspect) { state.inspect = null; state.releaseArm = false; state.modalCapturesInput = false; return true; }
       if (state.searchInput) { closeSearchInput(state); state.searchQ = ""; state._vv.view = null; return true; }
@@ -68,7 +53,6 @@ export function rosterPanelState() {
   return state;
 }
 
-// Memoized filter→sort→search view of the vault (identity-stable; same pattern as roster.js).
 function viewVault(state) {
   const v = state._vv;
   if (v.view && v.vault === state.vault && v.sort === state.sortMode && v.search === state.searchQ) return v.view;
@@ -80,7 +64,6 @@ const ownedChains = () => (net.state.chains || []).map((cs) => ({ cs, def: getSp
 const viewChains = () => sortChainsByTier(ownedChains());
 const loadout = () => (net.state.equippedChainIds || []);
 
-// ── server-authoritative mutations (mirror roster.js; the "roster" echo reconciles) ──
 const sync = (state) => net.setRoster(state.active.map((m) => m.id));
 function fieldFromVault(state, mon, showToast) {
   if (state.active.length >= TEAM_MAX) { showToast && showToast("Team is full (4). Store one first."); return; }
@@ -116,7 +99,6 @@ function clearSlot(state, i, showToast) {
   showToast && showToast(def ? `Cleared ${def.name}` : "Slot cleared");
 }
 
-// ── item icon lazy-bake (mirrors roster.drawItems) — TQ-393: free HTML/CSS icon only (legacy shape path removed) ──
 const itemIconKey = (it) => (it && it.id != null && hasHtmlVisual(it.html)) ? "itemicon_" + it.id : null;
 function ensureItemIcon(k, cache, key, it) {
   if (!key || cache.loaded.has(key) || cache.pending.has(key)) return;
@@ -132,10 +114,9 @@ function drawCard(k, x, y, m, { slotLabel = null, hover = false, cardW = CARD_W 
   const col = (t) => k.rgb(...t);
   const mt = getMonsterType(m.typeName);
   const ec = accentColor();
-  // Design upgrade: the shared lit "stage" card (panel material + radial accent glow behind the art).
   drawStageCard(k, { rect: [x, y, cardW, CARD_H], accent: ec, hover, radius: 12, glowY: 0.36, fixed: true });
-  drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x + cardW / 2, cy: y + 36, scale: 0.46 * Math.min(1, cardW / CARD_W), topY: y + 4, fixed: true }); // UI v4: smaller so the art ends above the name plate
-  drawCardPlate(k, { rect: [x, y, cardW, CARD_H], h: 44, inset: 5, radius: 10, opacity: 0.85, fixed: true }); // name plate band (opaque enough that the name never sits on the art)
+  drawMonsterIcon(k, { sprite: slugOf(m.typeName), typeName: m.typeName, cx: x + cardW / 2, cy: y + 36, scale: 0.46 * Math.min(1, cardW / CARD_W), topY: y + 4, fixed: true });
+  drawCardPlate(k, { rect: [x, y, cardW, CARD_H], h: 44, inset: 5, radius: 10, opacity: 0.85, fixed: true });
   const nm0 = m.name || m.typeName || "", avail = cardW - 14;
   const nmSize = Math.max(8.5, Math.min(13, avail / Math.max(1, nm0.length * 0.56)));
   const fitN = Math.max(4, Math.floor(avail / (nmSize * 0.56)));
@@ -146,17 +127,12 @@ function drawCard(k, x, y, m, { slotLabel = null, hover = false, cardW = CARD_W 
   try { maxHp = getMonsterMaxHp(mt, m.level); } catch {}
   const frac = maxHp > 0 ? Math.max(0, Math.min(1, (m.currentHealth ?? maxHp) / maxHp)) : 1;
   drawMeter(k, { rect: [x + 12, y + CARD_H - 11, cardW - 24, 5], frac, color: hpColor(frac), fixed: true });
-  if (slotLabel) { // UI v4: slot number in a small dark disc (top-left)
+  if (slotLabel) {
     k.drawCircle({ pos: k.vec2(x + 13, y + 13), radius: 9, color: col(THEME.bg), opacity: 0.75, fixed: true });
     k.drawText({ text: slotLabel, pos: k.vec2(x + 13, y + 13), size: 10, font: FONT_BOLD, anchor: "center", color: col(THEME.textBody), fixed: true });
   }
 }
 
-// TQ-527: focus targets for controller nav, read from the hitboxes the draw records in state._hit (so the
-// rects always match what's tapped). Tabs, then the active tab's actionable cells: monsters = sort + filled
-// team slots + vault cards; chains = chain slots + owned chains. A activates via rosterPanelTap at the cell
-// centre (switch tab / open a monster's inspect modal / etc.). Empty when an inspect modal is open or before
-// the first draw. (Hold-to-drag reorder + the in-modal Store/Field/Release stay mouse-only for now.)
 export function rosterPanelFocusables(_rect, state) {
   const hit = state._hit;
   if (!hit || state.modalCapturesInput) return [];
@@ -179,8 +155,7 @@ export function drawRosterPanel(k, rect, state) {
   const hit = { tabs: [], activeSlots: [], vaultCards: [], chains: [], slots: [], sort: null, search: null };
   const contentTop = ry + TABH + 10;
 
-  // Tab CONTENT first — each tab draws its own band mask (so cards scroll under the top band), so the
-  // tab row must be drawn AFTER it, or the mask paints over the buttons (they were invisible at portrait).
+  // Draw the tab row after content, or the content's band mask covers it.
   if (state.tab === "monsters") {
     drawMonstersTab(k, rect, state, hit, contentTop);
   } else if (state.tab === "chains") {
@@ -189,8 +164,6 @@ export function drawRosterPanel(k, rect, state) {
     drawItemsTab(k, rect, state, contentTop);
   }
 
-  // ── Tab row (Team / Chains / Items) — drawn LAST so it composites above any band mask ──
-  // Segmented control (design upgrade): one sunk track, an ember pill under the active tab.
   const tabs = [["monsters", "Team", "person"], ["chains", "Chains", "chain"], ["items", "Items", "bag"]];
   for (const t of drawTabs(k, { rect: [rx, ry, rw, TABH + 6], tabs, active: state.tab, pointer: mp, size: 15, accent: sheetAccent(), animKey: "vault-tabs", fixed: true })) hit.tabs.push(t);
   state._hit = hit;
@@ -218,20 +191,17 @@ function drawMonstersTab(k, rect, state, hit, contentTop) {
   state._maxScroll = Math.max(0, contentH - regionH);
   if (state.scrollY > state._maxScroll) state.scrollY = state._maxScroll;
 
-  // Vault grid (scrolls up under the top band drawn afterwards).
   const top = vaultTop - state.scrollY;
   for (let i = 0; i < view.length; i++) {
     const y = top + Math.floor(i / cols) * (CARD_H + GAP);
     const x = vaultX0 + (i % cols) * (CARD_W + GAP);
-    if (y + CARD_H < vaultTop || y > ry + rh) continue; // cull
+    if (y + CARD_H < vaultTop || y > ry + rh) continue;
     const hover = inRect(mp, [x, y, CARD_W, CARD_H]) && mp.y >= vaultTop;
     drawCard(k, x, y + sheetEntrance(k, 4 + i, { step: 0.02 }), view[i], { hover });
     hit.vaultCards.push({ mon: view[i], r: [x, y, CARD_W, CARD_H], clipTop: vaultTop });
   }
-  // Mask the top band so vault cards scroll UNDER it (matches the popup surface fill).
   drawSheetMask(k, [rx, ry - 2, rw, vaultTop - ry + 2]);
 
-  // Active team row.
   for (let i = 0; i < TEAM_MAX; i++) {
     const x = activeX0 + i * (activeCardW + GAP);
     if (i < state.active.length) {
@@ -243,7 +213,6 @@ function drawMonstersTab(k, rect, state, hit, contentTop) {
     }
     hit.activeSlots.push({ i, r: [x, activeTop, activeCardW, CARD_H] });
   }
-  // Labels + vault controls.
   drawEyebrow(k, { x: rx + 4, y: teamLabelY + 2, text: `Active team  ${state.active.length} of ${TEAM_MAX}`, size: 10, color: THEME.textMut, fixed: true });
   const vcap = vaultCapacity(net.state, GAME.VAULT_SIZE);
   const vfull = state.vault.length >= vcap, vnear = state.vault.length >= vcap * 0.9;
@@ -261,7 +230,6 @@ function drawMonstersTab(k, rect, state, hit, contentTop) {
   } else if (state.vault.length === 0) {
     drawEmptyState(k, { rect: [rx, vaultTop + 10, rw, (ry + rh) - vaultTop - 10], icon: "vault", title: "Your vault is empty", text: "Catch or loot monsters in a run. They wait here between adventures.", accent: sheetAccent(), fixed: true });
   }
-  // Scrollbar.
   if (state._maxScroll > 0) drawScrollbar(k, { top: vaultTop, trackH: (ry + rh) - vaultTop, contentH, scrollY: state.scrollY, maxScroll: state._maxScroll });
 }
 
@@ -270,7 +238,6 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
   const col = (t) => k.rgb(...t);
   const max = GAME.SPIRIT_CHAIN.CHAIN_SLOTS;
   const ids = loadout();
-  // Loadout slot row.
   const slotGap = 12, slotH = 60, slotTotalW = Math.min(rw, 700);
   const slotW = (slotTotalW - slotGap * (max - 1)) / max;
   const slotX0 = rx + (rw - slotTotalW) / 2;
@@ -297,7 +264,6 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
     }
     hit.slots.push({ i, r: [x, y, slotW, slotH], filled: !!def });
   }
-  // Owned chains grid (scrolls under the loadout band).
   const list = viewChains();
   const chainTop = slotTop + slotH + 28;
   const cc = Math.max(1, Math.floor((rw + CHAIN_GAP) / (CHAIN_W + CHAIN_GAP)));
@@ -315,9 +281,7 @@ function drawChainsTab(k, rect, state, hit, contentTop) {
     drawChainCard(k, x, y, list[i].cs, list[i].def, ids.indexOf(list[i].cs.chainId));
     hit.chains.push({ idx: i, r: [x, y, CHAIN_W, CHAIN_H], clipTop: chainTop });
   }
-  // Mask the loadout band.
   drawSheetMask(k, [rx, ry - 2, rw, chainTop - ry + 2]);
-  // Re-draw loadout label + slots over the mask (so chains scroll under).
   drawEyebrow(k, { x: rx + 4, y: contentTop + 2, text: `Loadout  ${ids.length} of ${max}`, size: 10, color: THEME.textMut, fixed: true });
   for (const s of hit.slots) {
     const [x, y, w, h] = s.r, id = ids[s.i], def = id ? getSpiritChain(id) : null;
@@ -403,16 +367,11 @@ function drawItemsTab(k, rect, state, contentTop) {
   if (state._maxScroll > 0) drawScrollbar(k, { top: itemTop, trackH: (ry + rh) - itemTop, contentH, scrollY: state.scrollY, maxScroll: state._maxScroll });
 }
 
-// helper to read a THEME color as a k color (used by the band masks)
-
-// ── inspect action-row geometry (shared with the scene; screen-centred) ──
 const inspBtnRow = (k) => { const { px, py, PW, PH } = monsterDetailRect(k); const bw = Math.floor((PW - 60) / 3); return { x: px + 15, y: py + PH - 52, bw }; };
 const inspActionRect = (k) => { const { x, y, bw } = inspBtnRow(k); return [x, y, bw, 44]; };
 const inspReleaseRect = (k) => { const { x, y, bw } = inspBtnRow(k); return [x + bw + 15, y, bw, 44]; };
 const inspCloseRect = (k) => { const { x, y, bw } = inspBtnRow(k); return [x + (bw + 15) * 2, y, bw, 44]; };
 
-// The inspect MODAL — the shared monster-detail with the Field/Store · Release · Close footer,
-// drawn by the host OUTSIDE the content clip (its own scrim, full screen). Mirrors roster.drawInspect.
 export function drawRosterModal(k, state) {
   if (!state.inspect) return;
   const col = (t) => k.rgb(...t);
@@ -448,10 +407,6 @@ export function drawRosterModal(k, state) {
   });
 }
 
-// TQ-527: focus targets for the INSPECT modal (controller nav while it captures input) — the Store/Field
-// action, Release (when more than one monster exists), and Close, in that order. Needs k (the buttons are
-// screen-positioned). A at any centre routes through rosterPanelTap's modal branch (Store/Field, Release
-// arm→confirm, or close).
 export function rosterModalFocusables(k, state) {
   if (!state.inspect) return [];
   const out = [{ rect: inspActionRect(k) }];
@@ -461,7 +416,6 @@ export function rosterModalFocusables(k, state) {
 }
 
 export function rosterPanelTap(k, rect, state, p, showToast) {
-  // Inspect modal is open → its buttons act; any other tap closes it (mirrors roster.release()).
   if (state.inspect) {
     const total = state.active.length + state.vault.length;
     if (total > 1 && inRect(p, inspReleaseRect(k))) {
@@ -478,16 +432,13 @@ export function rosterPanelTap(k, rect, state, p, showToast) {
   for (const t of hit.tabs) if (inRect(p, t.r)) { if (state.tab !== t.id) { sfx("click"); state.tab = t.id; state.scrollY = 0; } return true; }
 
   if (state.tab === "monsters") {
-    // sort / search controls
     if (hit.sort && inRect(p, hit.sort)) { state.sortMode = nextSortMode(state.sortMode); state.scrollY = 0; state._vv.view = null; return true; }
     if (hit.search && inRect(p, hit.search.r)) {
       if (hit.search.clearX != null && p.x >= hit.search.clearX) { state.searchQ = ""; state.scrollY = 0; state._vv.view = null; closeSearchInput(state); }
       else openSearchInput(state);
       return true;
     }
-    // active slot → inspect
     for (const s of hit.activeSlots) if (s.i < state.active.length && inRect(p, s.r)) { sfx("click"); state.inspect = { mon: state.active[s.i], source: "active", slot: s.i }; state.releaseArm = false; state.modalCapturesInput = true; return true; }
-    // vault card → inspect (respect the scroll clip — ignore taps in the masked band)
     for (const c of hit.vaultCards) if (p.y >= c.clipTop && inRect(p, c.r)) { sfx("click"); state.inspect = { mon: c.mon, source: "vault" }; state.releaseArm = false; state.modalCapturesInput = true; return true; }
     return true;
   }
@@ -496,7 +447,7 @@ export function rosterPanelTap(k, rect, state, p, showToast) {
     for (const c of hit.chains) if (p.y >= c.clipTop && inRect(p, c.r)) { toggleLoadout(state, c.idx, showToast); return true; }
     return true;
   }
-  return true; // items tab is read-only
+  return true;
 }
 
 export function rosterPanelScroll(state, dy) {
@@ -504,7 +455,6 @@ export function rosterPanelScroll(state, dy) {
   state.scrollY = Math.max(0, Math.min(state._maxScroll, state.scrollY + dy));
 }
 
-// ── free-text vault search: a fixed-position DOM <input> (mobile keyboard) ──
 function openSearchInput(state) {
   if (state.searchInput) { try { state.searchInput.focus(); } catch {} return; }
   const input = document.createElement("input");

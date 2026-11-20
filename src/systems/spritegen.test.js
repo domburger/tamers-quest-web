@@ -4,16 +4,9 @@ import { readFileSync } from "node:fs";
 import { archetypeFor, visualKey, paletteFor, eyeGlowFor } from "./spritegen.js";
 import { makeRng } from "../engine/rng.js";
 
-// The procedural generator draws each monster from one of six ANIMAL ARCHETYPES
-// (P5-T5 / PT1-T21 "brutal, not cute, not all egg-shaped"). These tests guard the
-// pure archetype-selection logic — especially the user's DONE criterion that a
-// lineup reads as several DISTINCT silhouettes — without needing a canvas.
-
 const ARCHES = new Set(["beast", "raptor", "saurian", "leviathan", "arthropod", "brute"]);
 const MONSTERS = JSON.parse(readFileSync("public/assets/data/monstertype.json", "utf8"));
 
-// Mirror generateMonsterSprite's seeding so the test sees the SAME archetype the
-// sprite would render (TQ-349: name-seeded, no element).
 const archOf = (mt) => archetypeFor(mt, visualKey(mt.typeName), makeRng(mt.typeName));
 
 test("archetypeFor returns a valid archetype for every monster in the data", () => {
@@ -23,11 +16,6 @@ test("archetypeFor returns a valid archetype for every monster in the data", () 
     assert.ok(ARCHES.has(a), `${mt.typeName} → invalid archetype "${a}"`);
   }
 });
-
-// (archetypeFor is the procedural silhouette picker that BAKES every hand-authored seed monster's
-// sprite at boot. AI-generated monsters don't use it — they carry an authored SVG model (mt.svg,
-// TQ-245) rasterized at runtime by drawMonster (TQ-246). The old LLM-authored-shapes renderer was
-// removed in the SVG cutover, TQ-242.)
 
 test("archetypeFor is deterministic — same monster always gets the same archetype (seeded)", () => {
   for (const mt of MONSTERS.slice(0, 30)) {
@@ -39,14 +27,10 @@ test("archetypeFor is deterministic — same monster always gets the same archet
 
 test("the full bestiary spans many archetypes (not one egg-shape) — the brutal-variety requirement", () => {
   const seen = new Set(MONSTERS.map(archOf));
-  // 6 archetypes exist; across 115 monsters we expect nearly all of them and
-  // certainly far more than the old single-blob silhouette.
   assert.ok(seen.size >= 4, `expected >=4 distinct archetypes across the pool, got ${seen.size}: ${[...seen].join(", ")}`);
 });
 
 test("any 'ten random monsters' lineup shows 4+ distinct silhouettes (DONE criterion)", () => {
-  // Deterministic sliding windows of 10 across the pool — every window must clear
-  // the bar, not just a lucky sample.
   let worst = 99;
   for (let i = 0; i + 10 <= MONSTERS.length; i += 5) {
     const window = MONSTERS.slice(i, i + 10);
@@ -68,8 +52,6 @@ test("keyword-named monsters map to their obvious archetype", () => {
 
 const isColor = (c) => Array.isArray(c) && c.length === 3 && c.every((n) => typeof n === "number" && n >= 0 && n <= 255);
 
-// Readability guard: every monster's name-seeded visual key must resolve to a complete
-// sprite palette + a valid eye-glow colour (no accidental grey monsters).
 test("every monster maps to a complete sprite palette + valid eye-glow", () => {
   for (const mt of MONSTERS) {
     const key = visualKey(mt.typeName);

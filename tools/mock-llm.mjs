@@ -1,10 +1,4 @@
-// Local MOCK of an OpenAI-compatible chat endpoint for combat / capture QA without spending on a real
-// model. Run:  node tools/mock-llm.mjs   (port 8099)   then start the game server with
-//   OPENAI_API_KEY=test OPENAI_BASE_URL=http://localhost:8099/v1 node server/index.js
-// It recognises the prompt family from the user prompt text and answers a deterministic, schema-valid
-// JSON object: v2 fight judge (deltas + display), v1 judge, the capture judge, and a generic fallback.
-// Env knobs: MOCK_CATCH=1|0 (capture verdict, default 1), MOCK_DMG (enemy HP loss per player turn, 45),
-// MOCK_ENEMY_DMG (player HP loss per enemy turn, 12), MOCK_DELAY_MS (fake latency, 300).
+// Mock OpenAI judge on :8099; run server with OPENAI_API_KEY=test OPENAI_BASE_URL=http://localhost:8099/v1 (knobs: MOCK_CATCH, MOCK_DMG, MOCK_ENEMY_DMG, MOCK_DELAY_MS).
 import http from "node:http";
 
 const PORT = Number(process.env.MOCK_PORT) || 8099;
@@ -24,7 +18,7 @@ function answer(system, user) {
       ? { playerEdits: { currentHealth: -EDMG }, enemyEdits: { currentEnergy: -5 }, display: "The wild monster lashes out — a glancing hit.", special: {} }
       : { playerEdits: { currentEnergy: -6 }, enemyEdits: { currentHealth: -DMG }, display: "A clean strike lands hard!", special: {} };
   }
-  if (/Player:.*Enemy:/s.test(u)) { // v1 absolute judge: echo plausible absolute values is hard without parsing → small deltas via narrative-only shape
+  if (/Player:.*Enemy:/s.test(u)) {
     return { narrative: "The monsters trade blows." };
   }
   return { ok: true, text: "mock" };

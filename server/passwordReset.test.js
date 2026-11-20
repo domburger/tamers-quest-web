@@ -4,7 +4,6 @@ import { handleAuthHttp } from "./auth.js";
 import { createAccountRecord, issuePasswordReset, consumePasswordReset } from "./store.js";
 import { hashPassword, verifyPassword } from "./accounts.js";
 
-// Minimal HTTP mocks (mirror auth.test.js): a JSON POST + a capturing response.
 function mockRes() {
   const out = { status: 0, headers: {}, body: "" };
   return { out, setHeader(k, v) { out.headers[k] = v; }, writeHead(s, h) { out.status = s; Object.assign(out.headers, h || {}); }, end(b) { out.body = b || ""; } };
@@ -16,10 +15,9 @@ function mockPost(url, bodyObj, ip = "9.9.9.9") {
   queueMicrotask(() => { handlers.data && handlers.data(JSON.stringify(bodyObj)); handlers.end && handlers.end(); });
   return req;
 }
-const STRONG = "Str0ng-Passw0rd!"; // assumed to satisfy validatePassword
+const STRONG = "Str0ng-Passw0rd!";
 const NEWPW = "N3w-Passw0rd!Ok";
 
-// ── Token store (TQ-59): issue / verify / single-use / expiry ──
 test("TQ-59 token: issue → consume returns the account, single-use", () => {
   const acc = createAccountRecord({ email: "pr-store-1@x.io", passwordHash: hashPassword(STRONG), nickname: "S1" });
   const token = issuePasswordReset(acc);
@@ -38,7 +36,6 @@ test("TQ-59 token: unknown + expired tokens return null (and an expired token is
   assert.equal(consumePasswordReset(token, t0), null, "the expired token was also consumed/burned");
 });
 
-// ── Endpoints (TQ-59) ──
 test("TQ-59 /auth/forgot-password: known + unknown email reply IDENTICALLY (no enumeration)", async () => {
   createAccountRecord({ email: "pr-known@x.io", passwordHash: hashPassword(STRONG), nickname: "K" });
   const r1 = mockRes(); await handleAuthHttp(mockPost("/auth/forgot-password", { email: "pr-known@x.io" }, "1.1.1.1"), r1);

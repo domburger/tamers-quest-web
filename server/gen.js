@@ -1,13 +1,3 @@
-// Monster-generation CORE helpers — framework-agnostic + unit-testable (no DB / API spend).
-// The live multi-agent generator (server/genStages.js) + its pipeline (genPipeline.js) consume
-// these; the single-call v1 generator was removed (2026-06-09), so this module no longer makes
-// LLM calls itself.
-//
-//   normalizeGeneratedMonster — arbitrary LLM JSON → a schema-valid, clamped MonsterType.
-//   normalizeGenAttacks        — the designer's 4 attacks → clean { title, description } objects.
-//   assignAttacks              — assign attack_1..4 from a pool (the deterministic crash-net move set).
-//   pickReuseOrGenerate        — the reuse-vs-generate policy (Q4).
-
 import { clampText } from "./text.js";
 import { MONSTER_ANIMS } from "../src/systems/monsterAnim.js";
 
@@ -21,7 +11,6 @@ function num(v, def, lo, hi) {
 function str(v, def) {
   return typeof v === "string" && v.trim() ? v.trim() : def;
 }
-// TQ-326: title-case a short phrase into a name (e.g. "ash wyrm" → "Ash Wyrm"), whitespace-collapsed + capped.
 function titleCase(s) {
   return String(s || "").trim().replace(/\s+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 40);
 }
@@ -34,17 +23,9 @@ function shuffle(arr, rand) {
   return a;
 }
 
-// Arbitrary/partial/garbage LLM JSON → a guaranteed-valid MonsterType. Numeric
-// fields are clamped to sane ranges (mirrors the existing hand-authored data);
-// missing fields get defaults; typeName is made unique vs opts.existingNames.
 export function normalizeGeneratedMonster(raw = {}, opts = {}) {
   const r = raw && typeof raw === "object" ? raw : {};
   let typeName = str(r.typeName, "").slice(0, 40);
-  // TQ-326: a blank typeName is a generation DEFECT — don't mask it with a generic "Wild Beast"
-  // placeholder and persist it. First recover a real, thematic name from the Idea stage's inspiration
-  // (the 2-4 words that seeded the monster), title-cased. If that's ALSO empty, REJECT (return null) so
-  // the caller (runGenPipeline) can retry/skip instead of polluting the pool. Log the fallback so it's
-  // observable (ties into the TQ-317 in-flight/gen visibility).
   if (!typeName && opts.inspiration) {
     typeName = titleCase(opts.inspiration);
     if (typeName) console.warn(`[gen] Attributes stage returned no typeName; recovered from inspiration → "${typeName}"`);
@@ -64,40 +45,22 @@ export function normalizeGeneratedMonster(raw = {}, opts = {}) {
     typeName,
     rarity: Math.round(num(r.rarity, 2, 1, 5)),
     size: Math.round(num(r.size, 3, 1, 6)),
-    // Trim lore/effects on a clean word/sentence boundary (no mid-word chop) — these
-    // show in the bestiary + monster-inspect panels. Shares clampText with FGT-T7.
     description: clampText(str(r.description, `A mysterious ${typeName}.`), 600),
     passiveEffect: clampText(str(r.passiveEffect, ""), 240),
-    // (activeEffect removed TQ-108: it was generated + stored but never a real game concept — no
-    // mechanic, never rendered. passiveEffect stays; attacks carry the active abilities.)
     biome: opts.biome ?? (typeof r.biome === "string" ? r.biome.slice(0, 40) : null),
-    // Spec: the designer generates a VISUAL DESCRIPTION (forwarded to the builder agent) and
-    // the 4 ATTACKS (title + judge/player-readable description). Stored additively — the
-    // pool-based attack_1..4 (assignAttacks) stay for the v1 judge + deterministic engine.
     visualDescription: clampText(str(r.visualDescription, ""), 400),
     genAttacks: normalizeGenAttacks(r.attacks),
-    // Standardized animation set (idle/walk/attack) — declared on every generated monster so the
-    // contract is explicit in the data. The clips are procedural (src/systems/monsterAnim.js) and
-    // apply to the monster's baked sprite uniformly, so no per-monster animation data is authored;
-    // this just guarantees the renderer (src/render/monster.js drawMonster) has the standard set.
     animations: [...MONSTER_ANIMS],
   };
   for (const k of STAT_KEYS) {
     const lk = k.toLowerCase();
     mt[`base${k}`] = Math.round(num(r[`base${k}`], 60, 1, 400));
     mt[`${lk}Scaling1`] = num(r[`${lk}Scaling1`], 1, 0, 5);
-    // scaling2 is the exponent in base + s1*level^s2; cap at 1.3 — CN-4 tightened the
-    // hand-authored data to this 95th-pct ceiling (with a regression test), so a
-    // generated monster must not exceed it either or it'd reintroduce runaway
-    // high-level stats (the exact thing CN-4 fixed) via the generation path.
     mt[`${lk}Scaling2`] = num(r[`${lk}Scaling2`], 1, 0, 1.3);
   }
   return mt;
 }
 
-// Normalize the designer's generated attacks → up to 4 clean { title, description } objects
-// (spec: each is a 2-3 word title + a judge/player-readable description). Drops malformed
-// entries; returns [] when none are valid (the pool-based attack_1..4 remain the fallback).
 export function normalizeGenAttacks(raw) {
   if (!Array.isArray(raw)) return [];
   const out = [];
@@ -111,8 +74,6 @@ export function normalizeGenAttacks(raw) {
   return out;
 }
 
-// Set attack_1..4 from the existing attack pool (4 distinct, randomly chosen).
-// `rand` is a () => [0,1) source (engine rng.next or Math.random).
 export function assignAttacks(mt, attackPool, rand = Math.random) {
   const pool = Array.isArray(attackPool) ? attackPool.filter((a) => a && a.name) : [];
   const ordered = shuffle(pool, rand);

@@ -23,9 +23,9 @@ test("TQ-282 onSceneLeave fires when switching away (once), and the new scene st
   sm.scene("a", () => { sm.onSceneLeave(() => log.push("leaveA")); });
   sm.scene("b", () => { sm.onSceneLeave(() => log.push("leaveB")); });
   sm.go("a");
-  sm.go("b");                 // leaving a → leaveA
+  sm.go("b");
   assert.deepEqual(log, ["leaveA"]);
-  sm.stop();                  // leaving b → leaveB
+  sm.stop();
   assert.deepEqual(log, ["leaveA", "leaveB"]);
   assert.equal(sm.current(), null);
 });
@@ -38,7 +38,7 @@ test("TQ-282 update/draw dispatch only to the ACTIVE scene's callbacks", () => {
   sm.go("a");
   sm.update(0.016); sm.draw({});
   assert.deepEqual(hits, { a: 1, b: 0, drawA: 1, drawB: 0 });
-  sm.go("b");                 // a's callbacks are dropped with the scene
+  sm.go("b");
   sm.update(0.016); sm.draw({});
   assert.deepEqual(hits, { a: 1, b: 1, drawA: 1, drawB: 1 }, "only scene b's callbacks run after the switch");
 });
@@ -49,7 +49,7 @@ test("TQ-282 onUpdate/onDraw pass dt/renderer through; cancel removes a callback
   sm.scene("s", () => {
     sm.onUpdate((dt) => { dtSeen = dt; });
     const sub = sm.onDraw(() => drew++);
-    sm.onSceneLeave(() => sub.cancel()); // canceling on leave is fine (idempotent)
+    sm.onSceneLeave(() => sub.cancel());
   });
   sm.go("s");
   sm.update(0.5); sm.draw({}); sm.draw({});
@@ -64,19 +64,17 @@ test("TQ-282 callbacks before any go() are safe no-ops (no active scene)", () =>
 });
 
 test("a throwing scene callback is swallowed (loop survives) AND recorded to globalThis.__drawErrs", () => {
-  globalThis.__drawErrs = [];                 // start clean
+  globalThis.__drawErrs = [];
   const sm = makeSceneManager();
   sm.scene("boom", () => {
     sm.onUpdate(() => { throw new Error("update kaboom"); });
     sm.onDraw(() => { throw new Error("draw kaboom"); });
   });
   sm.go("boom");
-  // The loop must NOT throw — resilience is unchanged.
   assert.doesNotThrow(() => { sm.update(0.016); sm.draw({}); });
   const ring = globalThis.__drawErrs;
   assert.ok(ring.some((m) => m === "update:boom: update kaboom"), "update error recorded with scene + phase");
   assert.ok(ring.some((m) => m === "draw:boom: draw kaboom"), "draw error recorded with scene + phase");
-  // A per-frame repeat collapses (consecutive dedupe) so the ring can't flood.
   const before = ring.length;
   sm.draw({}); sm.draw({}); sm.draw({});
   assert.equal(globalThis.__drawErrs.length, before, "consecutive duplicate draw errors are collapsed");

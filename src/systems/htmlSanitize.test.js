@@ -3,11 +3,6 @@ import assert from "node:assert/strict";
 import { sanitizeHtml, sanitizeCss, sanitizeHtmlModel, isSafeHtml, stripRootBackground } from "./htmlSanitize.js";
 import { HTML_CANVAS } from "./htmlModel.js";
 
-// TQ-261: the sanitizer is the ONLY defense for live-DOM monster HTML — assert every hostile fixture
-// is NEUTRALISED. (node has no DOMParser, so these exercise the string-sanitise pass — the server
-// path + the base of the client path; the client adds a DOMParser re-sanitise on top.)
-
-// A sanitised string must never contain any execution / external-fetch / event-wiring vector.
 const assertInert = (out, label) => {
   for (const bad of [/<script/i, /<\/script/i, /<style/i, /<iframe/i, /<img/i, /<object/i, /<embed/i,
     /<a[\s>]/i, /<form/i, /<input/i, /<link/i, /<meta/i, /\son\w+\s*=/i, /javascript:/i, /vbscript:/i,
@@ -68,7 +63,6 @@ test("TQ-261: CSS sanitiser keeps safe props, drops url()/expression()/@import/b
     const out = sanitizeCss(css);
     assertInert(`<div style="${out}">`, `css: ${css}`);
   }
-  // position:absolute is allowed (clamped by the render container); only fixed is dropped.
   assert.match(sanitizeCss("position:absolute; left:10px"), /position: absolute/);
 });
 
@@ -104,13 +98,13 @@ test("TQ-305: a valid <style> @keyframes survives, is name-scoped, and inline re
 
 test("TQ-305: hostile <style> is neutralised — selectors/@import/url()/empty dropped entirely", () => {
   for (const m of [
-    `<div><style>body{background:url(http://evil/x)}</style></div>`,                  // selector rule → no keyframes → dropped
-    `<div><style>@import url(//evil.css);</style></div>`,                              // @import → dropped
-    `<div><style>@keyframes x{0%{background:url(javascript:alert(1))}}</style></div>`, // only bad decls → empty → dropped
-    `<div><style>@keyframes a{}</style></div>`,                                        // empty body → dropped
+    `<div><style>body{background:url(http://evil/x)}</style></div>`,
+    `<div><style>@import url(//evil.css);</style></div>`,
+    `<div><style>@keyframes x{0%{background:url(javascript:alert(1))}}</style></div>`,
+    `<div><style>@keyframes a{}</style></div>`,
   ]) {
     const out = sanitizeHtml(m);
-    assertInert(out, `hostile style: ${m}`); // no <style>, no url(), no @import, no javascript:, etc.
+    assertInert(out, `hostile style: ${m}`);
     assert.match(out, /<div/, "the host element itself survives");
   }
 });
@@ -128,7 +122,6 @@ test("TQ-305: </style> breakout cannot smuggle script; keyframes sanitise is ide
 test("TQ-310: action-class-scoped rules (.tq-moving/.tq-attacking + descendants) survive, scoped to their @keyframes", () => {
   const m = `<div style="animation: idle 2s infinite"><style>@keyframes idle{0%{opacity:1}100%{opacity:1}}@keyframes lunge{0%{transform:none}100%{transform:translateX(8px)}}.tq-attacking{animation:lunge .3s ease}.tq-moving .leg{transform:rotate(10deg)}</style></div>`;
   const out = sanitizeHtml(m);
-  // the action rules survive, scoped under the engine classes
   assert.match(out, /\.tq-attacking\{animation:\s*kf[0-9a-z]+_lunge\s+\.3s\s+ease\}/, "tq-attacking rule kept + its animation-name scoped to the keyframes");
   assert.match(out, /\.tq-moving \.leg\{transform:\s*rotate\(10deg\)\}/, "descendant-scoped rule kept");
   assert.match(out, /@keyframes kf[0-9a-z]+_lunge\{/, "the referenced keyframes is kept + scoped");
@@ -151,18 +144,15 @@ test("TQ-310: only .tq-moving/.tq-attacking-scoped selectors survive — everyth
 
 test("TQ-310: hostile action-class rules are neutralised (url/expression dropped; no </style> breakout)", () => {
   for (const m of [
-    `<div><style>.tq-attacking{background:url(http://evil/x)}</style></div>`,             // url() in decls → dropped
-    `<div><style>.tq-attacking{background:expression(alert(1))}</style></div>`,           // expression() → dropped
-    `<div><style>.tq-attacking{}</style><script>alert(1)</script></div>`,                  // empty rule + sibling script
-    `<div><style>.tq-attacking{x:y}</style><img src=x onerror=alert(1)></div>`,            // sibling event-handler tag
+    `<div><style>.tq-attacking{background:url(http://evil/x)}</style></div>`,
+    `<div><style>.tq-attacking{background:expression(alert(1))}</style></div>`,
+    `<div><style>.tq-attacking{}</style><script>alert(1)</script></div>`,
+    `<div><style>.tq-attacking{x:y}</style><img src=x onerror=alert(1)></div>`,
   ]) {
     assertInert(sanitizeHtml(m), `hostile tq rule: ${m}`);
   }
-  // position:fixed is stripped from an otherwise-valid action rule (it would escape the canvas box);
-  // the harmless remainder (top:0) may stay, so assert the dangerous prop is gone (not the whole block).
   const fx = sanitizeHtml(`<div><style>.tq-moving{position:fixed;top:0}</style></div>`);
   assert.ok(!/position/i.test(fx) && !/fixed/i.test(fx), `position:fixed stripped — got: ${fx}`);
-  // a kept action rule is idempotent (re-sanitise is stable; names not re-scoped)
   const ok = `<div><style>@keyframes p{0%{opacity:1}100%{opacity:1}}.tq-attacking{animation:p 1s}</style></div>`;
   const once = sanitizeHtml(ok);
   assert.equal(sanitizeHtml(once), once, "action-rule sanitise is idempotent");
@@ -173,7 +163,7 @@ test("TQ-261: sanitizeHtmlModel — base required, states sanitised, canvas clam
     canvas: 9999,
     base: `<div style="background:#111"><script>evil()</script></div>`,
     idle: `<div style="transform:scale(1.02)" onclick="x()"></div>`,
-    attack: `<iframe src=//evil></iframe>`, // sanitises to empty → dropped (falls back to base)
+    attack: `<iframe src=//evil></iframe>`,
   });
   assert.ok(model, "a usable base yields a model");
   assert.equal(model.canvas, HTML_CANVAS, "canvas clamped to the code-authoritative size");
@@ -190,12 +180,10 @@ test("TQ-261: sanitizeHtmlModel — base required, states sanitised, canvas clam
 });
 
 test("TQ-332: stripRootBackground drops the ROOT element's background (no dark box), keeps inner shapes", () => {
-  // Root background (the bug) is stripped; inner element backgrounds (the creature's body) are kept.
   const out = stripRootBackground('<div style="width:256px;height:256px;background:#07070d;border-radius:8px"><span style="background:#a33;width:40px"></span></div>');
   assert.ok(!/background:\s*#07070d/i.test(out), "root background removed");
   assert.ok(/width:\s*256px/i.test(out) && /height:\s*256px/i.test(out) && /border-radius:\s*8px/i.test(out), "root's other styles kept");
   assert.ok(/background:\s*#a33/i.test(out), "inner shape background kept");
-  // background-color / background-image on the root are also dropped.
   const g = stripRootBackground('<div style="background-image:linear-gradient(#111,#222);width:256px"></div>');
   assert.ok(!/background-image/i.test(g) && /width:\s*256px/i.test(g));
   const c = stripRootBackground('<div style="background-color:#000;height:256px"></div>');
@@ -230,7 +218,6 @@ test("sanitizer keeps SVG self-closing shapes as SIBLINGS and keeps SVG name cas
   assert.ok(out.includes("viewBox="), "viewBox keeps its case");
   assert.ok(out.includes("<linearGradient") && out.includes("gradientUnits="), "gradient tag + attr keep their case");
   if (typeof DOMParser === "undefined") {
-    // Node: count paths that are NOT nested in another path — both must be top-level siblings.
     const nested = /<path[^>]*>(?:(?!<\/path>)[\s\S])*<path/.test(out.replace(/<path[^>]*\/>/g, "<p/>"));
     assert.equal(nested, false, "no path nested inside another");
   }

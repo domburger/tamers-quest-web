@@ -5,9 +5,6 @@ import { setGameData, getMonsterTypes, addMonsterType, removeMonsterType, getAtt
 import { BIOME_DEFS } from "../src/engine/mapgen.js";
 import { generateMonster, itemDiversitySeed, tileDiversitySeed, neediestTileTarget, saveGeneratedMonster, genInFlightState } from "./content.js";
 
-// A fake LangChain chat: withStructuredOutput(schema,{name}).invoke() → canned structured
-// output keyed by the stage name. Mirrors genStages.test.js's mockChat — monster generation
-// is ALWAYS the v2 multi-agent pipeline (the v1 single-call path was removed 2026-06-09).
 function mockChat(canned) {
   return {
     withStructuredOutput(_schema, cfg) {
@@ -28,11 +25,8 @@ test("monster pool has a low-rarity floor with usable attacks (GP-1/CN-2)", () =
   loadData();
   const pool = getMonsterTypes();
   const byR = (r) => pool.filter((m) => m.rarity === r);
-  // The rarity wall fix: early spawns need real R1/R2 variety (pool had 0×R1, 1×R2).
   assert.ok(byR(1).length >= 5, `expected ≥5 R1 monsters, got ${byR(1).length}`);
   assert.ok(byR(2).length >= 5, `expected ≥5 R2 monsters, got ${byR(2).length}`);
-  // Every early-tier monster must have at least one attack that actually resolves
-  // (a typo'd / nonexistent attack name → a monster that can't act in combat).
   for (const m of [...byR(1), ...byR(2)]) {
     assert.ok(getAttacksForMonster(m).length >= 1, `${m.typeName} has no usable attack`);
   }
@@ -41,7 +35,7 @@ test("monster pool has a low-rarity floor with usable attacks (GP-1/CN-2)", () =
 test("no monster has a runaway scaling exponent (CN-4)", () => {
   loadData();
   const STATS = ["health", "strength", "defense", "speed", "power", "energy", "luck"];
-  const CAP = 1.3; // scaling2 is the exponent in base + s1*level^s2; >1.3 → explosive growth
+  const CAP = 1.3;
   for (const m of getMonsterTypes()) {
     for (const s of STATS) {
       const v = m[`${s}Scaling2`];
@@ -72,7 +66,7 @@ test("removeMonsterType drops a type from the pool", () => {
 test("generateMonster adds a generated monster to the live pool (mocked v2 pipeline, no DB)", async () => {
   loadData();
   const origKey = process.env.OPENAI_API_KEY;
-  process.env.OPENAI_API_KEY = "test-key"; // aiEnabled() gate for the v2 pipeline
+  process.env.OPENAI_API_KEY = "test-key";
   const canned = {
     MonsterIdea: { inspiration: "tidal armored eel", vibe: "cold and relentless", role: "bruiser", elementHint: "Water", rarityHint: 3 },
     MonsterAttributes: {
@@ -86,14 +80,10 @@ test("generateMonster adds a generated monster to the live pool (mocked v2 pipel
         { title: "Crush Coil", description: "Constricts for heavy physical damage." },
       ],
     },
-    // Stage-3 Model/builder runs by default (aiconfig.genModel ON). TQ-259: it now authors the
-    // creature FROM SCRATCH as free-form HTML/CSS markup per state (was SVG).
     MonsterModel: { canvas: 256, base: '<div style="width:256px;height:256px;background:#16324a"><span style="background:#7fe0ff"></span></div>' },
   };
   try {
     const before = getMonsterTypes().length;
-    // deps.createChat injects the mock LangChain client → no live spend; the pipeline runs
-    // Idea→Attributes→Model and assigns attacks from the pool loaded by loadData().
     const mt = await generateMonster({}, { createChat: () => mockChat(canned) });
     assert.ok(mt, "returns a monster");
     assert.equal(mt.typeName, "Gen Test Beast");
@@ -159,7 +149,6 @@ test("itemDiversitySeed: a no-kind roll tags the item with structured category/r
   assert.ok(["common", "uncommon", "rare", "epic", "legendary"].includes(seed._meta.rarity), "rarity is a valid tier");
   assert.ok(seed._meta.effect && typeof seed._meta.effect.kind === "string", "effect has a kind");
   assert.ok(["self", "enemy"].includes(seed._meta.effect.target), "effect targets self or enemy");
-  // An explicit string kind (admin override) is respected and gets NO structured tag.
   const explicit = itemDiversitySeed({ kind: "a custom item" });
   assert.equal(explicit.kind, "a custom item");
   assert.equal(explicit._meta, undefined, "explicit kind is left untagged");
@@ -167,16 +156,12 @@ test("itemDiversitySeed: a no-kind roll tags the item with structured category/r
 
 test("TQ-150: tileDiversitySeed always targets a LIVE biome (so a generated tile pools as a distinct region)", () => {
   const live = new Set([...BIOME_DEFS.map((b) => b.name), ...getBiomes().map((b) => b.name)]);
-  // With no biome, a real live biome is chosen — never the normalizer's orphan "Wilds" (which matches
-  // no live biome → the all-tiles WFC fallback, so the region has no distinct ground). Loop to cover
-  // the random pick. This + TQ-83's connectivity confinement are the safety guarantees this Story locks.
   for (let i = 0; i < 25; i++) {
     const seed = tileDiversitySeed({});
     assert.ok(live.has(seed.biome), `picked a live biome (got "${seed.biome}")`);
     assert.notEqual(seed.biome, "Wilds", "never the orphan default");
     assert.equal(typeof seed.kind, "string", "also picks a surface kind for variety");
   }
-  // An explicit biome (the batch tool iterating the live pool, or an admin picker) is respected verbatim.
   const explicit = tileDiversitySeed({ biome: "Volcano", kind: "obsidian shard" });
   assert.equal(explicit.biome, "Volcano");
   assert.equal(explicit.kind, "obsidian shard");
@@ -191,21 +176,15 @@ test("tileDiversitySeed: kind is split by collidability (solid surface vs walkab
   assert.equal(tileDiversitySeed({ biome: "X", collidable: 1, kind: "preset" }).kind, "preset", "an explicit kind is respected");
 });
 
-// The tile balancer: of all biomes, pick the (biome, collidability) slot furthest below its target so
-// repeated generation fills every biome's collidable + walkable quota evenly (not random/skewed).
 test("neediestTileTarget: fills the most-deficient (biome, collidability) slot first", () => {
   const biomes = ["A", "B"];
   const targets = { collidable: 4, walk: 8 };
-  // A is empty; B already has its 4 collidable. The biggest shortfalls are the two walk slots (8 each);
-  // rand()=0 takes the first candidate in biome+type order → A, walkable.
   assert.deepEqual(
     neediestTileTarget(biomes, { B: { collidable: 4, walk: 0 } }, targets, {}, () => 0),
     { biome: "A", collidable: 0 });
-  // Pin collidable=1 → the biome most short of COLLIDABLE: A (0/4) over B (4/4).
   assert.deepEqual(
     neediestTileTarget(biomes, { B: { collidable: 4, walk: 0 } }, targets, { collidable: 1 }, () => 0),
     { biome: "A", collidable: 1 });
-  // Pin biome=B → B's neediest type: walk (0/8) over collidable (4/4).
   assert.deepEqual(
     neediestTileTarget(biomes, { B: { collidable: 4, walk: 0 } }, targets, { biome: "B" }, () => 0),
     { biome: "B", collidable: 0 });
@@ -233,7 +212,6 @@ test("TQ-317: genInFlightState reports the active gen (type) and clears on succe
   };
   try {
     assert.equal(genInFlightState().active, false, "idle before any gen");
-    // Start a gen but DON'T await yet — the synchronous prologue sets the in-flight state.
     const p = generateMonster({}, { createChat: () => mockChat(canned) });
     assert.equal(genInFlightState().active, true, "active mid-flight");
     assert.equal(genInFlightState().type, "monster", "type tracked");
@@ -241,7 +219,6 @@ test("TQ-317: genInFlightState reports the active gen (type) and clears on succe
     await p;
     assert.equal(genInFlightState().active, false, "cleared after success");
 
-    // Failure path: a chat whose invoke throws → the gen fails, but the flag must STILL clear (finally).
     const boom = { withStructuredOutput: () => ({ invoke: async () => { throw new Error("boom"); } }) };
     const r = await generateMonster({}, { createChat: () => boom }).catch(() => null);
     assert.equal(r, null);

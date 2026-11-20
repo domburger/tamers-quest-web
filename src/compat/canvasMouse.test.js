@@ -2,7 +2,6 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { makeMouse, isTouchscreen } from "./canvasMouse.js";
 
-// A mock canvas (EventTarget + style + a fixed rect) so synthetic pointer/wheel events drive makeMouse.
 function mockCanvas(rect = { left: 0, top: 0, width: 1280, height: 720 }) {
   const ls = {};
   return {
@@ -17,10 +16,10 @@ function mockCanvas(rect = { left: 0, top: 0, width: 1280, height: 720 }) {
 const ev = (clientX, clientY, pointerType = "mouse", extra = {}) => ({ clientX, clientY, pointerType, ...extra });
 
 test("TQ-281 mousePos tracks the last pointer position in DESIGN coords", () => {
-  const c = mockCanvas({ left: 0, top: 0, width: 2560, height: 1440 }); // 2x window
+  const c = mockCanvas({ left: 0, top: 0, width: 2560, height: 1440 });
   const m = makeMouse(c);
   assert.deepEqual(m.mousePos(), { x: 0, y: 0 });
-  c.fire("pointermove", ev(1280, 720));   // screen centre → design centre (640,360)
+  c.fire("pointermove", ev(1280, 720));
   assert.deepEqual(m.mousePos(), { x: 640, y: 360 }, "screen px mapped to design coords");
 });
 
@@ -32,9 +31,9 @@ test("TQ-281 onMouse* fire only for non-touch pointers; positions are design coo
   m.onMouseMove((p) => move.push(p));
   m.onMouseRelease((p) => release.push(p));
   c.fire("pointerdown", ev(100, 50, "mouse"));
-  c.fire("pointerdown", ev(200, 60, "touch"));   // touch → mouse handler ignores
+  c.fire("pointerdown", ev(200, 60, "touch"));
   c.fire("pointermove", ev(120, 55, "mouse"));
-  c.fire("pointerup", ev(100, 50, "pen"));        // pen counts as mouse (not touch)
+  c.fire("pointerup", ev(100, 50, "pen"));
   assert.deepEqual(press, [{ x: 100, y: 50 }]);
   assert.deepEqual(move, [{ x: 120, y: 55 }]);
   assert.deepEqual(release, [{ x: 100, y: 50 }], "pen (non-touch) fires onMouseRelease");
@@ -45,7 +44,7 @@ test("TQ-281 onTouch* fire only for touch pointers, with an identifier", () => {
   const m = makeMouse(c);
   const starts = [];
   m.onTouchStart((p, info) => starts.push({ p, id: info.identifier }));
-  c.fire("pointerdown", ev(10, 20, "mouse"));               // mouse → touch handler ignores
+  c.fire("pointerdown", ev(10, 20, "mouse"));
   c.fire("pointerdown", ev(30, 40, "touch", { pointerId: 7 }));
   assert.deepEqual(starts, [{ p: { x: 30, y: 40 }, id: 7 }]);
 });

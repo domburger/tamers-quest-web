@@ -5,8 +5,6 @@ import { initTitleGamepad } from "./titleGamepad.js";
 const DOWN = 13, A = 0, B = 1;
 const pressed = (...i) => new Set(i);
 
-// Minimal DOM doubles — enough surface for titleGamepad's glue (querySelectorAll("button"), offsetParent,
-// disabled, click/focus, style, and the .guest-modal.show / [id$="-cancel"] queries).
 function btn(id, { disabled = false, visible = true } = {}) {
   return { id, disabled, offsetParent: visible ? {} : null, clicks: 0, style: {}, click() { this.clicks++; }, focus() {} };
 }
@@ -20,7 +18,7 @@ function mkDoc({ hidden = false, titleButtons = [], modalButtons = null } = {}) 
   const title = Object.assign(rootOf(titleButtons), { id: "title", classList: { contains: (c) => c === "hidden" && hidden } });
   const modal = modalButtons ? rootOf(modalButtons) : null;
   return {
-    defaultView: null, // skip getComputedStyle in titleVisible()
+    defaultView: null,
     getElementById: (id) => (id === "title" ? title : null),
     querySelector: (sel) => (sel === ".guest-modal.show" ? modal : null),
   };
@@ -31,9 +29,9 @@ test("TQ-525 titleGamepad: d-pad moves focus; A clicks the FOCUSED button", () =
   const b0 = btn("guestBtn"), b1 = btn("enterBtn");
   const pad = { set: pressed() };
   const gp = mk(mkDoc({ titleButtons: [b0, b1] }), pad);
-  gp.step();                              // focus defaults to the first button
-  pad.set = pressed(DOWN); gp.step();     // → second
-  pad.set = pressed(A); gp.step();        // activate
+  gp.step();
+  pad.set = pressed(DOWN); gp.step();
+  pad.set = pressed(A); gp.step();
   assert.equal(b1.clicks, 1, "A clicked the focused (second) button");
   assert.equal(b0.clicks, 0);
 });
@@ -48,11 +46,11 @@ test("TQ-525 titleGamepad: inert when no pad is connected OR the title is hidden
 });
 
 test("TQ-525 titleGamepad: an open modal captures focus; B clicks its cancel", () => {
-  const behind = btn("guestBtn");                 // title button sitting behind the overlay
+  const behind = btn("guestBtn");
   const go = btn("guest-go"), cancel = btn("guest-cancel");
   const pad = { set: pressed(A) };
   const gp = mk(mkDoc({ titleButtons: [behind], modalButtons: [go, cancel] }), pad);
-  gp.step();                                       // focus the modal's first button; A activates it
+  gp.step();
   assert.equal(go.clicks, 1, "A activated the modal button, not the title's");
   assert.equal(behind.clicks, 0, "the button behind the modal is unreachable");
   pad.set = pressed(B); gp.step();

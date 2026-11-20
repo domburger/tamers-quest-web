@@ -9,7 +9,6 @@ test("applyJudgeEdits: integer fields are DELTAS, clamped to [0, max]", () => {
   const r = applyJudgeEdits(m, { currentHealth: -40, currentEnergy: 25 });
   assert.equal(r.currentHealth, 60, "HP delta applied (100-40)");
   assert.equal(r.currentEnergy, 65, "energy delta applied (40+25)");
-  // over-heal / over-drain clamps to bounds, never negative or over max
   assert.equal(applyJudgeEdits(m, { currentHealth: 9999 }).currentHealth, 200, "clamped to maxHealth");
   assert.equal(applyJudgeEdits(m, { currentHealth: -9999 }).currentHealth, 0, "clamped to 0");
   assert.equal(applyJudgeEdits(m, { strength: -100 }).strength, 0, "stat debuff clamps at 0");
@@ -17,13 +16,10 @@ test("applyJudgeEdits: integer fields are DELTAS, clamped to [0, max]", () => {
 });
 
 test("applyJudgeEdits: per-turn damage cap limits a single-turn HP loss (task 78)", () => {
-  const full = { ...mon(), currentHealth: 200, maxHealth: 200 }; // near-full target
-  // frac 0.4: can lose at most ceil(200*0.4)=80 this turn → a one-shot -200 is capped to 120.
+  const full = { ...mon(), currentHealth: 200, maxHealth: 200 };
   assert.equal(applyJudgeEdits(full, { currentHealth: -200 }, { maxTurnDamageFrac: 0.4 }).currentHealth, 120, "one-shot capped to an 80-HP loss");
   assert.equal(applyJudgeEdits(full, { currentHealth: -200 }).currentHealth, 0, "no cap by default (frac off) → one-shot lands");
-  // The cap limits only LOSSES — a heal passes through untouched.
   assert.equal(applyJudgeEdits({ ...mon(), currentHealth: 50, maxHealth: 200 }, { currentHealth: 100 }, { maxTurnDamageFrac: 0.4 }).currentHealth, 150, "a heal is never capped");
-  // A monster already below the cap can still be KO'd this turn (the cap floors at prevHP-cap, ≤0 here).
   assert.equal(applyJudgeEdits({ ...mon(), currentHealth: 50, maxHealth: 200 }, { currentHealth: -50 }, { maxTurnDamageFrac: 0.4 }).currentHealth, 0, "weakened monster can still die under the cap");
 });
 
@@ -32,7 +28,6 @@ test("applyJudgeEdits: status is a full REWRITE (canonicalized), and is pure", (
   assert.equal(applyJudgeEdits(m, { status: "burning" }).status, "Burn", "status rewritten + normalized");
   assert.equal(applyJudgeEdits({ ...m, status: "Poison" }, { status: null }).status, null, "null clears status");
   assert.equal(applyJudgeEdits({ ...m, status: "Poison" }, { status: "" }).status, null, "empty clears status");
-  // unknown fields ignored; original is never mutated
   const before = JSON.stringify(m);
   const r = applyJudgeEdits(m, { name: "HACKED", element: "Void", bogus: 1, currentHealth: -10 });
   assert.equal(r.name, "Test", "identity fields are not rewritable");
@@ -55,7 +50,6 @@ test("resolveSpecial: end/winner/flee/instaWin normalize safely", () => {
   const fl = resolveSpecial({ flee: true });
   assert.ok(fl.end && fl.flee);
   assert.equal(resolveSpecial({ winner: "nonsense" }).winner, null, "an invalid winner is dropped");
-  // reason is control-char-stripped + capped
   const r = resolveSpecial({ end: true, reason: "a\nb\tc" + "x".repeat(200) });
   assert.ok(!/[\n\t]/.test(r.reason), "control chars stripped");
   assert.ok(r.reason.length <= 80, "reason capped");

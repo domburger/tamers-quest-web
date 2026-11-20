@@ -4,9 +4,6 @@ import { readFileSync } from "node:fs";
 import { setGameData, getMonsterTypes } from "../engine/gamedata.js";
 import { drawMonsterDetail, monsterDetailRect, isInsidePanel } from "./monsterDetail.js";
 
-// The renderer is immediate-mode (k.draw* inside onDraw). We smoke-test it with a Proxy mock `k`
-// that records drawText calls and no-ops every other draw method, then assert it renders all the
-// spec fields (identity, vitals, stats, attacks, passive) without throwing — feasible per TQ-123.
 function loadData() {
   const read = (f) => JSON.parse(readFileSync(`./public/assets/data/${f}`, "utf8"));
   setGameData({
@@ -25,7 +22,7 @@ function mockK(w = 1280, h = 720) {
         if (prop === "vec2") return (x, y) => ({ x, y });
         if (prop === "rgb") return (r, g, b) => ({ r, g, b });
         if (prop === "drawText") return (o) => { if (o && o.text != null) texts.push(String(o.text)); };
-        return () => {}; // any other draw* / method → no-op
+        return () => {};
       },
     }),
   };
@@ -39,17 +36,16 @@ test("drawMonsterDetail renders all spec fields from a monster object (wide)", (
   assert.ok(texts.includes(mt.typeName), "renders the monster name");
   const joined = texts.join("\n");
   assert.ok(texts.some((t) => /^Rarity /.test(t)) && texts.some((t) => /^Size /.test(t)), "renders the rarity + size chips");
-  const flat = texts.join(""); // UI v3 eyebrows draw glyph by glyph (letter-spaced): check the concatenation
+  const flat = texts.join("");
   assert.match(flat, /STATS,LEVEL1TO50/, "renders the stats header");
   assert.match(flat, /ATTACKS/, "renders the attacks header");
   assert.match(joined, /12 \/ 30/, "renders live vitals when provided");
-  // at least one real stat label + one attack name appear
   assert.ok(texts.includes("strength"), "renders stat rows");
 });
 
 test("drawMonsterDetail is responsive (narrow) and safe with a minimal monster + no vitals", () => {
   loadData();
-  const { k, texts } = mockK(390, 780); // mobile portrait → narrow
+  const { k, texts } = mockK(390, 780);
   assert.doesNotThrow(() => drawMonsterDetail(k, { typeName: "Stubmaw", passiveEffect: "Regenerates each turn." }, {}));
   assert.ok(texts.includes("Stubmaw"));
   assert.match(texts.join(""), /PASSIVE/, "renders the passive ability with its detail");
@@ -65,11 +61,9 @@ test("drawMonsterDetail tolerates a null monster (no throw, draws nothing)", () 
 test("drawMonsterDetail: owned-monster mode shows current-level stats + XP-to-next (TQ-129)", () => {
   loadData();
   const mt = getMonsterTypes()[0];
-  // Default (catalog) = the Lv.1 → Lv.50 range.
   const a = mockK();
   drawMonsterDetail(a.k, mt, {});
   assert.match(a.texts.join(""), /STATS,LEVEL1TO50/, "no level → range header");
-  // Owned mode = current level header + an XP line.
   const b = mockK();
   drawMonsterDetail(b.k, mt, { level: 7, vitals: { currentHealth: 5, maxHealth: 20, currentEnergy: 2, maxEnergy: 8, xp: 30, xpToNext: 100 } });
   const joined = b.texts.join("\n");
@@ -90,7 +84,6 @@ test("drawMonsterDetail: opts.footer is invoked with the panel geometry and supp
   assert.equal(geom.px, px); assert.equal(geom.py, py); assert.equal(geom.PW, PW); assert.equal(geom.PH, PH);
   assert.equal(geom.footerTop, py + PH - 54, "footerTop = panel bottom minus the default footer height");
   assert.ok(!texts.some((t) => /tap.*close/i.test(t)), "default close-hint is suppressed when a footer is supplied");
-  // A custom footerHeight moves the strip; no footer => the close-hint returns.
   let g2 = null;
   drawMonsterDetail(mockK().k, mt, { footer: (kk, g) => { g2 = g; }, footerHeight: 80 });
   assert.equal(g2.footerTop, g2.py + g2.PH - 80, "footerHeight overrides the reserved strip");

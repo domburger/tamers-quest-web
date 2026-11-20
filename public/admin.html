@@ -8,8 +8,6 @@
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-400.woff2") format("woff2"); font-weight:400; font-display:swap; }
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-500.woff2") format("woff2"); font-weight:500; font-display:swap; }
   @font-face { font-family:"Fredoka"; src:url("/assets/font/fredoka-600.woff2") format("woff2"); font-weight:600; font-display:swap; }
-  /* TQ-212: monochrome (black & white / grays) admin scheme — no hues. Status meaning is carried by
-     the ●/✓/✗ glyphs + text + brightness (errors = brightest white) rather than color. */
   :root { --bg:#0B0B0B; --panel:#161616; --border:#2E2E2E; --text:#F0F0F0; --muted:#8A8A8A; --accent:#ECECEC; --ok:#BFBFBF; --err:#FFFFFF; }
   * { box-sizing: border-box; }
   body { margin:0; background:var(--bg); color:var(--text); font-family:"Fredoka",system-ui,"Segoe UI",sans-serif; line-height:1.5; -webkit-font-smoothing:antialiased; }
@@ -17,8 +15,6 @@
   h1 { color:var(--accent); font-size:26px; margin:0 0 6px; }
   .muted { color:var(--muted); font-size:14px; }
   .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:18px 20px; margin:16px 0; break-inside:avoid; -webkit-column-break-inside:avoid; }
-  /* TQ-222: collapsible admin sections — click a panel header to expand/collapse. A CSS-triangle caret
-     (no glyph) shows state; collapsed hides everything but the header. State persists in localStorage. */
   .panel > h2 { cursor:pointer; user-select:none; }
   .panel > h2:focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:4px; }
   .panel > h2::after { content:""; float:right; width:0; height:0; border:5px solid transparent; border-top-color:var(--muted); margin:7px 2px 0; }
@@ -33,8 +29,6 @@
   input[type=password] { width:100%; }
   .modelinput { width:100%; background:#0A0A0A; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:8px; font-size:13px; }
   select { background:#0A0A0A; border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px; }
-  /* One button design: dark "ghost" by default with a soft WHITE hover glow; the primary CTA
-     (.btn-primary / login) is a light-gray gradient (TQ-212 monochrome). */
   button { background:#1C1C1C; color:var(--text); border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:9px 16px; font-size:14px; font-weight:600; cursor:pointer;
     transition:background .18s ease, border-color .18s ease, box-shadow .22s ease, transform .12s ease; }
   button:hover { border-color:var(--accent); background:#262626; box-shadow:0 0 16px rgba(255,255,255,.14); }
@@ -54,7 +48,6 @@
   a { color:var(--accent); }
   .grp { margin-top:16px; font-size:13px; color:var(--accent); font-weight:600; border-bottom:1px solid var(--border); padding-bottom:4px; }
   .ov { color:var(--accent); font-size:11px; }
-  /* TQ-219: bestiary-style monster detail card (DOM mirror of the in-game src/ui/monsterDetail.js) */
   #mcardOv { position:fixed; inset:0; z-index:60; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.72); padding:20px; }
   .mcard { background:var(--panel); border:1px solid var(--accent); border-radius:14px; padding:22px 24px; width:100%; max-width:600px; max-height:90vh; overflow:auto; position:relative; }
   .mcard .x { position:absolute; top:10px; right:10px; padding:4px 12px; }
@@ -68,12 +61,10 @@
   .mcard th, .mcard td { padding:4px 8px; border-bottom:1px solid var(--border); text-align:left; }
   .mcard td.v { text-align:right; color:#fff; }
   .mcard thead th { color:var(--muted); font-weight:500; }
-  /* Login screen */
   #loginScreen { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; }
   .login-card { background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:32px 28px; width:100%; max-width:380px; text-align:center; }
   .login-card input { margin:14px 0; }
   .login-card button { width:100%; }
-  /* Status-bar navigation */
   .statusbar { position:sticky; top:0; z-index:10; display:flex; align-items:center; gap:14px; flex-wrap:wrap;
     background:#121212; border-bottom:1px solid var(--border); padding:10px 18px; }
   .statusbar .brand { color:var(--accent); font-weight:600; font-size:16px; }
@@ -82,11 +73,9 @@
   .tab-btn.active { background:var(--panel); color:var(--accent); border-color:var(--accent); }
   .tab-btn:hover { color:var(--text); }
   .statusbar .conn { font-size:13px; }
-  /* Sub-navigation (Asset Generation: Monsters / Items) */
   .subnav { display:flex; gap:6px; margin:18px 0 0; }
   .subtab-btn { background:var(--panel); border:1px solid var(--border); color:var(--muted); border-radius:8px 8px 0 0; padding:8px 18px; font-size:14px; font-weight:500; }
   .subtab-btn.active { background:var(--panel); color:var(--accent); border-color:var(--accent); border-bottom-color:var(--panel); }
-  /* Phase card */
   .phase { border:1px solid var(--border); border-radius:9px; padding:12px 14px; margin:12px 0; background:#121212; }
   .phase-h { color:#fff; font-size:14px; font-weight:600; margin-bottom:2px; }
   .dials { display:grid; grid-template-columns:1fr 130px; gap:10px; align-items:end; }
@@ -101,21 +90,12 @@
     .tab-btn, .subtab-btn { flex: 1 1 auto; text-align:center; }
     .dials { grid-template-columns:1fr; }
   }
-  /* TQ-210: wide screens get a full-width, TWO-COLUMN admin zone — the stacked panels
-     flow across two balanced columns (break-inside keeps each panel whole). Below 980px
-     this query simply doesn't apply, so it collapses back to the single column above. */
-  /* TQ-346: the Monsters gen pane uses an EXPLICIT two-column split (not height-balanced
-     auto-flow): configuration INPUTS (settings / prompts / schema) on the left, generation
-     OUTPUTS (test preview / trace / monster list) on the right, via .cols > .col-left/.col-right.
-     .cols stacks to a single column below 980px (the @media doesn't apply). */
   .cols { display:grid; grid-template-columns:1fr; gap:0 20px; align-items:start; }
   @media (min-width: 980px) {
     main { max-width:1500px; }
     #pane-combat, #pane-game, #pane-ops { columns:2; column-gap:20px; }
     .cols { grid-template-columns:1fr 1fr; }
   }
-  /* ── Generation-pipeline FLOW DIAGRAM (on top of each asset sub-page): one card per phase, an
-     arrow between them carrying the value that propagates, ending in the final saved-to-pool card. */
   .genflow { display:flex; align-items:stretch; gap:0; flex-wrap:wrap; margin:16px 0 6px; }
   .genflow .fcard { flex:1 1 0; min-width:150px; background:#121212; border:1px solid var(--border); border-radius:9px; padding:10px 12px; }
   .genflow .fcard.final { border-color:var(--accent); background:#161616; }
@@ -132,8 +112,6 @@
     .genflow .farrow { flex-direction:row-reverse; gap:6px; padding:3px 0; }
     .genflow .farrow .ar { transform:rotate(90deg); }
   }
-  /* ── Per-phase expandable config (native <details>): a phase accordion, then small expandables for
-     the system prompt, user prompt, schema view, and field descriptions of that phase. */
   details.phase-acc { border:1px solid var(--border); border-radius:9px; margin:10px 0; background:#121212; }
   details.phase-acc > summary { cursor:pointer; user-select:none; padding:11px 13px; color:#fff; font-size:14px; font-weight:600; list-style:none; display:flex; align-items:center; gap:8px; }
   details.phase-acc > summary::-webkit-details-marker { display:none; }
@@ -154,8 +132,6 @@
   .schemaviz .brace { color:var(--muted); }
   .sd-item { margin:6px 0 10px; }
   .sd-item > label.pl { margin:0 0 3px; }
-  /* ── Right-column generation OUTPUT: a fixed PREVIEW pane + a fixed LIST pane, each ~half the
-     viewport, that scroll internally instead of growing the page (so the layout stays stable). */
   .genpane { height:42vh; overflow:auto; border:1px solid var(--border); border-radius:8px; background:#0E0E0E; padding:10px; margin-top:8px; }
   .genpane > pre, .genpane > .genpane-scroll > pre { max-height:none; border:none; padding:0; margin:6px 0 0; background:transparent; }
   .genpane.empty { display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:13px; }
@@ -163,7 +139,6 @@
 </head>
 <body>
 
-<!-- ─────────────── LOGIN (separate screen) ─────────────── -->
 <div id="loginScreen">
   <div class="login-card">
     <h1>Tamer's Quest — Admin</h1>
@@ -174,7 +149,6 @@
   </div>
 </div>
 
-<!-- ─────────────── ADMIN ZONE (revealed after login) ─────────────── -->
 <div id="adminZone" style="display:none">
   <header class="statusbar">
     <span class="brand">Tamer's Quest Admin</span>
@@ -190,7 +164,6 @@
   </header>
   <main>
 
-  <!-- ─────────────── ASSET GENERATION ─────────────── -->
   <div class="tabpane" id="pane-assetgen">
     <div class="subnav">
       <button class="subtab-btn active" data-sub="monsters">Monsters</button>
@@ -199,11 +172,9 @@
       <button class="subtab-btn" data-sub="tiles">Tiles</button>
     </div>
 
-    <!-- MONSTERS sub-tab -->
     <div class="subpane" id="sub-monsters">
      <div class="genflow" id="flow-monsters"></div>
      <div class="cols">
-      <!-- LEFT column: the pipeline, ONE expandable per phase (settings · prompts · schema view · field guidance) -->
       <div class="col-left">
       <div class="panel">
         <h2>Monster pipeline — config by phase</h2>
@@ -213,9 +184,8 @@
         <div class="row"><button id="saveGenConfig">Save settings</button><span id="genCfgStatus" class="muted"></span></div>
         <div class="row"><button id="saveMonsterPrompts">Save all prompts</button><span id="monsterPromptStatus" class="muted"></span></div>
       </div>
-      </div><!-- /.col-left -->
+      </div>
 
-      <!-- RIGHT column: generation OUTPUTS (test preview · trace · monster list) — TQ-346 -->
       <div class="col-right">
       <div class="panel">
         <h2>Generation hub — test generation (no save)</h2>
@@ -287,13 +257,11 @@
           <pre id="genDetail" style="display:none; margin-top:8px"></pre>
         </div>
       </div>
-      </div><!-- /.col-right -->
-     </div><!-- /.cols -->
+      </div>
+     </div>
     </div>
 
-    <!-- ITEMS sub-tab -->
     <div class="subpane" id="sub-items" style="display:none">
-     <!-- ITEMS generator: the pipeline LEFT, generated list RIGHT — TQ-350 -->
      <div class="genflow" id="flow-items"></div>
      <div class="cols">
       <div class="col-left">
@@ -304,7 +272,7 @@
         <div class="row"><button id="saveItemConfig">Save settings</button><span id="itemCfgStatus" class="muted"></span></div>
         <div class="row"><button id="saveItemPrompts">Save all prompts</button><span id="itemPromptStatus" class="muted"></span></div>
       </div>
-      </div><!-- /.col-left -->
+      </div>
       <div class="col-right">
       <div class="panel">
         <h2>AI items — generate &amp; browse (<span id="itemCount">0</span>)</h2>
@@ -320,13 +288,11 @@
           <pre id="itemDetail" style="display:none; margin-top:8px"></pre>
         </div>
       </div>
-      </div><!-- /.col-right -->
-     </div><!-- /.cols ITEMS -->
-    </div><!-- /#sub-items -->
+      </div>
+     </div>
+    </div>
 
-    <!-- BIOMES sub-tab -->
     <div class="subpane" id="sub-biomes" style="display:none">
-     <!-- BIOMES generator: the pipeline LEFT, generated list RIGHT — TQ-350 -->
      <div class="genflow" id="flow-biomes"></div>
      <div class="cols">
       <div class="col-left">
@@ -337,7 +303,7 @@
         <div class="row"><button id="saveBiomeConfig">Save settings</button><span id="biomeCfgStatus" class="muted"></span></div>
         <div class="row"><button id="saveBiomePrompts">Save all prompts</button><span id="biomePromptStatus" class="muted"></span></div>
       </div>
-      </div><!-- /.col-left -->
+      </div>
       <div class="col-right">
       <div class="panel">
         <h2>AI biomes — generate &amp; browse (<span id="biomeCount">0</span>)</h2>
@@ -351,13 +317,11 @@
           <pre id="biomeDetail" style="display:none; margin-top:8px"></pre>
         </div>
       </div>
-      </div><!-- /.col-right -->
-     </div><!-- /.cols BIOMES -->
-    </div><!-- /#sub-biomes -->
+      </div>
+     </div>
+    </div>
 
-    <!-- TILES sub-tab -->
     <div class="subpane" id="sub-tiles" style="display:none">
-     <!-- TILES generator: the pipeline LEFT, generated list RIGHT — TQ-350 -->
      <div class="genflow" id="flow-tiles"></div>
      <div class="cols">
       <div class="col-left">
@@ -368,7 +332,7 @@
         <div class="row"><button id="saveTileConfig">Save settings</button><span id="tileCfgStatus" class="muted"></span></div>
         <div class="row"><button id="saveTilePrompts">Save all prompts</button><span id="tilePromptStatus" class="muted"></span></div>
       </div>
-      </div><!-- /.col-left -->
+      </div>
       <div class="col-right">
       <div class="panel">
         <h2>AI floor tiles — generate &amp; browse (<span id="tileCount">0</span>)</h2>
@@ -384,12 +348,11 @@
           <pre id="tileDetail" style="display:none; margin-top:8px"></pre>
         </div>
       </div>
-      </div><!-- /.col-right -->
-     </div><!-- /.cols TILES -->
-    </div><!-- /#sub-tiles -->
+      </div>
+     </div>
+    </div>
   </div>
 
-  <!-- ─────────────── COMBAT ─────────────── -->
   <div class="tabpane" id="pane-combat" style="display:none">
     <div class="panel">
       <h2>Combat — model &amp; AI parameters</h2>
@@ -423,7 +386,6 @@
     </div>
   </div>
 
-  <!-- ─────────────── GAME ─────────────── -->
   <div class="tabpane" id="pane-game" style="display:none">
     <div class="panel">
       <h2>Game settings (apply to new rounds)</h2>
@@ -460,7 +422,6 @@
       <div class="row"><button id="save" class="btn-primary">Save &amp; apply</button><span id="saveStatus" class="muted"></span></div>
     </div>
 
-    <!-- TQ-363/TQ-364: round composition + generation budget -->
     <div class="panel">
       <h2>Round composition &amp; generation</h2>
       <div class="muted">How a round is built from biomes/monsters/tiles, and the per-round generation budget. Reused biomes = total − new, so a round keeps most of the previous map and refreshes a few each time.</div>
@@ -486,7 +447,6 @@
       <div class="row"><button id="saveGenConfig" class="btn-primary">Save &amp; apply</button><span id="genConfigStatus" class="muted"></span></div>
     </div>
 
-    <!-- TQ-369: per-time generation scheduler -->
     <div class="panel">
       <h2>Generation schedule</h2>
       <div class="muted">Generate one new asset on a fixed cadence to grow content variety over time (independent of round-start backfill). All off by default; each generation costs OpenAI.</div>
@@ -507,7 +467,6 @@
     </div>
   </div>
 
-  <!-- ─────────────── LIVE OPS ─────────────── -->
   <div class="tabpane" id="pane-ops" style="display:none">
     <div class="panel">
       <h2>Live ops <span id="opsTick" class="muted" style="font-size:12px"></span></h2>
@@ -522,7 +481,6 @@
 
   </main>
 
-  <!-- TQ-219: bestiary-style monster detail card (gen-hub test result + AI-monster pool) -->
   <div id="mcardOv"><div class="mcard">
     <button class="x" id="mcardX" type="button">close</button>
     <div class="mcard-top">
@@ -539,25 +497,15 @@
 </div>
 
 <script type="module">
-  // Load the CANONICAL HTML/CSS model + sanitizer (served as standalone ES modules by the Node server)
-  // and expose a single LIVE-DOM preview helper for the gen hub — so this static page reuses the real
-  // render path (TQ-262) + the safety boundary (TQ-261 sanitizer) instead of duplicating them. The
-  // builder authors free-form HTML/CSS per animation state (monster.html, TQ-259/260). Missing module
-  // → preview skips. (Swapped off the SVG-rasterize preview in TQ-265.)
   let sanitizeHtmlModel = null, sanitizeHtml = null, hasHtmlModel = null, pickStateHtml = null, HTML_STATES = null, HTML_CANVAS = 256;
-  let ensureMonsterMotionStyle = null, wrapCreatureHtml = (h) => h; // TQ-386: default engine move/attack motion
+  let ensureMonsterMotionStyle = null, wrapCreatureHtml = (h) => h;
   try {
     ({ hasHtmlModel, pickStateHtml, HTML_STATES, HTML_CANVAS } = await import("/admin/htmlModel.js"));
-    ({ sanitizeHtmlModel, sanitizeHtml } = await import("/admin/htmlSanitize.js")); // TQ-393: sanitizeHtml (no root-bg strip) for full-bleed tile previews
+    ({ sanitizeHtmlModel, sanitizeHtml } = await import("/admin/htmlSanitize.js"));
     ({ ensureMonsterMotionStyle, wrapCreatureHtml } = await import("/admin/htmlMonsterMotion.js"));
-    if (ensureMonsterMotionStyle) ensureMonsterMotionStyle(document); // inject the move/attack keyframes once
+    if (ensureMonsterMotionStyle) ensureMonsterMotionStyle(document);
   } catch {}
 
-  // TQ-393: render an ITEM/TILE free-form HTML/CSS visual model ({canvas, base}) into `host` as a LIVE-DOM
-  // node — the same render path + sanitizer the monster preview uses (items + tiles now author free
-  // HTML/CSS like monsters). `transparent` strips the root background for ICONS (items, drop onto any
-  // slot); tiles pass transparent:false so their full-bleed ground fill survives (sanitizeHtml only).
-  // Returns true if something was drawn. Used by drawItemPreview / drawTilePreview below.
   window.__renderHtmlVisual = function (host, model, size, { transparent = true, bg = "#0b0b0b" } = {}) {
     if (!host) return false;
     host.innerHTML = "";
@@ -577,13 +525,10 @@
   };
 
   let _previewTimer = null;
-  // Render a generated monster's html model as a LIVE, animated DOM node into `host` (an element).
-  // Sanitizes first (admin previews untrusted gen output), scales the authored 256-box to `size`, and
-  // gently cycles the present animation states so the CSS animations are visible. Returns true if drawn.
   window.__renderMonsterPreview = function (host, m, size, opts = {}) {
     if (!host || !m) return false;
     if (_previewTimer) { clearInterval(_previewTimer); _previewTimer = null; }
-    window.__previewAnim = null; // TQ-311: clear any prior manual-control hook before re-rendering
+    window.__previewAnim = null;
     host.innerHTML = "";
     if (!sanitizeHtmlModel || !hasHtmlModel || !hasHtmlModel(m)) return false;
     const model = sanitizeHtmlModel(m.html);
@@ -594,36 +539,23 @@
     const inner = document.createElement("div");
     inner.style.cssText = `position:absolute;left:0;top:0;width:${box}px;height:${box}px;transform:scale(${s / box});transform-origin:top left`;
     stage.appendChild(inner); host.appendChild(stage);
-    // The authored states actually present (a variant equal to base is a no-op → skip), base first.
-    // TQ-386: the builder authors only the looping IDLE creature (base); MOVE/ATTACK are now driven by
-    // the ENGINE's default motion (htmlMonsterMotion MOTION_CSS), toggled via the same .tq-moving /
-    // .tq-attacking classes the game render path uses. Render the base creature ONCE, WRAPPED, then
-    // switch state by TOGGLING the class (never re-setting innerHTML, which would restart the idle) — so
-    // all states are testable here, matching the game, regardless of authored variants.
     inner.innerHTML = wrapCreatureHtml(pickStateHtml(model, "base"));
     const showState = (st) => {
       const s2 = st || "idle";
       inner.classList.remove("tq-moving", "tq-attacking");
-      void inner.offsetWidth; // reflow so re-selecting an action replays its (one-shot) animation
+      void inner.offsetWidth;
       if (s2 === "move") inner.classList.add("tq-moving");
       else if (s2 === "attack") inner.classList.add("tq-attacking");
-      // base/idle → no action class: the creature's own looping idle @keyframes keep playing.
     };
-    const cycle = ["idle", "move", "attack"]; // all engine-drivable now (idle == base visual)
+    const cycle = ["idle", "move", "attack"];
     let i = 0;
     const show = () => { showState(cycle[i % cycle.length]); i++; };
     showState("idle");
-    // TQ-311: the gen-hub preview opts into MANUAL control (per-state Play buttons); expose the states +
-    // a show(state) hook. All four canonical states drive the engine motion now (TQ-386), so none are
-    // disabled. Other callers keep the gentle auto-cycle through idle → move → attack.
     if (opts.manual) window.__previewAnim = { states: (HTML_STATES || ["base", "idle", "attack", "move"]), show: showState };
     else _previewTimer = setInterval(show, 1500);
     return true;
   };
-  // True when a monster carries a renderable authored HTML visual — for list badges + preview gating.
   window.__hasMonsterVisual = (m) => !!(m && hasHtmlModel && hasHtmlModel(m));
-  // TQ-311: the canonical animation-state list (Base/Idle/Attack/Move) for the gen-hub play buttons —
-  // exposed so the (separate-script) button row can render absent states as disabled.
   window.__htmlStates = HTML_STATES || ["base", "idle", "attack", "move"];
 </script>
 <script>
@@ -635,13 +567,8 @@
   const hdr = () => ({ "x-admin-token": token() });
   $("token").value = localStorage.getItem("tq_admin_token") || "";
   $("token").addEventListener("keydown", (e) => { if (e.key === "Enter") load(); });
-  // TQ-105: stay logged in across reloads — if a token is already stored, validate it and reveal
-  // the admin zone automatically. load() falls back to the login screen on 401/invalid; a missing
-  // token skips this (login screen stays). (load is a hoisted function declaration below.)
   if (localStorage.getItem("tq_admin_token")) load();
 
-  // ── Top-bar tabs (the active tab persists across reloads via localStorage, so you keep your place).
-  // Scope to [data-tab] so the Sign out button — which shares the .tab-btn style — isn't treated as a tab.
   const TAB_KEY = "tq-admin-tab";
   function selectTab(tab) {
     document.querySelectorAll(".tab-btn[data-tab]").forEach((x) => x.classList.toggle("active", x.dataset.tab === tab));
@@ -653,7 +580,6 @@
     let t = null; try { t = localStorage.getItem(TAB_KEY); } catch {}
     if (t && document.getElementById("pane-" + t)) selectTab(t);
   })();
-  // ── Asset Generation sub-tabs (Monsters / Items) — the active sub-tab also persists across reloads.
   const SUB_KEY = "tq-admin-sub";
   function selectSub(sub) {
     document.querySelectorAll(".subtab-btn").forEach((x) => x.classList.toggle("active", x.dataset.sub === sub));
@@ -674,7 +600,7 @@
       const c = await r.json();
       for (const k of NUMS) $(k).value = c[k];
       $("pvpEnabled").checked = !!c.pvpEnabled;
-      $("salesEnabled").checked = !!c.salesEnabled; // TQ-198
+      $("salesEnabled").checked = !!c.salesEnabled;
       localStorage.setItem("tq_admin_token", token());
       $("loginScreen").style.display = "none";
       $("adminZone").style.display = "";
@@ -684,7 +610,7 @@
     } catch (e) { $("status").textContent = e.message; $("status").style.color = "var(--err)"; }
   }
   async function save() {
-    const patch = { pvpEnabled: $("pvpEnabled").checked, salesEnabled: $("salesEnabled").checked }; // TQ-198
+    const patch = { pvpEnabled: $("pvpEnabled").checked, salesEnabled: $("salesEnabled").checked };
     for (const k of NUMS) patch[k] = Number($(k).value);
     $("saveStatus").textContent = "Saving…"; $("saveStatus").style.color = "var(--muted)";
     try {
@@ -693,21 +619,16 @@
       const out = await r.json();
       for (const k of NUMS) $(k).value = out.config[k];
       $("pvpEnabled").checked = !!out.config.pvpEnabled;
-      $("salesEnabled").checked = !!out.config.salesEnabled; // TQ-198
+      $("salesEnabled").checked = !!out.config.salesEnabled;
       $("saveStatus").textContent = "Saved & applied."; $("saveStatus").style.color = "var(--ok)";
     } catch (e) { $("saveStatus").textContent = e.message; $("saveStatus").style.color = "var(--err)"; }
   }
-  // Unsaved-changes hint — editing any field in a settings form flags its Save status as unsaved until
-  // you save, so edits aren't silently forgotten. load()/save() set values programmatically (no 'input'
-  // event fires), so this reacts only to real user edits; the save handlers overwrite it on success.
-  // (Other config forms are wired below, once their field lists are defined.)
   function wireDirty(ids, statusId) {
     const flag = () => { const s = $(statusId); if (s) { s.textContent = "● unsaved changes"; s.style.color = "var(--accent)"; } };
     ids.forEach((id) => { const el = $(id); if (el) el.addEventListener("input", flag); });
   }
   wireDirty([...NUMS, "pvpEnabled", "salesEnabled"], "saveStatus");
 
-  // ── Round composition & generation (TQ-363/TQ-364) ──
   const GENNUMS = ["biomesPerRound","newBiomesPerRound","monstersPerBiome","maxNewMonstersPerRound","tilesCollidablePerBiome","tilesNonCollidablePerBiome"];
   const GENBOOLS = ["roundGenBackfill","biomeRarity","biomeSize"];
   function showComposition(c) {
@@ -739,7 +660,6 @@
   $("saveGenConfig").onclick = saveGenConfig;
   wireDirty([...GENNUMS, ...GENBOOLS], "genConfigStatus");
 
-  // ── Generation schedule (TQ-369) ──
   const SCHED_ASSETS = ["biomes", "tiles", "monsters"];
   const INTERVAL_OPTS = [["1 hour", 3600000], ["2 hours", 7200000], ["6 hours", 21600000], ["12 hours", 43200000], ["1 day", 86400000], ["1 week", 604800000]];
   for (const a of SCHED_ASSETS) {
@@ -775,7 +695,6 @@
   $("saveGenSchedule").onclick = saveGenSchedule;
   wireDirty(SCHED_ASSETS.flatMap((a) => [a + "Enabled", a + "EveryMs"]), "genScheduleStatus");
 
-  // ── AI monsters ──
   let genCache = [];
   async function loadMonsters() {
     try {
@@ -798,16 +717,12 @@
       $("genDetail").style.display = "none";
       loadMonsters();
     } else {
-      openMonsterCard(m); // TQ-219: bestiary-style card (raw JSON still available below)
+      openMonsterCard(m);
       $("genDetail").textContent = JSON.stringify(m, null, 2);
       $("genDetail").style.display = "";
     }
   };
 
-  // TQ-219: bestiary-style monster detail card (model preview + identity + Lv.1→Lv.50 stats),
-  // reused by the gen-hub test result + the AI-monster pool rows. DOM mirror of the in-game popup
-  // (src/ui/monsterDetail.js) since admin.html is HTML/CSS (the TQ-221 hybrid-UI direction). Stats use
-  // the same calcStat formula + neutral fallbacks as src/engine/stats.js, computed inline.
   const MCARD_STATS = [
     ["Health", "baseHealth", "healthScaling1", "healthScaling2"],
     ["Strength", "baseStrength", "strengthScaling1", "strengthScaling2"],
@@ -828,23 +743,17 @@
     $("mcardStats").innerHTML = MCARD_STATS.map(([label, b, s1, s2]) =>
       `<tr><th>${label}</th><td class="v">${_calcStat(m[b], m[s1], m[s2], 1)}</td><td class="v">${_calcStat(m[b], m[s1], m[s2], 50)}</td></tr>`).join("");
     const host = $("mcardCanvas");
-    if (window.__renderMonsterPreview) window.__renderMonsterPreview(host, m, 128); // TQ-265: live-DOM HTML model
+    if (window.__renderMonsterPreview) window.__renderMonsterPreview(host, m, 128);
     else host.innerHTML = "";
     $("mcardOv").style.display = "flex";
   }
   function closeMonsterCard() { $("mcardOv").style.display = "none"; }
-  window.__openMonsterCard = openMonsterCard; // QA hook (admin is auth-gated; lets headless verify the card without a token)
+  window.__openMonsterCard = openMonsterCard;
   $("mcardX").onclick = closeMonsterCard;
   $("mcardOv").onclick = (e) => { if (e.target === $("mcardOv")) closeMonsterCard(); };
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("mcardOv").style.display === "flex") closeMonsterCard(); });
   if ($("genTestCard")) $("genTestCard").onclick = () => { if (__lastGen && __lastGen.type === "monster") openMonsterCard(__lastGen.result); };
 
-  // TQ-347: the redundant "Generate one monster (test → saves to DB)" button (#gen1) was removed — it
-  // duplicated the Generation-hub flow with a confusing generate-AND-save-in-one-click. The single
-  // generation path is now #genTestBtn (preview, no save: /api/admin/gen/test) → #genTestSave (explicit
-  // "Save to pool": /api/admin/gen/save). The "AI monsters" panel is browse-only.
-
-  // ── AI items ──
   let itemCache = [];
   async function loadItems() {
     try {
@@ -870,7 +779,7 @@
     } else {
       $("itemDetail").textContent = JSON.stringify(it, null, 2);
       $("itemDetail").style.display = "";
-      drawItemPreview(it, "itemDetailPreview"); // TQ-374; TQ-399: own host beside the detail, not the test-gen preview
+      drawItemPreview(it, "itemDetailPreview");
     }
   };
   $("genItem1").onclick = async () => {
@@ -882,24 +791,16 @@
       $("itemGenStatus").textContent = "Generated " + out.item.name; $("itemGenStatus").style.color = "var(--ok)";
       $("itemGenResult").textContent = JSON.stringify(out.item, null, 2);
       $("itemGenResult").style.display = "";
-      drawItemPreview(out.item); // TQ-374
+      drawItemPreview(out.item);
       loadItems();
     } catch (e) { $("itemGenStatus").textContent = e.message; $("itemGenStatus").style.color = "var(--err)"; }
   };
-  // TQ-393: preview an item's ICON — the item's free HTML/CSS model (`html`) rendered LIVE-DOM (same path
-  // + sanitizer as the monster preview). Items without an html model show nothing (the legacy shape-layer
-  // `visual` preview path was removed with the back-compat path, Dominik 2026-06-16).
-  // TQ-399: the test-gen result and the browse detail render into SEPARATE hosts (`itemPreview` under the
-  // gen button; `itemDetailPreview` beside the clicked item's JSON). They previously SHARED one host at the
-  // top, so clicking a browse item replaced — or, for an item with no renderable html, HID — the test-gen
-  // icon, making the test-gen section's preview "go missing".
   function drawItemPreview(item, hostId = "itemPreview") {
     const host = $(hostId); if (!host) return;
     if (item && item.html && item.html.base && window.__renderHtmlVisual && window.__renderHtmlVisual(host, item.html, 96, { transparent: true })) return;
     host.innerHTML = ""; host.style.display = "none";
   }
 
-  // ── AI biomes ──
   let biomeCache = [];
   async function loadBiomes() {
     try {
@@ -939,19 +840,15 @@
     } catch (e) { $("biomeGenStatus").textContent = e.message; $("biomeGenStatus").style.color = "var(--err)"; }
   };
 
-  // ── AI floor tiles ──
   let tileCache = [];
-  // TQ-393: preview a tile's TEXTURE. New tiles carry a free HTML/CSS model (`html`) → render it LIVE-DOM,
-  // FULL-BLEED (transparent:false so the authored ground fill survives the sanitizer). Legacy tiles
-  // (shape-layer `visual`/seed, pre-TQ-393) → bake the procedural texture and drop the canvas into the host.
-  async function drawTilePreview(tile, hostId = "tilePreview") { // TQ-399: own host for the browse detail (see drawItemPreview)
+  async function drawTilePreview(tile, hostId = "tilePreview") {
     const host = $(hostId); if (!host) return;
     if (tile && tile.html && tile.html.base && window.__renderHtmlVisual) {
       if (window.__renderHtmlVisual(host, tile.html, 96, { transparent: false })) return;
     }
     host.innerHTML = "";
     try {
-      const { generateTileTexture } = await import("/admin/tiles.js"); // legacy procedural/layer texture (prod-safe /admin/ route)
+      const { generateTileTexture } = await import("/admin/tiles.js");
       const tex = generateTileTexture(tile, 64);
       const cv = document.createElement("canvas");
       cv.width = 96; cv.height = 96;
@@ -986,13 +883,13 @@
     } else {
       $("tileDetail").textContent = JSON.stringify(t, null, 2);
       $("tileDetail").style.display = "";
-      drawTilePreview(t, "tileDetailPreview"); // TQ-359; TQ-399: own host beside the detail, not the test-gen preview
+      drawTilePreview(t, "tileDetailPreview");
     }
   };
   $("genTile1").onclick = async () => {
     $("tileGenStatus").textContent = "Generating…"; $("tileGenStatus").style.color = "var(--muted)";
     try {
-      const collSel = $("genTileCollidable") ? $("genTileCollidable").value : ""; // "" = auto (balancer picks), "0"/"1" = forced INPUT
+      const collSel = $("genTileCollidable") ? $("genTileCollidable").value : "";
       const r = collSel === ""
         ? await fetch("/api/admin/tiles/generate", { method: "POST", headers: hdr() })
         : await fetch("/api/admin/tiles/generate", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify({ collidable: Number(collSel) }) });
@@ -1001,15 +898,11 @@
       $("tileGenStatus").textContent = "Generated " + out.tile.name; $("tileGenStatus").style.color = "var(--ok)";
       $("tileGenResult").textContent = JSON.stringify(out.tile, null, 2);
       $("tileGenResult").style.display = "";
-      drawTilePreview(out.tile); // TQ-359: show the baked texture (with authored visual) for the new tile
+      drawTilePreview(out.tile);
       loadTiles();
     } catch (e) { $("tileGenStatus").textContent = e.message; $("tileGenStatus").style.color = "var(--err)"; }
   };
 
-  // ── Live ops ──
-  // Reflect live connection health in the status bar. The ops poll (every 3s, started at login) is the
-  // heartbeat: a failed poll — server down/restarted or token revoked — flips this to "disconnected"
-  // instead of leaving a stale "connected"; a recovering poll flips it back.
   function setConn(ok, why) {
     const el = $("connStatus"); if (!el) return;
     el.textContent = ok ? "● connected" : ("● disconnected" + (why ? " (" + why + ")" : ""));
@@ -1021,19 +914,15 @@
       if (!r.ok) { setConn(false, r.status === 401 ? "token rejected" : "HTTP " + r.status); return; }
       const s = await r.json();
       const fa = s.fightAgent || {};
-      // TQ-317: live content-generation indicator — shows what's generating right now (so a 503 "a
-      // generation is in flight" isn't a mystery), with type + elapsed; idle otherwise.
       const g = s.generation || { active: false };
       const genLine = g.active
         ? `<span style="color:#7ad67a">● Generating <b>${esc(g.type || "?")}</b></span> · <b>${Math.max(0, Math.round((Date.now() - (g.startedAt || Date.now())) / 1000))}s</b> elapsed`
         : `<span class="muted">○ idle</span>`;
-      // TQ-498: content-pool statistics — totals per type + the AI-generated split where markable.
       const gs = s.generationStats || {};
       const aiPart = (o) => (o && typeof o.aiGenerated === "number") ? ` (<b>${o.aiGenerated}</b> AI-gen)` : "";
       const statsLine = gs.monsters
         ? `Monsters <b>${gs.monsters.total}</b>${aiPart(gs.monsters)} · Tiles <b>${(gs.tiles||{}).total||0}</b>${aiPart(gs.tiles)} · Items <b>${(gs.items||{}).total||0}</b> · Biomes <b>${(gs.biomes||{}).total||0}</b>`
         : '<span class="muted">—</span>';
-      // TQ-403: live API token usage + cost estimate (tokens exact; $ is an editable-rate estimate).
       const ac = s.apiCost || {};
       const fmtTok = (n) => (n >= 1e6 ? (n / 1e6).toFixed(2) + "M" : n >= 1e3 ? (n / 1e3).toFixed(1) + "k" : String(n || 0));
       const costLine = (ac.calls || 0) > 0
@@ -1048,7 +937,7 @@
       $("opsRounds").innerHTML = s.rounds.length
         ? s.rounds.map((r) => `<div class="muted">${esc(r.roundId)}: ${esc(r.phase)} · ${r.players} players · ${r.monsters} monsters · ${r.remaining}s left</div>`).join("")
         : '<div class="muted">No active rounds.</div>';
-      if (s.clientErrors) { // client JS error beacon (server/clientErrors.js)
+      if (s.clientErrors) {
         const ce = s.clientErrors;
         $("opsClientErrTotal").textContent = ce.total ? `${ce.total} since boot` : "none since boot";
         $("opsClientErrors").innerHTML = ce.recent.slice(0, 12).map((x) => `<li title="${esc(x.stack || "")}">${esc(new Date(x.at).toLocaleTimeString())} — <b>${esc(x.message)}</b>${x.scene ? ` <span class="muted">@${esc(x.scene)}</span>` : ""}${x.build ? ` <span class="muted">(${esc(x.build)})</span>` : ""}</li>`).join("");
@@ -1061,11 +950,6 @@
     } catch { setConn(false, "no response"); }
   }
 
-  // TQ-331: gen telemetry — the recent per-stage model inputs + raw outputs, so a bad generation can
-  // be inspected (what was the model asked? what did it return?). Newest first; prompts/output are
-  // collapsed <details> to keep the list scannable.
-  // Shared trace renderer — the gen trace and the TQ-491 fight-judge trace have the SAME entry shape
-  // (stage, model, ms, ok, system, user, output|error), so both endpoints render through this.
   function renderTraceList(listEl, statusEl, trace, emptyMsg) {
     statusEl.textContent = trace.length ? `${trace.length} recent call(s)` : emptyMsg;
     listEl.innerHTML = trace.slice().reverse().map((t) => {
@@ -1086,22 +970,18 @@
       renderTraceList(list, $(statusId), trace, emptyMsg);
     } catch { $(statusId).textContent = "no response"; }
   }
-  // TQ-331: gen telemetry — the recent per-stage model inputs + raw outputs, so a bad generation can
-  // be inspected (what was the model asked? what did it return?). Newest first; collapsed <details>.
   const loadGenTrace = () => loadTrace("/api/admin/gen/trace", "genTraceList", "genTraceStatus", "no generations since restart");
   if ($("genTraceBtn")) $("genTraceBtn").onclick = loadGenTrace;
-  // TQ-491: fight-judge telemetry — the recent combat/capture judge calls (same panel UI as gen).
   const loadCombatTrace = () => loadTrace("/api/admin/combat/trace", "combatTraceList", "combatTraceStatus", "no fights judged since restart");
   if ($("combatTraceBtn")) $("combatTraceBtn").onclick = loadCombatTrace;
 
-  // ── Prompts: routed by key prefix to Monsters / Items / Combat / Biome / Tile / Capture editors ──
   function promptBucket(k) {
     if (k.startsWith("combat")) return "combat";
-    if (k.startsWith("catch")) return "capture"; // catchJudge* — spirit-chain capture judge
+    if (k.startsWith("catch")) return "capture";
     if (k.startsWith("biome")) return "biome";
     if (k.startsWith("tile")) return "tile";
     if (k.startsWith("item")) return "item";
-    return "monster"; // genIdea* / genAttributes* / genModel*
+    return "monster";
   }
   function promptGroup(k) {
     if (k.startsWith("combat")) return "Combat judge";
@@ -1109,25 +989,23 @@
     if (k.startsWith("genIdea")) return "Phase 1 — Idea";
     if (k.startsWith("genAttributes")) return "Phase 2 — Attributes";
     if (k.startsWith("genModel")) return "Phase 3 — Builder (visual)";
-    if (k.startsWith("tileBuilder")) return "Phase 3 — Builder (visual)"; // TQ-372: tile visual builder agent
-    if (k.startsWith("itemBuilder")) return "Phase 3 — Builder (icon)"; // TQ-390: item visual builder agent
-    // Inspiration → Designer pipeline (items, biomes, tiles share the same two-phase shape)
+    if (k.startsWith("tileBuilder")) return "Phase 3 — Builder (visual)";
+    if (k.startsWith("itemBuilder")) return "Phase 3 — Builder (icon)";
     if (/^(item|biome|tile)Idea/.test(k)) return "Phase 1 — Inspiration";
     if (/^(item|biome|tile)Designer/.test(k)) return "Phase 2 — Designer";
     return "Other";
   }
   function promptLabel(k) {
     if (k === "combatSystem") return "v1 absolute judge — system";
-    if (k === "combatUser") return "v1 absolute judge — user"; // TQ-491
+    if (k === "combatUser") return "v1 absolute judge — user";
     if (k === "combatJudgeV2System") return "v2 structured judge (DEFAULT) — system";
-    if (k === "combatJudgeV2User") return "v2 structured judge (DEFAULT) — user"; // TQ-491
-    if (k === "genModelBrief") return "render-target brief (canvas + allowed tags/CSS + safety)"; // TQ-300: editable brief
+    if (k === "combatJudgeV2User") return "v2 structured judge (DEFAULT) — user";
+    if (k === "genModelBrief") return "render-target brief (canvas + allowed tags/CSS + safety)";
     if (/System$/.test(k)) return "system prompt";
     if (/User$/.test(k)) return "user prompt";
     return k;
   }
   function fieldHtml(cls, key, labelText, overridden) {
-    // TQ-106: every prompt gets its OWN Save button + status (saves just this prompt — setPrompts merges).
     return `<label class="pl">${esc(labelText)}${overridden ? ' <span class="ov">• overridden</span>' : ''}</label><textarea class="${cls}" data-key="${esc(key)}"></textarea>` +
       `<div class="row"><button class="prompt-save" data-key="${esc(key)}">Save this prompt</button><span class="muted prompt-save-status" data-key="${esc(key)}"></span></div>`;
   }
@@ -1136,10 +1014,6 @@
       const r = await fetch("/api/admin/prompts", { headers: hdr() });
       if (!r.ok) return;
       const p = await r.json();
-      // Combat + Capture editors keep their own grouped containers (Combat tab); the asset-generation
-      // prompt fields (monster/item/biome/tile) are pre-built inside the per-phase pipeline sections by
-      // buildPipelines(), so here we only build the combat/capture buckets, then fill EVERY prompt
-      // textarea by data-key + refresh its "overridden" badge.
       let combat = "", capture = "", lastG = {};
       for (const k of Object.keys(p)) {
         const b = promptBucket(k);
@@ -1171,8 +1045,6 @@
       $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
     } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
   }
-  // TQ-106: save ONE prompt independently. setPrompts merges, so posting {[key]: value} updates only
-  // this prompt (empty value resets it to the server default); other overrides are untouched.
   async function savePrompt(key) {
     const ta = document.querySelector(`.prompt-field[data-key="${CSS.escape(key)}"]`);
     const st = document.querySelector(`.prompt-save-status[data-key="${CSS.escape(key)}"]`);
@@ -1186,10 +1058,8 @@
       if (st) { st.textContent = "Saved & applied."; st.style.color = "var(--ok)"; }
     } catch (e) { if (st) { st.textContent = e.message; st.style.color = "var(--err)"; } }
   }
-  // Delegated (the prompt fields are re-rendered by loadPrompts, so bind once on the document).
   document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest(".prompt-save"); if (b && b.dataset.key) savePrompt(b.dataset.key); });
 
-  // The group "Save all" buttons (kept as a convenience) save every prompt textarea in one POST.
   $("saveMonsterPrompts").onclick = () => savePrompts("monsterPromptStatus");
   $("saveItemPrompts").onclick = () => savePrompts("itemPromptStatus");
   $("saveCombatPrompts").onclick = () => savePrompts("combatPromptStatus");
@@ -1197,7 +1067,6 @@
   $("saveTilePrompts")?.addEventListener("click", () => savePrompts("tilePromptStatus"));
   $("saveCapturePrompts")?.addEventListener("click", () => savePrompts("capturePromptStatus"));
 
-  // ── Schema field descriptions (.sd-field data-key) ──
   function schemaGroup(k) {
     if (k.startsWith("idea.")) return "Monster · Phase 1 — Idea";
     if (k.startsWith("attributes.")) return "Monster · Phase 2 — Attributes";
@@ -1207,21 +1076,17 @@
     if (k.startsWith("tile.")) return "Tile fields";
     return "Other";
   }
-  // Which container a schema-desc key renders into — items/biomes/tiles each get their own sub-tab
-  // panel; everything else (idea./attributes./model.) stays under Monsters.
   function schemaBucket(k) {
     if (k.startsWith("item.")) return "Item";
     if (k.startsWith("biome.")) return "Biome";
     if (k.startsWith("tile.")) return "Tile";
-    return ""; // monster
+    return "";
   }
   async function loadSchemaDesc() {
     try {
       const r = await fetch("/api/admin/schemadesc", { headers: hdr() });
       if (!r.ok) return;
       const p = await r.json();
-      // The schema-description fields are pre-built inside the per-phase pipeline sections
-      // (buildPipelines → "Field descriptions"); fill each by data-key + refresh its overridden badge.
       for (const k of Object.keys(p)) {
         const el = document.querySelector(`.sd-field[data-key="${CSS.escape(k)}"]`);
         if (el) el.value = p[k].current || "";
@@ -1229,11 +1094,6 @@
       }
     } catch {}
   }
-  // TQ-311: render the gen-hub preview's per-state PLAY buttons. `anim` is window.__previewAnim from
-  // __renderMonsterPreview({manual:true}) ({states, show}) — or null to clear the row. One button per
-  // canonical state (Base/Idle/Attack/Move): enabled if the monster authored that state, disabled
-  // otherwise (clearly unavailable). Replay re-renders the current state; an Auto-play checkbox restores
-  // the gentle cycle. Reuses the existing pickStateHtml render path (no fork); admin-only + sanitized.
   let _animAutoTimer = null;
   function buildAnimButtons(anim) {
     const host = $("genTestAnim"); if (!host) return;
@@ -1264,27 +1124,24 @@
     lbl.appendChild(cb); lbl.appendChild(document.createTextNode("Auto-play")); host.appendChild(lbl);
     host.style.display = "block";
   }
-  // TQ-214: gen hub — run a dry-run test generation (POST /api/admin/gen/test, TQ-213) and show the
-  // raw result. No live-pool write; an explicit "save to pool" is a separate action (TQ-216).
-  let __lastGen = null; // TQ-216: the currently-previewed test generation, pending an explicit save
+  let __lastGen = null;
   if ($("genTestBtn")) $("genTestBtn").onclick = async () => {
     const type = $("genTestType").value;
     const hint = $("genTestHints").value.trim();
     const body = { type };
-    if (hint) { body.kind = hint; body.inspiration = hint; } // whichever the pipeline reads; extras ignored
+    if (hint) { body.kind = hint; body.inspiration = hint; }
     $("genTestStatus").style.color = "var(--muted)"; $("genTestStatus").textContent = "Generating… (one AI call)";
     $("genTestResult").style.display = "none";
-    $("genTestSave").style.display = "none"; __lastGen = null; // a new gen invalidates the previous save target
+    $("genTestSave").style.display = "none"; __lastGen = null;
     try {
       const r = await fetch("/api/admin/gen/test", { method: "POST", headers: { ...hdr(), "Content-Type": "application/json" }, body: JSON.stringify(body) });
       const out = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(out.error || ("HTTP " + r.status));
       const result = out.result;
-      // monster → render the authored visual (SVG, or legacy shapes) + key attributes; item/biome/tile → raw result.
-      $("genTestPreview").style.display = "none"; $("genTestAttrs").innerHTML = ""; buildAnimButtons(null); // reset the play-button row
+      $("genTestPreview").style.display = "none"; $("genTestAttrs").innerHTML = ""; buildAnimButtons(null);
       if (out.type === "monster" && result && window.__renderMonsterPreview && window.__hasMonsterVisual(result)) {
-        window.__renderMonsterPreview($("genTestCanvas"), result, 128, { manual: true }); // TQ-265 live-DOM model; TQ-311 manual per-state control
-        buildAnimButtons(window.__previewAnim); // TQ-311: per-state Play buttons for this monster
+        window.__renderMonsterPreview($("genTestCanvas"), result, 128, { manual: true });
+        buildAnimButtons(window.__previewAnim);
         $("genTestAttrs").innerHTML = `<b>${esc(result.typeName || "?")}</b> · R${result.rarity ?? "?"}`
           + `<br>HP ${result.baseHealth ?? result.health ?? "?"} · STR ${result.baseStrength ?? "?"} · DEF ${result.baseDefense ?? "?"} · SPD ${result.baseSpeed ?? "?"} · PWR ${result.basePower ?? "?"}`
           + (result.description ? `<br><span style="color:var(--muted)">${esc(result.description)}</span>` : "");
@@ -1292,13 +1149,11 @@
       }
       $("genTestResult").textContent = JSON.stringify(result, null, 2);
       $("genTestResult").style.display = "block";
-      __lastGen = { type: out.type, result }; // TQ-216: arm the explicit save
+      __lastGen = { type: out.type, result };
       $("genTestSave").style.display = "inline-block";
       $("genTestStatus").style.color = "var(--ok)"; $("genTestStatus").textContent = `Generated ${out.type} — NOT saved to the pool.`;
     } catch (e) { $("genTestStatus").style.color = "var(--err)"; $("genTestStatus").textContent = e.message; }
   };
-  // TQ-216: explicit save-to-pool — persist the currently-previewed test generation, then refresh the
-  // relevant pool list. The only path a test gen reaches the live pool.
   if ($("genTestSave")) $("genTestSave").onclick = async () => {
     if (!__lastGen) return;
     $("genTestStatus").style.color = "var(--muted)"; $("genTestStatus").textContent = "Saving to pool…";
@@ -1312,7 +1167,6 @@
       if (t === "monster") loadMonsters(); else if (t === "item") loadItems(); else if (t === "biome") loadBiomes(); else if (t === "tile") loadTiles();
     } catch (e) { $("genTestStatus").style.color = "var(--err)"; $("genTestStatus").textContent = e.message; }
   };
-  // TQ-492: bulk generation queue — enqueue many gens, steer parallelism, live status (polls while active).
   (function genQueueUI() {
     if (!$("qAdd")) return;
     const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
@@ -1330,11 +1184,11 @@
     function schedule(s) {
       if (pollTimer) clearTimeout(pollTimer);
       const active = s && (s.running > 0 || s.pending > 0 || s.endless);
-      pollTimer = setTimeout(poll, active ? 1200 : 4000); // poll faster while it's working
+      pollTimer = setTimeout(poll, active ? 1200 : 4000);
     }
     async function poll() {
       let s = null;
-      if (token()) { try { const res = await fetch("/api/admin/gen/queue", { headers: hdr() }); if (res.ok) s = await res.json(); } catch { /* offline */ } }
+      if (token()) { try { const res = await fetch("/api/admin/gen/queue", { headers: hdr() }); if (res.ok) s = await res.json(); } catch { } }
       render(s); schedule(s);
     }
     async function enqueue(count) {
@@ -1348,7 +1202,7 @@
       } catch (e) { $("qStatus").style.color = "var(--err)"; $("qStatus").textContent = e.message; }
     }
     async function control(action) {
-      try { const res = await post("/api/admin/gen/queue/control", { action, concurrency: Number($("qConc").value) || undefined }); const j = await res.json(); render(j.status); schedule(j.status); } catch { /* ignore */ }
+      try { const res = await post("/api/admin/gen/queue/control", { action, concurrency: Number($("qConc").value) || undefined }); const j = await res.json(); render(j.status); schedule(j.status); } catch { }
     }
     $("qAdd").onclick = () => enqueue(Math.max(1, parseInt($("qCount").value, 10) || 1));
     $("qAdd50").onclick = () => enqueue(50);
@@ -1360,8 +1214,6 @@
     $("qConc").addEventListener("change", () => control(null));
     poll();
   })();
-  // Save the schema descriptions inside one container (each sub-tab has its own panel + Save button).
-  // setSchemaDesc merges, so posting only this panel's fields updates them and leaves the rest intact.
   async function saveSchemaDescScope(containerId, statusId) {
     const root = $(containerId); if (!root) return;
     const patch = {};
@@ -1375,20 +1227,11 @@
       $(statusId).textContent = "Saved & applied."; $(statusId).style.color = "var(--ok)";
     } catch (e) { $(statusId).textContent = e.message; $(statusId).style.color = "var(--err)"; }
   }
-  // Each phase's "Field descriptions" block has its own Save button (data-scope = its container id,
-  // data-status = its status span id). setSchemaDesc merges, so saving one phase leaves the rest intact.
   document.addEventListener("click", (e) => {
     const b = e.target.closest && e.target.closest(".sd-save");
     if (b && b.dataset.scope) saveSchemaDescScope(b.dataset.scope, b.dataset.status);
   });
 
-  // ── Generation-pipeline UI: flow diagram (per sub-page) + per-phase expandable config ──
-  // Declarative spec per asset type → renders (1) a flow diagram on top of each sub-page showing what
-  // each phase collects and how it propagates to the saved asset, and (2) one expandable section per
-  // phase, each with the phase's model/sampling, its system+user prompt(s), a view of the data it
-  // emits, and its per-field guidance. The prompt/field-desc textareas carry the SAME data-key/classes
-  // (prompt-field / sd-field / ov badge) the load + save paths already use, so this is purely a
-  // re-layout — no change to how prompts/schema-descriptions are fetched or persisted.
   const PIPE = {
     monsters: {
       final: { title: "Monster", fields: ["typeName", "rarity · size", "7 base stats + scalings", "4 attacks", "passiveEffect", "description", "HTML visual"] },
@@ -1469,8 +1312,6 @@
       ],
     },
   };
-  // The flow diagram for one asset type: a card per phase (what it takes in / emits), an arrow carrying
-  // the value that propagates, then the final saved-to-pool card.
   function renderFlow(type) {
     const host = $("flow-" + type); if (!host) return;
     const spec = PIPE[type]; const parts = [];
@@ -1487,19 +1328,15 @@
       + `<div class="fc-fields">${spec.final.fields.map(esc).join(" · ")}</div></div>`);
     host.innerHTML = parts.join("");
   }
-  // A small expandable holding one editable prompt (system / user / render-brief). Same data-key +
-  // classes the prompt load/save path uses; the .ov badge is filled by loadPrompts.
   function miniPrompt(label, key) {
     return `<details class="mini"><summary>${esc(label)}<span class="ov" data-ov="${esc(key)}"></span></summary>`
       + `<div class="mini-body"><textarea class="prompt-field" data-key="${esc(key)}"></textarea>`
       + `<div class="row"><button class="prompt-save" data-key="${esc(key)}">Save this prompt</button><span class="muted prompt-save-status" data-key="${esc(key)}"></span></div></div></details>`;
   }
-  // A compact view of the structured data a phase emits.
   function schemaViz(schema) {
     const rows = Object.entries(schema).map(([k, v]) => `  <span class="sf">${esc(k)}</span><span class="st">: ${esc(v)}</span>`).join("\n");
     return `<div class="schemaviz"><span class="brace">{</span>\n${rows}\n<span class="brace">}</span></div>`;
   }
-  // The per-phase config sections for one asset type.
   function renderPhases(type) {
     const host = $("phases-" + type); if (!host) return;
     const out = [];
@@ -1527,9 +1364,8 @@
     host.innerHTML = out.join("");
   }
   function buildPipelines() { for (const type of Object.keys(PIPE)) { renderFlow(type); renderPhases(type); } }
-  buildPipelines(); // run now so the ai_* / prompt-field / sd-field elements exist before wiring + load()
+  buildPipelines();
 
-  // ── AI model & params — per-phase config (one aiconfig endpoint) ──
   const MONSTER_FIELDS = ["genIdeaModel","genIdeaTemperature","genAttributesModel","genAttributesTemperature","genBuilderModel","genBuilderTemperature","genModel"];
   const ITEM_FIELDS = ["itemInspirationModel","itemInspirationTemperature","itemDesignerModel","itemDesignerTemperature","itemBuilderModel","itemBuilderTemperature","itemBuilderEnabled"];
   const BIOME_FIELDS = ["biomeInspirationModel","biomeInspirationTemperature","biomeDesignerModel","biomeDesignerTemperature"];
@@ -1545,13 +1381,8 @@
       renderProviderStatus(a.aiEnabled);
     } catch {}
   }
-  // ── TQ-405: multi-provider model pickers ──
-  // Every model <select> is grouped by PROVIDER (OpenAI / Anthropic / Gemini / DeepSeek / Groq). The groups
-  // come from the server: each configured provider's quick-pick defaults, replaced by its LIVE model list
-  // once "Load live models" has been pressed (GET /api/admin/models — cached 10 min server-side).
   let aiProviders = [], liveModels = null;
   const ALL_MODEL_FIELDS = () => [...MONSTER_FIELDS, ...ITEM_FIELDS, ...BIOME_FIELDS, ...TILE_FIELDS, ...COMBAT_FIELDS];
-  // A model id belongs to a provider by prefix ("groq:…") or family; mirrors server/llm.js inferProvider.
   function providerOfModel(id) {
     const m = /^([a-z]+):/.exec(id); if (m) return m[1];
     const s = id.toLowerCase();
@@ -1563,10 +1394,9 @@
   }
   function modelGroupsFrom(providers, live) {
     const enabled = providers.filter((p) => p.enabled);
-    const shown = enabled.length ? enabled : providers; // nothing configured yet → show every provider's defaults
+    const shown = enabled.length ? enabled : providers;
     return shown.map((p) => {
       const ids = (live && live[p.id] && live[p.id].ids && live[p.id].ids.length) ? live[p.id].ids : (p.defaults || []);
-      // qualify ids the family wouldn't route to this provider (e.g. a gemma model on Groq)
       return { id: p.id, label: p.label + (live && live[p.id] && live[p.id].ids && live[p.id].ids.length ? " (live)" : ""), ids: ids.map((m) => providerOfModel(m) === p.id ? m : p.id + ":" + m) };
     });
   }
@@ -1574,9 +1404,6 @@
     for (const k of ALL_MODEL_FIELDS()) {
       const el = $("ai_" + k); if (!el) continue;
       const cur = fields && fields[k] ? fields[k].current : "";
-      // MODEL <select>s (class "modelinput", TQ-145) are rebuilt per provider group; a saved value that
-      // isn't listed stays as its own option so a custom/legacy model is never silently dropped. Non-model
-      // toggle <select>s keep their own options — only their value is set (TQ-361).
       if (el.tagName === "SELECT" && el.classList.contains("modelinput")) {
         const known = new Set(groups.flatMap((g) => g.ids));
         let html = groups.map((g) => `<optgroup label="${esc(g.label)}">${g.ids.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join("")}</optgroup>`).join("");
@@ -1602,7 +1429,7 @@
         const r = await fetch("/api/admin/models" + (liveModels ? "?refresh=1" : ""), { headers: hdr() });
         if (r.ok) { const j = await r.json(); liveModels = j.models || {}; if (j.providers) aiProviders = j.providers; }
       } catch {}
-      await loadAiConfig(); // re-fills every model select from the live groups (keeps saved values)
+      await loadAiConfig();
     };
   }
   async function saveAiConfig(fields, statusId) {
@@ -1621,7 +1448,6 @@
   $("saveBiomeConfig")?.addEventListener("click", () => saveAiConfig(BIOME_FIELDS, "biomeCfgStatus"));
   $("saveTileConfig")?.addEventListener("click", () => saveAiConfig(TILE_FIELDS, "tileCfgStatus"));
   $("saveCombatConfig").onclick = () => saveAiConfig(COMBAT_FIELDS, "combatCfgStatus");
-  // Unsaved-changes hints for the AI model/param forms (same pattern as Game settings).
   wireDirty(MONSTER_FIELDS.map((k) => "ai_" + k), "genCfgStatus");
   wireDirty(ITEM_FIELDS.map((k) => "ai_" + k), "itemCfgStatus");
   wireDirty(BIOME_FIELDS.map((k) => "ai_" + k), "biomeCfgStatus");
@@ -1631,8 +1457,6 @@
   $("load").onclick = load;
   $("save").onclick = save;
 
-  // Sign out — clear the stored token, stop the live-ops polling, and return to the login screen so a
-  // different token can be entered (e.g. on a shared machine). Inverse of load() + the auto-login gate.
   function signOut() {
     try { localStorage.removeItem("tq_admin_token"); } catch {}
     if (window._ops) { clearInterval(window._ops); window._ops = null; }
@@ -1645,9 +1469,6 @@
   }
   $("signout").onclick = signOut;
 
-  // TQ-222: make every admin section collapsible. Click a panel's header to toggle; the state per
-  // section persists in localStorage (default open). Panels are static HTML so this runs at load,
-  // independent of the login gate / active tab.
   (function initAccordions() {
     const KEY = "tq-admin-collapsed";
     let collapsed = {};
@@ -1665,8 +1486,6 @@
         persist(); syncToggleLabel();
       });
     });
-    // Collapse all / Expand all — one click to tidy or reveal every section across the admin zone.
-    // State persists exactly like the per-section toggles, and the button label tracks the current state.
     const btn = document.getElementById("toggleAll");
     const allCollapsed = () => entries.length > 0 && entries.every((e) => e.panel.classList.contains("collapsed"));
     function syncToggleLabel() { if (btn) btn.textContent = allCollapsed() ? "Expand all" : "Collapse all"; }

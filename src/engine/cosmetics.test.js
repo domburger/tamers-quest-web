@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { skinAcquire, isSkinFree, isSkinOwned, acquireLabel, canBuySkin, buySkin } from "./cosmetics.js";
 
-const FREE = { id: "aether" }; // no acquire → free
+const FREE = { id: "aether" };
 const GOLD = { id: "void", acquire: { kind: "cost", cur: "gold", amount: 250 } };
 const ESS = { id: "prism", acquire: { kind: "cost", cur: "essence", amount: 150 } };
 const LOCK = { id: "secret", acquire: { kind: "unlock", note: "Extract 10 times" } };
@@ -24,20 +24,19 @@ test("acquireLabel formats per kind", () => {
 
 test("canBuySkin respects currency, ownership, and kind", () => {
   assert.equal(canBuySkin(GOLD, { gold: 300 }, []), true);
-  assert.equal(canBuySkin(GOLD, { gold: 100 }, []), false); // too poor
-  assert.equal(canBuySkin(GOLD, { gold: 300 }, ["void"]), false); // already owned
-  assert.equal(canBuySkin(FREE, { gold: 300 }, []), false); // free isn't bought
-  assert.equal(canBuySkin(LOCK, { gold: 9999 }, []), false); // unlock, not purchasable
+  assert.equal(canBuySkin(GOLD, { gold: 100 }, []), false);
+  assert.equal(canBuySkin(GOLD, { gold: 300 }, ["void"]), false);
+  assert.equal(canBuySkin(FREE, { gold: 300 }, []), false);
+  assert.equal(canBuySkin(LOCK, { gold: 9999 }, []), false);
   assert.equal(canBuySkin(ESS, { essence: 150 }, []), true);
 });
 
 test("buySkin is a pure transaction: deducts the right currency + grants the id", () => {
   const r = buySkin(GOLD, { gold: 300, essence: 5 }, ["aether"]);
   assert.equal(r.ok, true);
-  assert.equal(r.gold, 50);       // 300 - 250
-  assert.equal(r.essence, 5);     // untouched
+  assert.equal(r.gold, 50);
+  assert.equal(r.essence, 5);
   assert.deepEqual(r.owned, ["aether", "void"]);
-  // essence-priced skin spends essence, not gold
   const e = buySkin(ESS, { gold: 1000, essence: 150 }, []);
   assert.equal(e.ok, true);
   assert.equal(e.gold, 1000);
@@ -51,13 +50,11 @@ test("buySkin fails cleanly (no mutation) on poor/owned/locked", () => {
   assert.equal(poor.ok, false); assert.equal(poor.reason, "gold"); assert.equal(poor.gold, 10);
   const dup = buySkin(GOLD, { gold: 999 }, owned);
   assert.equal(dup.ok, false); assert.equal(dup.reason, "owned");
-  assert.deepEqual(owned, ["void"]); // input not mutated
+  assert.deepEqual(owned, ["void"]);
   const lock = buySkin(LOCK, { gold: 999 }, []);
   assert.equal(lock.ok, false); assert.equal(lock.reason, "locked");
 });
 
-// TQ-132: a skin can be priced in premium currency (essence). Both gold (earned) and essence
-// (premium/paid) are first-class cosmetic costs; the server runs this same math server-side.
 const PREM = { id: "voidstar", acquire: { kind: "cost", cur: "essence", amount: 120 } };
 test("essence is a first-class premium cosmetic currency (label / canBuy / buySkin)", () => {
   assert.equal(acquireLabel(PREM), "120 ess");

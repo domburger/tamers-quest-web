@@ -25,7 +25,7 @@ test("prefersReducedMotion: false when the user has no motion preference", () =>
 });
 
 test("prefersReducedMotion: false (no throw) when matchMedia is unavailable", () => {
-  global.window = {}; // window exists but matchMedia doesn't (older browsers)
+  global.window = {};
   try {
     assert.equal(prefersReducedMotion(), false);
   } finally {

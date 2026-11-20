@@ -4,23 +4,21 @@ import { MOTION_CSS, MOTION_WRAP_CLASS, wrapCreatureHtml, ensureMonsterMotionSty
 
 test("TQ-386: wrapCreatureHtml nests the creature in the engine motion wrapper", () => {
   assert.equal(wrapCreatureHtml("<div>x</div>"), `<div class="${MOTION_WRAP_CLASS}"><div>x</div></div>`);
-  assert.equal(wrapCreatureHtml(null), `<div class="${MOTION_WRAP_CLASS}"></div>`); // null → empty wrapper, never "null"
+  assert.equal(wrapCreatureHtml(null), `<div class="${MOTION_WRAP_CLASS}"></div>`);
   assert.equal(wrapCreatureHtml(undefined), `<div class="${MOTION_WRAP_CLASS}"></div>`);
 });
 
 test("TQ-386: MOTION_CSS drives the wrapper from the action classes (walk loops, attack one-shot)", () => {
-  // Default motion is keyed on the engine's .tq-moving / .tq-attacking classes (TQ-310) → wrapper.
   assert.match(MOTION_CSS, new RegExp(`\\.tq-moving>\\.${MOTION_WRAP_CLASS}\\{animation:tqMonWalk`));
   assert.match(MOTION_CSS, new RegExp(`\\.tq-attacking>\\.${MOTION_WRAP_CLASS}\\{animation:tqMonLunge`));
   assert.match(MOTION_CSS, /@keyframes tqMonWalk\{/);
   assert.match(MOTION_CSS, /@keyframes tqMonLunge\{/);
-  assert.match(MOTION_CSS, /infinite/);                 // walk loops
+  assert.match(MOTION_CSS, /infinite/);
   assert.ok(!/tqMonLunge[^}]*infinite/.test(MOTION_CSS), "attack lunge is a one-shot, not looping");
-  assert.match(MOTION_CSS, /prefers-reduced-motion:reduce/); // a11y: action motion off under reduced-motion
+  assert.match(MOTION_CSS, /prefers-reduced-motion:reduce/);
 });
 
 test("TQ-386: ensureMonsterMotionStyle injects once (idempotent) and no-ops without a document", () => {
-  // Minimal fake document: getElementById/createElement/head.appendChild.
   const created = [];
   const head = { children: [], appendChild(el) { this.children.push(el); } };
   const doc = {
