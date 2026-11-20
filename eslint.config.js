@@ -2,7 +2,7 @@
 import globals from "globals";
 
 export default [
-  { ignores: ["dist/", "node_modules/", ".vite/", ".wiki-clone/", ".screenshots/", ".claude/"] },
+  { ignores: ["dist/", "node_modules/", ".vite/",".screenshots/", ".claude/"] },
   {
     files: ["**/*.js", "**/*.mjs"],
     languageOptions: {

@@ -11,7 +11,6 @@ dist/
 !.env.example
 .screenshots/
 .screenshots-*
-.wiki-clone/
 backups/
 tmp_*
 tools/_*

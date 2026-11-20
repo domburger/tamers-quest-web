@@ -22,7 +22,6 @@ npm run build    # Vite production build
   persistence live on the server or in shared `src/engine/` code (pure, used by client and server).
 - Combat is AI-judged (`server/ai.js`, `server/judge.js`); the deterministic engine is only a crash-net.
 - New live tuning knobs, prompts or model settings belong in the admin panel (`server/admin.js`).
-- Mechanics changes must be mirrored in the GitHub Wiki (`tamers-quest-web.wiki.git`).
 
 ## Where things are
 
